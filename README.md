@@ -1,2 +1,14 @@
 # MC656
 Repositório para a matéria MC656 - Engenharia de Software no segundo semestre de 2026.
+
+Esse repositório vai conter o projeto desenvolvido durante toda a duração da matéria.
+
+Buscamos sistematizar processos de tomada de decisão coletiva, de acordo com o ODS (Objetivo de Desenvolvimento Sustentável) 16 da ONU:
+Paz, Justiça e Instituições Eficazes.
+
+Nosso produto se baseará em módulos que representam diferentes situações que necessitam de tomada de decisões coletivas.
+
+
+
+Autoria:
+Juca Magalhães Meniconi 281803
