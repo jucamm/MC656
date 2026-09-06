@@ -12,3 +12,4 @@ Nosso produto se baseará em módulos que representam diferentes situações que
 
 Autoria:
 Juca Magalhães Meniconi 281803
+Állan Rocha Pereira 252694
