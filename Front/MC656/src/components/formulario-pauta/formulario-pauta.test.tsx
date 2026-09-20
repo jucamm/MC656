@@ -7,7 +7,6 @@ import FormularioPauta from './formulario-pauta';
 describe('FormularioPauta Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Restaura o mock do fetch global usando globalThis
     vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
       Promise.resolve(new Response())
     );
@@ -31,7 +30,7 @@ describe('FormularioPauta Component', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => ({ message: 'Pauta criada com sucesso' }),
-    } as Response); // Corrigi o erro de 'any' usando 'as Response'
+    } as Response);
 
     render(<FormularioPauta />);
 

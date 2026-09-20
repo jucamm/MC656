@@ -58,8 +58,11 @@ export default function FormularioPauta() {
     setIsSubmitting(true);
 
     try {
-      // Substitua o URL abaixo pela rota correta da sua API no Express
-      const response = await fetch('http://localhost:3000/api/pautas', {
+      // Deve ser substituido depois pela rota correta da API no Express
+      // Adicionando quais os nomes dos campos do formulário e o caminho da rota
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+      const response = await fetch(`${API_URL}/api/pautas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
