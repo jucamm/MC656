@@ -5,6 +5,8 @@ import type {
   CreateDecisionProcessInput,
   DecisionProcessConfiguration,
   DecisionProcessOutput,
+  DecisionProcessVersion,
+  FindDecisionProcessInput,
   ReconfigureDecisionProcessInput,
 } from './decision-process.types';
 import {
@@ -97,23 +99,23 @@ export class DecisionProcessService {
   async reconfigureProcess(
     input: ReconfigureDecisionProcessInput,
   ): Promise<DecisionProcessOutput> {
+    this.ensureGroupExists(input.groupId);
     const process = await this.repository.findProcessById(input.processId);
-    if (!process) {
+    if (!process || process.groupId !== input.groupId) {
       throw new DecisionProcessServiceError(
         DecisionProcessServiceErrorCode.PROCESS_NOT_FOUND,
         'Processo de decisão não encontrado.',
       );
     }
 
-    this.ensureGroupExists(process.groupId);
-    this.ensureGroupAdministrator(input.requestedByUserId, process.groupId);
+    this.ensureGroupAdministrator(input.requestedByUserId, input.groupId);
 
     const validation = validateDecisionProcessConfiguration(input.configuration);
     if (!validation.valid) {
       throw this.validationError(validation.errors);
     }
 
-    this.validateRequiredParticipants(input.configuration, process.groupId);
+    this.validateRequiredParticipants(input.configuration, input.groupId);
 
     return this.repository.withTransaction(async (transaction) => {
       const currentProcess = await transaction.findProcessById(input.processId);
@@ -151,6 +153,32 @@ export class DecisionProcessService {
     });
   }
 
+  async getProcess(
+    input: FindDecisionProcessInput,
+  ): Promise<DecisionProcessOutput> {
+    const process = await this.findScopedProcess(input);
+    this.ensureGroupMember(input.requestedByUserId, input.groupId);
+
+    const activeVersion = await this.repository.findActiveVersion(process.id);
+    if (!activeVersion) {
+      throw new DecisionProcessServiceError(
+        DecisionProcessServiceErrorCode.PROCESS_NOT_FOUND,
+        'O processo de decisão não possui versão ativa.',
+      );
+    }
+
+    return { process, activeVersion };
+  }
+
+  async listVersions(
+    input: FindDecisionProcessInput,
+  ): Promise<DecisionProcessVersion[]> {
+    const process = await this.findScopedProcess(input);
+    this.ensureGroupMember(input.requestedByUserId, input.groupId);
+
+    return this.repository.findVersions(process.id);
+  }
+
   private ensureGroupExists(groupId: string): void {
     if (!this.groups.some((group) => group.id === groupId)) {
       throw new DecisionProcessServiceError(
@@ -161,14 +189,7 @@ export class DecisionProcessService {
   }
 
   private ensureGroupAdministrator(userId: string, groupId: string): void {
-    const user = this.users.find((user) => user.id === userId);
-    if (!user) {
-      throw new DecisionProcessServiceError(
-        DecisionProcessServiceErrorCode.UNAUTHENTICATED,
-        'Usuário mockado não encontrado.',
-      );
-    }
-
+    const user = this.findUserOrThrow(userId);
     const membership = user.memberships.find(
       (membership) => membership.groupId === groupId,
     );
@@ -178,6 +199,48 @@ export class DecisionProcessService {
         'O usuário não é administrador deste grupo.',
       );
     }
+  }
+
+  private ensureGroupMember(userId: string, groupId: string): void {
+    const user = this.findUserOrThrow(userId);
+    const belongsToGroup = user.memberships.some(
+      (membership) => membership.groupId === groupId,
+    );
+
+    if (!belongsToGroup) {
+      throw new DecisionProcessServiceError(
+        DecisionProcessServiceErrorCode.FORBIDDEN,
+        'O usuário não pertence a este grupo.',
+      );
+    }
+  }
+
+  private findUserOrThrow(userId: string): MockUser {
+    const user = this.users.find((candidate) => candidate.id === userId);
+    if (!user) {
+      throw new DecisionProcessServiceError(
+        DecisionProcessServiceErrorCode.UNAUTHENTICATED,
+        'Usuário mockado não encontrado.',
+      );
+    }
+
+    return user;
+  }
+
+  private async findScopedProcess(
+    input: FindDecisionProcessInput,
+  ): Promise<DecisionProcessOutput['process']> {
+    this.ensureGroupExists(input.groupId);
+    const process = await this.repository.findProcessById(input.processId);
+
+    if (!process || process.groupId !== input.groupId) {
+      throw new DecisionProcessServiceError(
+        DecisionProcessServiceErrorCode.PROCESS_NOT_FOUND,
+        'Processo de decisão não encontrado.',
+      );
+    }
+
+    return process;
   }
 
   private validateRequiredParticipants(
