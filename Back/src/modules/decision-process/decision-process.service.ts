@@ -103,7 +103,10 @@ export class DecisionProcessService {
 
     this.ensureGroupAdministrator(input.requestedByUserId, input.groupId);
 
-    const validation = validateDecisionProcessConfiguration(input.configuration);
+    const validation = validateDecisionProcessConfiguration(
+      input.configuration,
+      'configuration',
+    );
     if (!validation.valid) {
       throw this.validationError(validation.errors);
     }
@@ -250,7 +253,7 @@ export class DecisionProcessService {
 
       if (!belongsToGroup) {
         errors.push({
-          path: `requiredParticipantIds[${index}]`,
+          path: `configuration.requiredParticipantIds[${index}]`,
           code: ValidationIssueCode.INVALID_VALUE,
           message: 'O participante obrigatório não pertence ao grupo.',
         });
