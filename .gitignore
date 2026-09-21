@@ -1,5 +1,7 @@
 Back/node_modules/
 Back/.env
 
+Back/src/docs
+
 Front/node_modules/
 Front/.env
