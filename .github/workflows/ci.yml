@@ -1,0 +1,70 @@
+name: Pipeline de CI
+
+on:
+  # roda quando abre ou atualiza PR nas branches develop ou main
+  pull_request:
+    branches: [ develop, main ]
+  # roda quando merge/push é feito direto em develop ou main
+  push:
+    branches: [ develop, main ]
+
+jobs:
+  backend-checks:
+    name: Backend - Build, Lint e Testes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./back # Faz os comandos rodarem na pasta Back
+
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: back/package-lock.json
+
+      - name: Instalar dependências (Build/Setup)
+        run: npm ci
+
+      - name: Verificar TypeScript (Build)
+        run: npm run build
+
+      - name: Rodar análise estática (ESLint)
+        run: npm run lint
+
+      - name: Rodar testes automatizados e cobertura (Vitest)
+        run: npm run test:coverage
+
+  frontend-checks:
+    name: Frontend - Build, Lint e Testes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./front # Faz os comandos rodarem na pasta Front
+
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+      
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: front/package-lock.json
+
+      - name: Instalar dependências (Build/Setup)
+        run: npm ci
+
+      - name: Verificar TypeScript (Build)
+        run: npm run build
+
+      - name: Rodar análise estática (ESLint)
+        run: npm run lint
+
+      - name: Rodar testes automatizados e cobertura (Vitest)
+        run: npm run test:coverage

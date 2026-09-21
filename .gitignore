@@ -1,0 +1,12 @@
+node_modules/
+*/node_modules/
+
+coverage/
+*/coverage/
+
+.env
+.env.*
+*.env
+
+dist/
+*/dist/
