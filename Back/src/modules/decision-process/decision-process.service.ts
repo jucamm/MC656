@@ -1,3 +1,4 @@
+import { DomainError } from '../../errors/domain.error';
 import { mockGroups, type MockGroup } from '../../mocks/mock-groups';
 import { mockUsers, MockGroupRole, type MockUser } from '../../mocks/mock-users';
 import type { DecisionProcessRepository } from './repositories/decision-process.repository';
@@ -27,25 +28,17 @@ export const DecisionProcessServiceErrorCode = {
 export type DecisionProcessServiceErrorCode =
   (typeof DecisionProcessServiceErrorCode)[keyof typeof DecisionProcessServiceErrorCode];
 
-const errorStatusByCode: Record<DecisionProcessServiceErrorCode, number> = {
-  UNAUTHENTICATED: 401,
-  FORBIDDEN: 403,
-  GROUP_NOT_FOUND: 404,
-  PROCESS_NOT_FOUND: 404,
-  VALIDATION_ERROR: 400,
-};
-
-export class DecisionProcessServiceError extends Error {
-  public readonly statusCode: number;
-
+export class DecisionProcessServiceError extends DomainError<
+  DecisionProcessServiceErrorCode,
+  readonly ValidationIssue[]
+> {
   constructor(
-    public readonly code: DecisionProcessServiceErrorCode,
+    code: DecisionProcessServiceErrorCode,
     message: string,
-    public readonly details?: readonly ValidationIssue[],
+    details?: readonly ValidationIssue[],
   ) {
-    super(message);
+    super(code, message, details);
     this.name = 'DecisionProcessServiceError';
-    this.statusCode = errorStatusByCode[code];
   }
 }
 
