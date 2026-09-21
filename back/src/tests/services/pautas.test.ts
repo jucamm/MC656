@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createPauta } from '../../services/pautas';
+import { createPauta } from '../../services/pautas.js';
 
 describe('Serviço de Pautas - createPauta', () => {
 
