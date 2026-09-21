@@ -363,7 +363,8 @@ export function validateDecisionProcessConfiguration(
   // Verifica, se houve atribuição indevida da porcentagem para um tipo de votação
   // em que não é necessário
   if (
-    decisionTypes.has(String(input.decisionType)) &&
+    typeof input.decisionType === 'string' &&
+    decisionTypes.has(input.decisionType) &&
     !qualifiedPercentageRequired &&
     !isMissing(input.qualifiedMajorityPercentage)
   ) {
