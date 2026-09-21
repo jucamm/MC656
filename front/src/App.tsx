@@ -1,4 +1,5 @@
 import FormularioPauta from './components/formulario-pauta'; // Ajuste o caminho se a pasta for diferente
+import './App.css'
 
 function App() {
   return (
