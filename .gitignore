@@ -1,7 +1,12 @@
-Back/node_modules/
-Back/.env
+node_modules/
+*/node_modules/
 
-Back/src/docs
+coverage/
+*/coverage/
 
-Front/node_modules/
-Front/.env
+.env
+.env.*
+*.env
+
+dist/
+*/dist/
