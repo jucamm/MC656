@@ -19,6 +19,9 @@ export interface DecisionProcessRepository {
   createVersion(input: CreateVersionInput): Promise<DecisionProcessVersion>;
   findProcessById(id: string): Promise<DecisionProcess | null>;
   findVersions(processId: string): Promise<DecisionProcessVersion[]>;
+  findActiveVersion(
+    processId: string,
+  ): Promise<DecisionProcessVersion | null>;
   setActiveVersion(processId: string, versionId: string): Promise<void>;
   withTransaction<T>(
     operation: (repository: DecisionProcessRepository) => Promise<T>,
