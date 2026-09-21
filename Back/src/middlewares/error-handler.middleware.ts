@@ -1,6 +1,14 @@
 import type { ErrorRequestHandler } from 'express';
 
-import { DecisionProcessServiceError } from '../modules/decision-process/decision-process.service';
+import { DomainError } from '../errors/domain.error';
+
+const statusByDomainErrorCode: Readonly<Record<string, number>> = {
+  UNAUTHENTICATED: 401,
+  FORBIDDEN: 403,
+  GROUP_NOT_FOUND: 404,
+  PROCESS_NOT_FOUND: 404,
+  VALIDATION_ERROR: 422,
+};
 
 export const errorHandlerMiddleware: ErrorRequestHandler = (
   error: unknown,
@@ -8,13 +16,16 @@ export const errorHandlerMiddleware: ErrorRequestHandler = (
   response,
   _next,
 ) => {
-  if (error instanceof DecisionProcessServiceError) {
-    response.status(error.statusCode).json({
-      error: error.code,
-      message: error.message,
-      ...(error.details ? { details: error.details } : {}),
-    });
-    return;
+  if (error instanceof DomainError) {
+    const statusCode = statusByDomainErrorCode[error.code];
+    if (statusCode) {
+      response.status(statusCode).json({
+        error: error.code,
+        message: error.message,
+        ...(error.details ? { details: error.details } : {}),
+      });
+      return;
+    }
   }
 
   if (
