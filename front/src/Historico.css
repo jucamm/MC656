@@ -4,7 +4,7 @@
     align-items: stretch;
     width: 100%;
     height: auto;
-    padding: 41px 22px;
+    padding: 22px 22px;
     gap: 21px;
     background: #3D4B49;
     box-sizing: border-box;
@@ -13,6 +13,7 @@
 .CaixaFiltros h2,
 .CaixaPautas h2 {
     text-align: center;
+    color: #ffffff;
 }
 
 .filtros {
