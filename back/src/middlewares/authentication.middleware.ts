@@ -3,11 +3,9 @@ import type { NextFunction, Request, Response } from 'express';
 import { DomainError } from '../errors/domain.error';
 import { mockUsers, type MockUser } from '../mocks/mock-users';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: MockUser;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: MockUser;
   }
 }
 
