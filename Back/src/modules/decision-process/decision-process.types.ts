@@ -174,8 +174,15 @@ export interface CreateDecisionProcessInput {
 
 /** Entrada do caso de uso que cria e ativa uma nova versão. */
 export interface ReconfigureDecisionProcessInput {
+  readonly groupId: string;
   readonly processId: string;
   readonly configuration: DecisionProcessConfigurationInput;
+  readonly requestedByUserId: string;
+}
+
+export interface FindDecisionProcessInput {
+  readonly groupId: string;
+  readonly processId: string;
   readonly requestedByUserId: string;
 }
 
