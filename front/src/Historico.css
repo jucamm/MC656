@@ -77,16 +77,22 @@
 }
 
 .BotaoApply {
-    display: flex;
-    flex-direction: row;
+    display: block;
+    box-sizing: border-box;
     justify-content: center;
-    align-items: center;
-    padding: 0px 9px;
-    gap: 10px;
+    padding: 12px 16px;
+    border: 0;
     width: 212px;
-    height: 100%;
-    background: #293231;
-    border-radius: 24px;
+    background: #5f7472;
+    color: #ffffff;
+    font: inherit;
+    text-align: center;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.BotaoApply:hover {
+    background: #526461;
 }
 
 .CaixaPautas {
