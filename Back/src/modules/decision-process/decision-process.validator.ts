@@ -13,6 +13,7 @@ import {
 export const ValidationIssueCode = {
   REQUIRED: 'REQUIRED',
   INVALID_TYPE: 'INVALID_TYPE',
+  INVALID_INTEGER: 'INVALID_INTEGER',
   INVALID_VALUE: 'INVALID_VALUE',
   OUT_OF_RANGE: 'OUT_OF_RANGE',
   INCOMPATIBLE_FIELDS: 'INCOMPATIBLE_FIELDS',
@@ -65,6 +66,9 @@ function isMissing(value: unknown): boolean {
   return value === undefined || value === null;
 }
 
+function joinPath(basePath: string, field: string): string {
+  return basePath === '' ? field : `${basePath}.${field}`;
+}
 
 // Adiciona um novo erro à lista de erros apresentados.
 function addIssue(
@@ -134,10 +138,9 @@ function validatePercentage(
 
 function validateQuorumFailureRule(
   value: unknown,
+  path: string,
   errors: ValidationIssue[],
 ): void {
-  const path = 'quorumFailureRule';
-
   if (isMissing(value)) {
     addIssue(errors, path, ValidationIssueCode.REQUIRED, 'Campo obrigatório.');
     return;
@@ -164,14 +167,14 @@ function validateQuorumFailureRule(
     validateRequiredEnum(
       value.result,
       quorumFailureResults,
-      `${path}.result`, 
+      `${path}.result`,
       errors,
     );
   }
 
   if (
     value.behavior === QuorumFailureBehavior.CONTINUE &&
-    !isMissing(value.result)
+    Object.prototype.hasOwnProperty.call(value, 'result')
   ) {
     addIssue(
       errors,
@@ -212,9 +215,11 @@ function validateRuleWithBehavior(
   );
 }
 
-function validateTieRule(value: unknown, errors: ValidationIssue[]): void {
-  const path = 'tieRule';
-
+function validateTieRule(
+  value: unknown,
+  path: string,
+  errors: ValidationIssue[],
+): void {
   if (isMissing(value)) {
     addIssue(errors, path, ValidationIssueCode.REQUIRED, 'Campo obrigatório.');
     return;
@@ -235,21 +240,30 @@ function validateTieRule(value: unknown, errors: ValidationIssue[]): void {
 
 function validateMaxRestarts(
   value: unknown,
+  path: string,
   errors: ValidationIssue[],
 ): void {
-  const path = 'maxRestarts';
-
   if (isMissing(value)) {
     addIssue(errors, path, ValidationIssueCode.REQUIRED, 'Campo obrigatório.');
     return;
   }
 
-  if (typeof value !== 'number' || !Number.isInteger(value)) {
+  if (typeof value !== 'number') {
     addIssue(
       errors,
       path,
       ValidationIssueCode.INVALID_TYPE,
-      'O número máximo de reinícios deve ser um número inteiro.',
+      'O número máximo de reinícios deve ser um número.',
+    );
+    return;
+  }
+
+  if (!Number.isSafeInteger(value)) {
+    addIssue(
+      errors,
+      path,
+      ValidationIssueCode.INVALID_INTEGER,
+      'O número máximo de reinícios deve ser um número inteiro seguro.',
     );
     return;
   }
@@ -266,10 +280,9 @@ function validateMaxRestarts(
 
 function validateRequiredParticipants(
   value: unknown,
+  path: string,
   errors: ValidationIssue[],
 ): void {
-  const path = 'requiredParticipantIds';
-
   if (isMissing(value)) {
     addIssue(errors, path, ValidationIssueCode.REQUIRED, 'Campo obrigatório.');
     return;
@@ -315,16 +328,20 @@ function validateRequiredParticipants(
   });
 }
 
-/** Valida apenas a configuração versionada, sem consultar estado externo. */
+/**
+ * Valida apenas a configuração versionada, sem consultar estado externo.
+ * `basePath` permite que os erros reflitam a posição da configuração no payload.
+ */
 export function validateDecisionProcessConfiguration(
   input: unknown,
+  basePath = '',
 ): ValidationResult<DecisionProcessConfiguration> {
   if (!isRecord(input)) {
     return {
       valid: false,
       errors: [
         {
-          path: 'configuration',
+          path: basePath || 'configuration',
           code: ValidationIssueCode.INVALID_TYPE,
           message: 'A configuração deve ser um objeto.',
         },
@@ -333,17 +350,23 @@ export function validateDecisionProcessConfiguration(
   }
 
   const errors: ValidationIssue[] = [];
+  const path = (field: string): string => joinPath(basePath, field);
 
   validateRequiredEnum(
     input.decisionType,
     decisionTypes,
-    'decisionType',
+    path('decisionType'),
     errors,
   );
-  validateRequiredEnum(input.votingMode, votingModes, 'votingMode', errors);
+  validateRequiredEnum(
+    input.votingMode,
+    votingModes,
+    path('votingMode'),
+    errors,
+  );
   validatePercentage(
     input.quorumPercentage,
-    'quorumPercentage',
+    path('quorumPercentage'),
     errors,
     true,
   );
@@ -355,7 +378,7 @@ export function validateDecisionProcessConfiguration(
   // Verifica se o valor na porcentagem qualificada é válido
   validatePercentage(
     input.qualifiedMajorityPercentage,
-    'qualifiedMajorityPercentage',
+    path('qualifiedMajorityPercentage'),
     errors,
     qualifiedPercentageRequired,
   );
@@ -370,30 +393,38 @@ export function validateDecisionProcessConfiguration(
   ) {
     addIssue(
       errors,
-      'qualifiedMajorityPercentage',
+      path('qualifiedMajorityPercentage'),
       ValidationIssueCode.INCOMPATIBLE_FIELDS,
       'O percentual qualificado só pode ser usado com maioria qualificada.',
     );
   }
 
-  validateQuorumFailureRule(input.quorumFailureRule, errors);
-  validateTieRule(input.tieRule, errors);
+  validateQuorumFailureRule(
+    input.quorumFailureRule,
+    path('quorumFailureRule'),
+    errors,
+  );
+  validateTieRule(input.tieRule, path('tieRule'), errors);
   validateRuleWithBehavior(
     input.inconclusiveRule,
-    'inconclusiveRule',
+    path('inconclusiveRule'),
     inconclusiveBehaviors,
     'A regra de resultado inconclusivo',
     errors,
   );
   validateRuleWithBehavior(
     input.invalidityRule,
-    'invalidityRule',
+    path('invalidityRule'),
     invalidityBehaviors,
     'A regra de invalidez',
     errors,
   );
-  validateMaxRestarts(input.maxRestarts, errors);
-  validateRequiredParticipants(input.requiredParticipantIds, errors);
+  validateMaxRestarts(input.maxRestarts, path('maxRestarts'), errors);
+  validateRequiredParticipants(
+    input.requiredParticipantIds,
+    path('requiredParticipantIds'),
+    errors,
+  );
 
   if (errors.length > 0) {
     return { valid: false, errors };
@@ -455,18 +486,11 @@ export function validateCreateDecisionProcessInput(
     // Chamada de validação
     const configurationResult = validateDecisionProcessConfiguration(
       input.configuration,
+      'configuration',
     );
 
     if (!configurationResult.valid) {
-      for (const issue of configurationResult.errors) {
-        errors.push({
-          ...issue,
-          path:
-            issue.path === 'configuration'
-              ? 'configuration'
-              : `configuration.${issue.path}`,
-        });
-      }
+      errors.push(...configurationResult.errors);
     }
   }
 
