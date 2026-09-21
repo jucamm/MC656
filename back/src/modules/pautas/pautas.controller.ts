@@ -13,8 +13,8 @@ export class PautasController {
         pauta,
         statusCode: 201
       });
-    } catch (error: any) {
-      const message = error.message;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro interno do servidor';
       
       // Mapeamento de erro para 403 se for prazo vencido, ou 400 para erros de validação
       if (message === 'Janela de submissão encerrada') {
