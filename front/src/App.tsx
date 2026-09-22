@@ -1,9 +1,11 @@
-import FormularioPauta from './components/formulario-pauta'; // Ajuste o caminho se a pasta for diferente
-import './App.css'
+import Historico from './Historico';
+import FormularioPauta from './components/formulario-pauta';
+import './App.css';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="min-h-screen bg-gray-100 p-8 flex flex-col gap-8">
+      <Historico />
       <FormularioPauta />
     </div>
   );
