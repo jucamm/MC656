@@ -11,7 +11,6 @@ Nosso produto se baseará em módulos que representam diferentes situações que
 
 
 Autoria:
-Juca Magalhães Meniconi 281803
 Állan Rocha Pereira 252694
 Larissa Gabriela Arantes Palhares 177154
 Felipe Gayotto Bianchessi 281174
