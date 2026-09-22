@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, test } from 'vitest';
-import Historico from '../Historico';
+import Historico from './Historico';
 import { mockDatabase } from '../data/mockDatabase';
 
 describe('pagina Historico', () => {

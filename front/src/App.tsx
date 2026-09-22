@@ -1,4 +1,4 @@
-import Historico from './Historico';
+import Historico from './components/Historico';
 import FormularioPauta from './components/formulario-pauta';
 import './App.css';
 

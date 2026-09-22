@@ -10,7 +10,7 @@ import {
   QuorumFailureResult,
   TieResult,
   VotingMode,
-} from '../modules/decision-process/decision-process-types.js';
+} from '../decision-process-types.js';
 
 import {
   CastVote,
@@ -22,7 +22,7 @@ import {
   quorumThreshold,
   tallyVotes,
   validateTallyInput,
-} from '../modules/decision-process/tally/tally.js';
+} from '../tally/tally.js';
 
 
 function cfg(over: Partial<DecisionProcessConfiguration> = {}): DecisionProcessConfiguration {

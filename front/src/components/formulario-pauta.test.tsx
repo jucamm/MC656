@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import FormularioPauta from '../components/formulario-pauta';
+import FormularioPauta from './formulario-pauta';
 
 describe('FormularioPauta Component', () => {
   beforeEach(() => {
