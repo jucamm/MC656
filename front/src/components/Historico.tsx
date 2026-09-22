@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import './Historico.css';
-import { mockDatabase } from './data/mockDatabase';
+import { mockDatabase } from '../data/mockDatabase';
 
 const coresCategorias = ['#d97706', '#2563eb', '#059669', '#db2777', '#7c3aed'];
 
