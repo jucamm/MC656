@@ -1,4 +1,4 @@
-# HU01 — Issue 2: Banco de Dados e Migrations
+# HU01 — Issue 2 (Banco de Dados e Migrations)
 
 ## Pré-requisitos
 
