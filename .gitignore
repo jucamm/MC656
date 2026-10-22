@@ -10,3 +10,7 @@ coverage/
 
 dist/
 */dist/
+
+temp/*
+# Permitir somente o template sem segredos.
+!.env.example
