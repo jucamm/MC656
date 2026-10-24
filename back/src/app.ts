@@ -1,3 +1,4 @@
+import { identityErrorHandler, requireAuthentication, requireVerifiedAccount } from './modules/identity/session.middleware';
 import type { IdentityOnboardingServices } from './modules/identity/identity.controller';
 import { createIdentityRouter } from './modules/identity/identity.routes';
 import type { SessionService } from './modules/identity/session.service';
@@ -21,6 +22,11 @@ export function createApp(
   const controller = new DecisionProcessController(service);
 
   if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions, identityOnboarding));
+  // As rotas de grupos existentes passam a consultar a identidade real
+  // quando o módulo está configurado; o onboarding continua disponível a pending.
+  if (identitySessions) {
+    application.use('/groups', requireAuthentication(identitySessions), requireVerifiedAccount, identityErrorHandler);
+  }
   application.use(express.json());
   application.use(createDecisionProcessRouter(controller));
   application.use(errorHandlerMiddleware);

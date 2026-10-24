@@ -20,6 +20,17 @@ export function requireAuthentication(sessions: SessionService): RequestHandler 
   };
 }
 
+/** Deve seguir requireAuthentication, que carrega a conta do banco a cada uso. */
+export const requireVerifiedAccount: RequestHandler = (request, _response, next) => {
+  if (!request.auth || !request.account) {
+    throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
+  }
+  if (request.account.status !== 'verified') {
+    throw new DomainError('ACCOUNT_NOT_VERIFIED', 'Confirme e-mail e telefone para acessar este recurso.', {});
+  }
+  next();
+};
+
 export const identityErrorHandler: ErrorRequestHandler = (error: unknown, _request, response, _next) => {
   if (error instanceof DomainError && Object.hasOwn(identityErrorStatus, error.code)) {
     if ((error.code === 'VERIFICATION_RATE_LIMITED' || error.code === 'VERIFICATION_DELIVERY_BLOCKED') &&

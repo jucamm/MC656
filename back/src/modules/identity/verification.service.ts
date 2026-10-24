@@ -97,7 +97,7 @@ export class VerificationService implements InitialEmailVerificationRequester {
   async confirm(identity: AuthIdentity, rawChannel: VerificationChannel, input: unknown): Promise<{ user: UserDto }> {
     const channel = validateChannel(rawChannel);
     const { challenge_id, code } = validateConfirmation(input);
-    const result = await this.repository.withUserLock(identity.user_id, async transaction => {
+    const result = await this.repository.withConfirmationLock(identity.user_id, channel, async transaction => {
       this.requireEmail(transaction.user, channel);
       const challenge = await transaction.current(channel);
       if (!challenge || challenge.id !== challenge_id) {

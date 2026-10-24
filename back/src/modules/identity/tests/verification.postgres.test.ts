@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -49,7 +49,8 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
 
   async function register() {
     const email = `verification-${randomUUID()}@example.com`;
-    const response = await request(app).post('/auth/register').send({ name: 'Ana', email, phone: '11987654321', password: 'senha-segura' }).expect(201);
+    const phone = `119${randomInt(0, 100_000_000).toString().padStart(8, '0')}`;
+    const response = await request(app).post('/auth/register').send({ name: 'Ana', email, phone, password: 'senha-segura' }).expect(201);
     ids.push(BigInt(response.body.data.user.id));
     const login = await request(app).post('/auth/login').send({ email, password: 'senha-segura' }).expect(200);
     return { ...response.body.data, token: login.body.data.token as string };
@@ -86,7 +87,7 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     const phone = await send(account.token, 'phone').expect(200);
     expect(phone.body.data).toMatchObject({ channel: 'phone', expires_at: '2026-10-23T12:05:00.000Z' });
     const phoneCode = delivery.outbox.at(-1)!.code;
-    expect(delivery.outbox.at(-1)).toMatchObject({ channel: 'phone', destination: '+55 (11) 98765-4321' });
+    expect(delivery.outbox.at(-1)).toMatchObject({ channel: 'phone', destination: account.user.phone });
     const verified = await confirm(account.token, 'phone', phone.body.data.challenge_id, phoneCode).expect(200);
     expect(verified.body.data.user).toMatchObject({ status: 'verified', email_verified_at: now.toISOString(), phone_verified_at: now.toISOString() });
     const me = await request(app).get('/auth/me').set('Authorization', `Bearer ${account.token}`).expect(200);
