@@ -1,7 +1,96 @@
-import type { AuthIdentity, ChallengeDto, ConfirmVerificationRequest, UserDto, VerificationChannel } from './identity.types';
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { DomainError } from '../../errors/domain.error';
+import type { AuthIdentity, ChallengeDto, InitialEmailVerification, UserDto, VerificationChannel } from './identity.types';
+import type { InitialEmailRequest, InitialEmailVerificationRequester } from './notifications/initial-email-verification';
+import type { VerificationDelivery } from './notifications/verification-delivery';
+import type { PostgresVerificationRepository, VerificationUser } from './verification.repository';
+import { validateChannel, validateConfirmation } from './validators/verification.validator';
 
-/** Implementação transacional prevista nas Issues 5 e 7. */
-export interface VerificationService {
-  send(identity: AuthIdentity, channel: VerificationChannel): Promise<ChallengeDto>;
-  confirm(identity: AuthIdentity, channel: VerificationChannel, input: ConfirmVerificationRequest): Promise<{ user: UserDto }>;
+export class VerificationService implements InitialEmailVerificationRequester {
+  private readonly key: string;
+
+  constructor(
+    private readonly repository: PostgresVerificationRepository,
+    private readonly delivery: VerificationDelivery,
+    key: string | undefined = process.env.VERIFICATION_HMAC_KEY,
+    private readonly clock: () => Date = () => new Date(),
+  ) {
+    if (!key || Buffer.byteLength(key, 'utf8') < 32) {
+      throw new Error('VERIFICATION_HMAC_KEY deve conter ao menos 32 bytes e permanecer fora do banco.');
+    }
+    this.key = key;
+  }
+
+  private hmac(userId: string, channel: VerificationChannel, id: string, code: string): string {
+    return createHmac('sha256', this.key).update(`${userId}:${channel}:${id}:${code}`).digest('hex');
+  }
+
+  private requireEmail(user: VerificationUser, channel: VerificationChannel): void {
+    if (channel === 'phone' && !user.email_verified_at) {
+      throw new DomainError('EMAIL_VERIFICATION_REQUIRED', 'Confirme o e-mail antes de verificar o telefone.', {});
+    }
+  }
+
+  /** Adaptador do contrato da Issue 3. O destino vem do banco, não de input.email. */
+  async request(input: InitialEmailRequest): Promise<InitialEmailVerification> {
+    const challenge = await this.issue(input.user_id, 'email');
+    return { delivery_status: 'sent', challenge_id: challenge.challenge_id, expires_at: challenge.expires_at };
+  }
+
+  async send(identity: AuthIdentity, channel: VerificationChannel): Promise<ChallengeDto> {
+    return this.issue(identity.user_id, validateChannel(channel));
+  }
+
+  private async issue(userId: string, channel: VerificationChannel): Promise<ChallengeDto> {
+    return this.repository.withUserLock(userId, async transaction => {
+      this.requireEmail(transaction.user, channel);
+      if (channel === 'email' ? transaction.user.email_verified_at : transaction.user.phone_verified_at) {
+        throw new DomainError('CHANNEL_ALREADY_VERIFIED', 'Este canal já está confirmado.', {});
+      }
+      // O relógio é lido após obter o lock, evitando validade desatualizada em espera.
+      const now = this.clock();
+      const id = randomUUID();
+      const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+      const expires = new Date(now.getTime() + (channel === 'email' ? 30 : 5) * 60_000);
+      try {
+        await this.delivery.sendVerification({ channel,
+          destination: channel === 'email' ? transaction.user.email : transaction.user.phone, code });
+      } catch {
+        throw new DomainError('VERIFICATION_DELIVERY_FAILED', 'Não foi possível enviar o código. Tente novamente.', {});
+      }
+      // Só substitui o desafio depois de o mock aceitar o envio.
+      await transaction.replace({ id, user_id: transaction.user.id, channel,
+        code_hmac: this.hmac(userId, channel, id, code), issued_at: now, expires_at: expires });
+      return { challenge_id: id, channel, expires_at: expires.toISOString() };
+    });
+  }
+
+  async confirm(identity: AuthIdentity, rawChannel: VerificationChannel, input: unknown): Promise<{ user: UserDto }> {
+    const channel = validateChannel(rawChannel);
+    const { challenge_id, code } = validateConfirmation(input);
+    const result = await this.repository.withUserLock(identity.user_id, async transaction => {
+      this.requireEmail(transaction.user, channel);
+      const challenge = await transaction.current(channel);
+      if (!challenge || challenge.id !== challenge_id) {
+        return { error: new DomainError('INVALID_VERIFICATION_CODE', 'Código de verificação inválido.', {}) };
+      }
+      if (challenge.revoked_at) return { error: new DomainError('VERIFICATION_CODE_REVOKED', 'Código revogado. Solicite um novo envio.', {}) };
+      if (challenge.consumed_at) return { error: new DomainError('VERIFICATION_CODE_CONSUMED', 'Este código já foi utilizado.', {}) };
+      const now = this.clock();
+      if (challenge.expires_at <= now) return { error: new DomainError('VERIFICATION_CODE_EXPIRED', 'Código expirado. Solicite um novo envio.', {}) };
+      const expected = Buffer.from(challenge.code_hmac, 'hex');
+      const actual = Buffer.from(this.hmac(identity.user_id, channel, challenge.id, code), 'hex');
+      if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+        const attempts = Math.min(challenge.failed_attempts + 1, 3);
+        await transaction.failedAttempt(challenge.id, attempts, attempts === 3 ? now : null);
+        return { error: attempts === 3
+          ? new DomainError('VERIFICATION_ATTEMPTS_EXCEEDED', 'Limite de tentativas atingido. Solicite um novo envio.', {})
+          : new DomainError('INVALID_VERIFICATION_CODE', 'Código de verificação inválido.', {}) };
+      }
+      return { user: await transaction.consumeAndVerify(challenge.id, channel, now) };
+    });
+    // Fora da transação: erro HTTP não desfaz incremento/revogação já confirmados.
+    if (result.error) throw result.error;
+    return { user: result.user! };
+  }
 }
