@@ -6,6 +6,14 @@ import {
 } from '../../middlewares/authorization.middleware';
 import type { DecisionProcessController } from './decision-process.controller';
 
+/**
+ * Monta endpoints de grupos recebendo explicitamente a política de identidade.
+ * @param {DecisionProcessController} controller - Handlers homologados de processos decisórios.
+ * @param {RequestHandler} authenticate - Na aplicação real, vincula permissões ao ID já autenticado;
+ * em testes isolados, pode receber fixtures explícitas do módulo.
+ * @returns {Router} Rotas com checagem de associação/papel além do gate global da aplicação.
+ * @remarks Não escolhe uma identidade a partir de header por conta própria.
+ */
 export function createDecisionProcessRouter(
   controller: DecisionProcessController,
   authenticate: RequestHandler,
