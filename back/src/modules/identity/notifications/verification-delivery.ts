@@ -88,3 +88,22 @@ export class MockVerificationDelivery implements VerificationDelivery {
     this.outbox.push({ ...message });
   }
 }
+
+  /**
+     * Roteia cada canal para o adaptador correspondente:
+     * Permite usar provedores reais para e-mail e manter telefone como mock em desenvolvimento.
+     */
+    export class HybridVerificationDelivery implements VerificationDelivery {
+      constructor(
+        private readonly emailDelivery: VerificationDelivery,
+        private readonly phoneDelivery: VerificationDelivery,
+      ) {}
+    
+      async sendVerification(message: VerificationMessage): Promise<void> {
+        if (message.channel === 'email') {
+          await this.emailDelivery.sendVerification(message);
+        } else {
+          await this.phoneDelivery.sendVerification(message);
+        }
+      }
+    }
