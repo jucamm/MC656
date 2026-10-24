@@ -10,6 +10,8 @@ Nosso produto se baseará em módulos que representam diferentes situações que
 
 
 
+Documentação do backend: [Introdução ao Cadastro e Autenticação (HU01)](back/docs/README.md).
+
 Autoria:
 Állan Rocha Pereira 252694
 Larissa Gabriela Arantes Palhares 177154
