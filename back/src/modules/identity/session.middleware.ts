@@ -22,6 +22,12 @@ export function requireAuthentication(sessions: SessionService): RequestHandler 
 
 export const identityErrorHandler: ErrorRequestHandler = (error: unknown, _request, response, _next) => {
   if (error instanceof DomainError && Object.hasOwn(identityErrorStatus, error.code)) {
+    if ((error.code === 'VERIFICATION_RATE_LIMITED' || error.code === 'VERIFICATION_DELIVERY_BLOCKED') &&
+        typeof error.details === 'object' && error.details !== null &&
+        'retry_after_seconds' in error.details && typeof error.details.retry_after_seconds === 'number' &&
+        Number.isInteger(error.details.retry_after_seconds) && error.details.retry_after_seconds > 0) {
+      response.set('Retry-After', String(error.details.retry_after_seconds));
+    }
     response.status(identityErrorStatus[error.code as IdentityErrorCode]).json({
       error: { code: error.code, message: error.message, details: error.details ?? {} },
     });

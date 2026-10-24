@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../../app';
-import { authenticationSessions, users, verificationChallenges } from '../../../db/schema';
+import { authenticationSessions, rateLimits, users, verificationChallenges } from '../../../db/schema';
 import { MockVerificationDelivery } from '../notifications/verification-delivery';
 import { PasswordService } from '../password.service';
 import { RegistrationService } from '../registration.service';
@@ -42,6 +42,7 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     if (!ids.length) return;
     await db.delete(authenticationSessions).where(inArray(authenticationSessions.user_id, ids));
     await db.delete(verificationChallenges).where(inArray(verificationChallenges.user_id, ids));
+    await db.delete(rateLimits).where(inArray(rateLimits.user_id, ids));
     await db.delete(users).where(inArray(users.id, ids));
   });
   afterAll(async () => { await pool.end(); });

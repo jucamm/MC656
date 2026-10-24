@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { users, verificationChallenges as challenges } from '../../db/schema';
+import { users, rateLimits, verificationChallenges as challenges } from '../../db/schema';
 import { DomainError } from '../../errors/domain.error';
 import type { VerificationChannel } from './identity.types';
 import { publicUserColumns, toUserDto } from './user.repository';
@@ -19,6 +19,35 @@ export class VerificationTransaction {
       eq(challenges.user_id, this.user.id), eq(challenges.channel, channel),
     ));
     return row ?? null;
+  }
+
+  async deliveryLimits(channel: VerificationChannel) {
+    return this.db.select().from(rateLimits).where(and(
+      eq(rateLimits.user_id, this.user.id), eq(rateLimits.channel, channel),
+    ));
+  }
+
+  async blockDelivery(channel: VerificationChannel, until: Date): Promise<void> {
+    await this.db.update(rateLimits).set({ blocked_until: until }).where(and(
+      eq(rateLimits.user_id, this.user.id), eq(rateLimits.channel, channel), eq(rateLimits.window_type, 'day'),
+    ));
+  }
+
+  /** Chamado após aceitação pelo mock, na mesma transação do desafio. */
+  async recordDelivery(channel: VerificationChannel, now: Date,
+    previous: (typeof rateLimits.$inferSelect)[]): Promise<void> {
+    for (const window_type of ['hour', 'day'] as const) {
+      const existing = previous.find(row => row.window_type === window_type);
+      const active = existing && existing.window_expires_at > now;
+      const window_started_at = active ? existing.window_started_at : now;
+      const window_expires_at = active ? existing.window_expires_at
+        : new Date(now.getTime() + (window_type === 'hour' ? 1 : 24) * 60 * 60_000);
+      const values = { window_started_at, window_expires_at,
+        request_count: active ? existing.request_count + 1 : 1,
+        blocked_until: active ? existing.blocked_until : null };
+      await this.db.insert(rateLimits).values({ user_id: this.user.id, channel, window_type, ...values })
+        .onConflictDoUpdate({ target: [rateLimits.user_id, rateLimits.channel, rateLimits.window_type], set: values });
+    }
   }
 
   async replace(challenge: NewVerificationChallenge): Promise<void> {
