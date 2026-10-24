@@ -1,3 +1,4 @@
+import { mockUsers, type MockUser } from '../../../mocks/mock-users';
 import { randomInt, randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -31,15 +32,17 @@ describe.skipIf(!connectionString)('reciclagem de telefone com PostgreSQL real',
   let delivery: MockVerificationDelivery;
   let app: ReturnType<typeof createApp>;
   let ids: bigint[];
+  let groupUsers: MockUser[];
   beforeAll(async () => { await migrateIdentityTestDatabase(pool); });
   beforeEach(() => {
     now = new Date('2026-10-23T12:00:00.000Z');
     sharedPhone = newPhone();
     ids = [];
+    groupUsers = [...mockUsers];
     delivery = new MockVerificationDelivery();
     const verification = new VerificationService(repository, delivery, 'fixture-key-only-for-phone-recycling-tests', () => new Date(now));
     const sessions = new SessionService(userRepository, new PostgresSessionRepository(db), passwords, () => new Date(now));
-    app = createApp(undefined, sessions, { verification, registration: new RegistrationService(userRepository, verification, passwords) });
+    app = createApp(undefined, sessions, { verification, registration: new RegistrationService(userRepository, verification, passwords) }, { groupUsers });
   });
   afterEach(async () => {
     if (!ids.length) return;
@@ -54,6 +57,7 @@ describe.skipIf(!connectionString)('reciclagem de telefone com PostgreSQL real',
     const response = await request(app).post('/auth/register').send({ name: 'Ana', email, phone, password: 'senha-segura' }).expect(201);
     const id = response.body.data.user.id as string;
     ids.push(BigInt(id));
+    groupUsers.push({ id, name: 'Ana', memberships: mockUsers[0].memberships });
     const emailCode = delivery.email.outbox.at(-1)!.code;
     const token = (await request(app).post('/auth/login').send({ email, password: 'senha-segura' }).expect(200)).body.data.token as string;
     if (confirmEmail) {

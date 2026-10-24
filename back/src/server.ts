@@ -18,6 +18,8 @@ if (!Number.isInteger(port) || port < 1 || port > 65_535) {
   throw new Error('A variável PORT deve conter uma porta válida.');
 }
 
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a plataforma autenticada.');
+
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : undefined;
 const database = pool ? drizzle({ client: pool }) : undefined;
 const sessions = database
