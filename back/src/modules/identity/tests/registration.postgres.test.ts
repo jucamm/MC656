@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { migrateIdentityTestDatabase } from './postgres-test-utils';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { users } from '../../../db/schema';
@@ -25,7 +25,7 @@ describe.skipIf(!connectionString)('cadastro com PostgreSQL real', () => {
   const service = new RegistrationService(repository, delivery, passwords);
   const input = { name: 'Ana', email: emails[0], phone: '11987654321', password: ' senhaSegura ' };
 
-  beforeAll(async () => { await migrate(db, { migrationsFolder: './drizzle' }); });
+  beforeAll(async () => { await migrateIdentityTestDatabase(pool); });
   afterAll(async () => {
     try {
       await db.delete(users).where(inArray(users.email, emails));
