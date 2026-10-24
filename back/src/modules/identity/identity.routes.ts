@@ -1,9 +1,9 @@
 import express, { Router } from 'express';
-import { IdentitySessionController } from './identity.controller';
+import { IdentitySessionController, IdentityVerificationController, type IdentityOnboardingServices } from './identity.controller';
 import { identityErrorHandler, requireAuthentication } from './session.middleware';
 import type { SessionService } from './session.service';
 
-/** Matriz dos seis contratos; login, logout e me já possuem handlers.
+/** Matriz dos seis contratos de identidade.
  * Todos os recursos fora do onboarding exigirão conta verified (Issue 8).
  */
 export const identityRoutes = [
@@ -15,8 +15,8 @@ export const identityRoutes = [
   { method: 'POST', path: '/auth/verifications/:channel/confirm', authentication: true, verified_account: false, success_status: 200 },
 ] as const;
 
-/** Montado em /auth. Os demais contratos serão implementados nas próximas issues. */
-export function createIdentityRouter(sessions: SessionService): Router {
+/** Montado em /auth; onboarding exige a composição dos serviços correspondentes. */
+export function createIdentityRouter(sessions: SessionService, onboarding?: IdentityOnboardingServices): Router {
   const router = Router();
   const controller = new IdentitySessionController(sessions);
   const authenticate = requireAuthentication(sessions);
@@ -28,6 +28,12 @@ export function createIdentityRouter(sessions: SessionService): Router {
   router.post('/login', controller.login);
   router.post('/logout', authenticate, controller.logout);
   router.get('/me', authenticate, controller.me);
+  if (onboarding) {
+    const verification = new IdentityVerificationController(onboarding);
+    router.post('/register', verification.register);
+    router.post('/verifications/:channel/send', authenticate, verification.send);
+    router.post('/verifications/:channel/confirm', authenticate, verification.confirm);
+  }
   router.use(identityErrorHandler);
   return router;
 }

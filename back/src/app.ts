@@ -1,3 +1,4 @@
+import type { IdentityOnboardingServices } from './modules/identity/identity.controller';
 import { createIdentityRouter } from './modules/identity/identity.routes';
 import type { SessionService } from './modules/identity/session.service';
 import express, { type Express } from 'express';
@@ -13,12 +14,13 @@ export function createApp(
   repository: DecisionProcessRepository =
     new InMemoryDecisionProcessRepository(),
   identitySessions?: SessionService,
+  identityOnboarding?: IdentityOnboardingServices,
 ): Express {
   const application = express();
   const service = new DecisionProcessService(repository);
   const controller = new DecisionProcessController(service);
 
-  if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions));
+  if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions, identityOnboarding));
   application.use(express.json());
   application.use(createDecisionProcessRouter(controller));
   application.use(errorHandlerMiddleware);

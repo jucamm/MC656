@@ -1,5 +1,10 @@
 import 'dotenv/config';
 
+import { PostgresVerificationRepository } from './modules/identity/verification.repository';
+import { VerificationService } from './modules/identity/verification.service';
+import { MockVerificationDelivery } from './modules/identity/notifications/verification-delivery';
+import { RegistrationService } from './modules/identity/registration.service';
+
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { createApp } from './app';
@@ -18,7 +23,13 @@ const database = pool ? drizzle({ client: pool }) : undefined;
 const sessions = database
   ? new SessionService(new PostgresUserRepository(database), new PostgresSessionRepository(database))
   : undefined;
-const app = createApp(undefined, sessions);
+const verification = database
+  ? new VerificationService(new PostgresVerificationRepository(database), new MockVerificationDelivery())
+  : undefined;
+const onboarding = database && verification
+  ? { verification, registration: new RegistrationService(new PostgresUserRepository(database), verification) }
+  : undefined;
+const app = createApp(undefined, sessions, onboarding);
 
 export const server = app.listen(port, () => {
   console.log(`Servidor executando na porta ${port}.`);
