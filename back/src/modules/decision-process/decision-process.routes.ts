@@ -1,6 +1,5 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 
-import { mockAuthenticationMiddleware } from '../../middlewares/authentication.middleware';
 import {
   requireGroupAdministratorMiddleware,
   requireGroupMemberMiddleware,
@@ -9,10 +8,11 @@ import type { DecisionProcessController } from './decision-process.controller';
 
 export function createDecisionProcessRouter(
   controller: DecisionProcessController,
+  authenticate: RequestHandler,
 ): Router {
   const router = Router();
 
-  router.use(mockAuthenticationMiddleware);
+  router.use(authenticate);
   router.post(
     '/groups/:groupId/decision-processes',
     requireGroupAdministratorMiddleware,
