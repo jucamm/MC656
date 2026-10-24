@@ -1,3 +1,5 @@
+import { createIdentityRouter } from './modules/identity/identity.routes';
+import type { SessionService } from './modules/identity/session.service';
 import express, { type Express } from 'express';
 
 import { errorHandlerMiddleware } from './middlewares/error-handler.middleware';
@@ -10,11 +12,13 @@ import type { DecisionProcessRepository } from './modules/decision-process/repos
 export function createApp(
   repository: DecisionProcessRepository =
     new InMemoryDecisionProcessRepository(),
+  identitySessions?: SessionService,
 ): Express {
   const application = express();
   const service = new DecisionProcessService(repository);
   const controller = new DecisionProcessController(service);
 
+  if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions));
   application.use(express.json());
   application.use(createDecisionProcessRouter(controller));
   application.use(errorHandlerMiddleware);

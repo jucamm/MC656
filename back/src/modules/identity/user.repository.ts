@@ -50,6 +50,13 @@ export class PostgresUserRepository implements UserRepository {
     }
   }
 
+  /** Consulta interna exclusiva para comparação de senha; nunca é DTO público. */
+  async findCredentialsByEmail(email: string): Promise<{ user_id: string; password_hash: string } | null> {
+    const [row] = await this.db.select({ user_id: users.id, password_hash: users.password_hash })
+      .from(users).where(eq(users.email, email));
+    return row ? { user_id: row.user_id.toString(), password_hash: row.password_hash } : null;
+  }
+
   async findById(id: string): Promise<UserDto | null> {
     const [user] = await this.db.select(publicColumns).from(users).where(eq(users.id, BigInt(id)));
     return user ? toUserDto(user) : null;
