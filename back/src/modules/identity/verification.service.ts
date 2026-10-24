@@ -31,6 +31,15 @@ export class VerificationService implements InitialEmailVerificationRequester {
     }
   }
 
+  private deliveryLimitError(code: 'VERIFICATION_RATE_LIMITED' | 'VERIFICATION_DELIVERY_BLOCKED', until: Date, now: Date) {
+    return new DomainError(code, code === 'VERIFICATION_DELIVERY_BLOCKED'
+      ? 'Envios bloqueados temporariamente. Tente novamente mais tarde.'
+      : 'Limite de envios atingido. Tente novamente mais tarde.', {
+      retry_after_seconds: Math.max(1, Math.ceil((until.getTime() - now.getTime()) / 1000)),
+      retry_at: until.toISOString(),
+    });
+  }
+
   /** Adaptador do contrato da Issue 3. O destino vem do banco, não de input.email. */
   async request(input: InitialEmailRequest): Promise<InitialEmailVerification> {
     const challenge = await this.issue(input.user_id, 'email');
@@ -42,13 +51,29 @@ export class VerificationService implements InitialEmailVerificationRequester {
   }
 
   private async issue(userId: string, channel: VerificationChannel): Promise<ChallengeDto> {
-    return this.repository.withUserLock(userId, async transaction => {
+    const result = await this.repository.withUserLock(userId, async transaction => {
       this.requireEmail(transaction.user, channel);
       if (channel === 'email' ? transaction.user.email_verified_at : transaction.user.phone_verified_at) {
         throw new DomainError('CHANNEL_ALREADY_VERIFIED', 'Este canal já está confirmado.', {});
       }
       // O relógio é lido após obter o lock, evitando validade desatualizada em espera.
       const now = this.clock();
+      const limits = await transaction.deliveryLimits(channel);
+      const daily = limits.find(row => row.window_type === 'day');
+      const hourly = limits.find(row => row.window_type === 'hour');
+      // Bloqueio prevalece mesmo que a janela diária já tenha expirado.
+      if (daily?.blocked_until && daily.blocked_until > now) {
+        return { error: this.deliveryLimitError('VERIFICATION_DELIVERY_BLOCKED', daily.blocked_until, now) };
+      }
+      // O excesso diário tem prioridade quando os dois tetos foram alcançados.
+      if (daily && daily.window_expires_at > now && daily.request_count >= 6) {
+        const until = new Date(now.getTime() + 3 * 24 * 60 * 60_000);
+        await transaction.blockDelivery(channel, until);
+        return { error: this.deliveryLimitError('VERIFICATION_DELIVERY_BLOCKED', until, now) };
+      }
+      if (hourly && hourly.window_expires_at > now && hourly.request_count >= 3) {
+        return { error: this.deliveryLimitError('VERIFICATION_RATE_LIMITED', hourly.window_expires_at, now) };
+      }
       const id = randomUUID();
       const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
       const expires = new Date(now.getTime() + (channel === 'email' ? 30 : 5) * 60_000);
@@ -61,8 +86,12 @@ export class VerificationService implements InitialEmailVerificationRequester {
       // Só substitui o desafio depois de o mock aceitar o envio.
       await transaction.replace({ id, user_id: transaction.user.id, channel,
         code_hmac: this.hmac(userId, channel, id, code), issued_at: now, expires_at: expires });
-      return { challenge_id: id, channel, expires_at: expires.toISOString() };
+      await transaction.recordDelivery(channel, now, limits);
+      return { challenge: { challenge_id: id, channel, expires_at: expires.toISOString() } };
     });
+    // O bloqueio diário deve sobreviver ao HTTP 429, como as tentativas da confirmação.
+    if (result.error) throw result.error;
+    return result.challenge!;
   }
 
   async confirm(identity: AuthIdentity, rawChannel: VerificationChannel, input: unknown): Promise<{ user: UserDto }> {
