@@ -17,12 +17,26 @@ export interface ChallengeInfo {
     expires_at: string;
 }
 
+export interface CurrentChallenge {
+    challenge_id: string;
+    channel: 'email' | 'phone';
+    expires_at: string;
+    failed_attempts: number;
+    consumed_at: string | null;
+    revoked_at: string | null;
+}
+
+export interface MeData {
+    user: User;
+    verification_challenges: CurrentChallenge[];
+}
+
 export interface ApiError {
     code: string;
     message: string;
     details?: {
-    fields?: Record<string, string>;
-    retry_after_seconds?: number;
-    retry_at?: string;
+        fields?: Record<string, string>;
+        retry_after_seconds?: number;
+        retry_at?: string;
     };
 }

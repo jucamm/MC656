@@ -1,4 +1,4 @@
-import type { User, ChallengeInfo, ApiError } from '../types/auth';
+import type { User, ChallengeInfo, ApiError, MeData } from '../types/auth';
 
 const API_BASE = 'http://localhost:3000';
 
@@ -70,7 +70,7 @@ class AuthApiService {
     }
 
     async getMe() {
-    return this.request<{ user: User }>('/auth/me');
+        return this.request<MeData>('/auth/me');
     }
 
     async sendVerification(channel: 'email' | 'phone') {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { authApi } from '../../services/authApi';
 import type { User, ApiError } from '../../types/auth';
 
@@ -25,54 +25,97 @@ export const VerificationView: React.FC<Props> = ({ user, onUserUpdated, onConti
     const isPhoneVerified = !!user.phone_verified_at;
     const isFullyVerified = user.status === 'verified';
 
+    // Carrega os desafios ativos do backend assim que a tela abre
+    useEffect(() => {
+        const loadChallenges = async () => {
+            try {
+                const me = await authApi.getMe();
+                if (me.verification_challenges) {
+                    const emailCh = me.verification_challenges.find(c => c.channel === 'email' && !c.consumed_at && !c.revoked_at);
+                    if (emailCh) {
+                        setEmailChallengeId(emailCh.challenge_id);
+                    }
+                    const phoneCh = me.verification_challenges.find(c => c.channel === 'phone' && !c.consumed_at && !c.revoked_at);
+                    if (phoneCh) {
+                        setPhoneChallengeId(phoneCh.challenge_id);
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao buscar desafios ativos:', err);
+            }
+        };
+        loadChallenges();
+    }, [user.id, user.email_verified_at, user.phone_verified_at]);
+
     // Solicitar envio/reenvio de código
     const handleSend = async (channel: 'email' | 'phone') => {
-    const isEmail = channel === 'email';
-    const setMsg = isEmail ? setEmailMsg : setPhoneMsg;
-    const setLoading = isEmail ? setEmailLoading : setPhoneLoading;
-    const setChallenge = isEmail ? setEmailChallengeId : setPhoneChallengeId;
+        const isEmail = channel === 'email';
+        const setMsg = isEmail ? setEmailMsg : setPhoneMsg;
+        const setLoading = isEmail ? setEmailLoading : setPhoneLoading;
+        const setChallenge = isEmail ? setEmailChallengeId : setPhoneChallengeId;
 
-    setLoading(true);
-    setMsg(null);
+        setLoading(true);
+        setMsg(null);
 
-    try {
-        const challenge = await authApi.sendVerification(channel);
-        setChallenge(challenge.challenge_id);
-        setMsg({ type: 'success', text: `Código enviado para o seu ${isEmail ? 'e-mail' : 'telefone'}!` });
-    } catch (err) {
-        const apiErr = err as ApiError;
-        setMsg({ type: 'error', text: apiErr.message || 'Falha ao solicitar código.' });
-    } finally {
-        setLoading(false);
-    }
+        try {
+            const challenge = await authApi.sendVerification(channel);
+            setChallenge(challenge.challenge_id);
+            setMsg({ type: 'success', text: `Código enviado para o seu ${isEmail ? 'e-mail' : 'telefone'}!` });
+        } catch (err) {
+            const apiErr = err as ApiError;
+            setMsg({ type: 'error', text: apiErr.message || 'Falha ao solicitar código.' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Confirmar código digitado
     const handleConfirm = async (channel: 'email' | 'phone') => {
-    const isEmail = channel === 'email';
-    const code = isEmail ? emailCode : phoneCode;
-    const challengeId = isEmail ? emailChallengeId : phoneChallengeId;
-    const setMsg = isEmail ? setEmailMsg : setPhoneMsg;
-    const setLoading = isEmail ? setEmailLoading : setPhoneLoading;
+        const isEmail = channel === 'email';
+        const code = isEmail ? emailCode : phoneCode;
+        let challengeId = isEmail ? emailChallengeId : phoneChallengeId;
+        const setMsg = isEmail ? setEmailMsg : setPhoneMsg;
+        const setLoading = isEmail ? setEmailLoading : setPhoneLoading;
 
-    if (!code || code.length !== 6) {
-        setMsg({ type: 'error', text: 'Informe exatamente o código de 6 dígitos.' });
-        return;
-    }
+        if (!code || code.length !== 6) {
+            setMsg({ type: 'error', text: 'Informe exatamente o código de 6 dígitos.' });
+            return;
+        }
 
-    setLoading(true);
-    setMsg(null);
+        setLoading(true);
+        setMsg(null);
 
-    try {
-        const res = await authApi.confirmVerification(channel, challengeId, code);
-        onUserUpdated(res.user);
-        setMsg({ type: 'success', text: `Canal ${isEmail ? 'de e-mail' : 'telefônico'} confirmado com sucesso!` });
-    } catch (err) {
-        const apiErr = err as ApiError;
-        setMsg({ type: 'error', text: apiErr.message || 'Código incorreto ou expirado.' });
-    } finally {
-        setLoading(false);
-    }
+        // Se o challenge_id ainda não estiver em memória, tenta recuperar do /auth/me
+        if (!challengeId) {
+            try {
+                const me = await authApi.getMe();
+                const ch = me.verification_challenges?.find(c => c.channel === channel && !c.consumed_at && !c.revoked_at);
+                if (ch) {
+                    challengeId = ch.challenge_id;
+                    if (isEmail) setEmailChallengeId(ch.challenge_id);
+                    else setPhoneChallengeId(ch.challenge_id);
+                }
+            } catch {
+                // segue para a checagem abaixo
+            }
+        }
+
+        if (!challengeId) {
+            setMsg({ type: 'error', text: 'Desafio não encontrado. Por favor, clique em "Solicitar novo código".' });
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const res = await authApi.confirmVerification(channel, challengeId, code);
+            onUserUpdated(res.user);
+            setMsg({ type: 'success', text: `Canal ${isEmail ? 'de e-mail' : 'telefônico'} confirmado com sucesso!` });
+        } catch (err) {
+            const apiErr = err as ApiError;
+            setMsg({ type: 'error', text: apiErr.message || 'Código incorreto ou expirado.' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
