@@ -30,7 +30,7 @@
           }
           setLoadingInitial(false);
         };
-        init();
+        void init();
       }, []);
     
       const handleLogout = async () => {
