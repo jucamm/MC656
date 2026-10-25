@@ -41,8 +41,9 @@ export const LoginForm: React.FC<Props> = ({ onSuccess, onSwitchToRegister }) =>
 
         <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
             <input
+            id="login-email"
             type="email"
             required
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -53,8 +54,9 @@ export const LoginForm: React.FC<Props> = ({ onSuccess, onSwitchToRegister }) =>
         </div>
 
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
             <input
+            id="login-password"
             type="password"
             required
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
