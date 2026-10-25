@@ -44,7 +44,7 @@ export const VerificationView: React.FC<Props> = ({ user, onUserUpdated, onConti
                 console.error('Erro ao buscar desafios ativos:', err);
             }
         };
-        loadChallenges();
+        void loadChallenges();;
     }, [user.id, user.email_verified_at, user.phone_verified_at]);
 
     // Solicitar envio/reenvio de código
