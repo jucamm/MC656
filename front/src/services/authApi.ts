@@ -44,7 +44,13 @@ class AuthApiService {
     const json = await response.json();
 
     if (!response.ok) {
-        throw json.error as ApiError;
+        const rawError = json.error || {};
+        const safeMessage = (rawError.message || 'Ocorreu um erro inesperado.').replace(/[\r\n]+/g, ' ');
+        
+        throw { 
+            ...rawError, 
+            message: safeMessage 
+        } as ApiError;
     }
 
     return json.data as T;

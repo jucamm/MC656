@@ -41,7 +41,10 @@ export const VerificationView: React.FC<Props> = ({ user, onUserUpdated, onConti
                     }
                 }
             } catch (err) {
-                console.error('Erro ao buscar desafios ativos:', err);
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                const sanitizedError = errorMessage.replace(/[\r\n]+/g, ' ');
+                
+                console.error('Erro ao buscar desafios ativos:', sanitizedError);
             }
         };
         void loadChallenges();;
