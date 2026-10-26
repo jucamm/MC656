@@ -7,7 +7,7 @@ import 'dotenv/config';
 
 import { PostgresVerificationRepository } from './modules/identity/verification.repository';
 import { VerificationService } from './modules/identity/verification.service';
-import { MockVerificationDelivery, MockChannelVerificationDelivery, HybridVerificationDelivery } from './modules/identity/notifications/verification-delivery';
+import { MockChannelVerificationDelivery, HybridVerificationDelivery } from './modules/identity/notifications/verification-delivery';
 import { ResendEmailAdapter } from './modules/identity/notifications/resend-email.adapter';
 import { RegistrationService } from './modules/identity/registration.service';
 
