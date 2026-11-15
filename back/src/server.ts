@@ -51,12 +51,20 @@ const onboarding = database && verification
   : undefined;
 const app = createApp(undefined, sessions, onboarding);
 
+const certPath = process.env.SSL_CERT ?? 'certs/cert.pem';
+const keyPath = process.env.SSL_KEY ?? 'certs/key.pem';
+
+const tlsOptions: https.ServerOptions = {
+  cert: fs.readFileSync(certPath),
+  key: fs.readFileSync(keyPath),
+};
+
 /**
- * Servidor HTTP da aplicação com as dependências já validadas.
+ * Servidor HTTPS da aplicação com as dependências já validadas.
  * @remarks A conexão é composta uma vez; o fechamento do servidor também encerra seu pool.
  */
-export const server = app.listen(port, () => {
-  console.log(`Servidor executando na porta ${port}.`);
+export const server = https.createServer(tlsOptions, app).listen(port, () => {
+  console.log(`Servidor HTTPS executando na porta ${port}.`);
 });
 
 // O fechamento do pool é assíncrono; o evento não publica nem serializa credenciais.
