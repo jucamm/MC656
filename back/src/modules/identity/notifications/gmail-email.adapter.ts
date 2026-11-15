@@ -21,7 +21,9 @@ export class GmailEmailAdapter implements VerificationDelivery {
 
     if (this.user && this.appPassword) {
       this.transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
           user: this.user,
           pass: this.appPassword,
