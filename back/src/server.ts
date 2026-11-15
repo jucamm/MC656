@@ -3,7 +3,8 @@
  * @remarks DATABASE_URL e VERIFICATION_HMAC_KEY são obrigatórias nesta composição;
  * a origem é validada durante createApp. Segredos não são impressos no startup.
  */
-import 'dotenv/config';
+import fs from 'fs';
+import https from 'https';
 
 import { PostgresVerificationRepository } from './modules/identity/verification.repository';
 import { VerificationService } from './modules/identity/verification.service';
