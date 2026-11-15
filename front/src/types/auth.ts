@@ -4,22 +4,20 @@ export interface User {
     id: string;
     name: string;
     email: string;
-    phone: string;
     status: AccountStatus;
     email_verified_at: string | null;
-    phone_verified_at: string | null;
     created_at: string;
 }
 
 export interface ChallengeInfo {
     challenge_id: string;
-    channel: 'email' | 'phone';
+    channel: 'email';
     expires_at: string;
 }
 
 export interface CurrentChallenge {
     challenge_id: string;
-    channel: 'email' | 'phone';
+    channel: 'email';
     expires_at: string;
     failed_attempts: number;
     consumed_at: string | null;

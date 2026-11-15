@@ -2,9 +2,9 @@
 /**
  * Canais permitidos em rotas, desafios e cotas; não aceita aliases como sms.
  */
-export type VerificationChannel = 'email' | 'phone';
+export type VerificationChannel = 'email';
 /**
- * Estado derivado dos dois timestamps de confirmação, protegido por check no banco.
+ * Estado derivado da confirmação por e-mail, protegido por check no banco.
  */
 export type AccountStatus = 'pending' | 'verified';
 /**
@@ -13,19 +13,16 @@ export type AccountStatus = 'pending' | 'verified';
  * @property {string} name - Nome validado no cadastro.
  * @property {string} email - E-mail canônico usado também no login.
  * @property {string} phone - Celular com máscara +55 (XX) 9XXXX-XXXX.
- * @property {AccountStatus} status - verified somente quando ambos os canais estão confirmados.
+ * @property {AccountStatus} status - verified quando o e-mail está confirmado.
  * @property {string | null} email_verified_at - Confirmação em ISO UTC ou null.
- * @property {string | null} phone_verified_at - Confirmação em ISO UTC; pode voltar a null por reciclagem.
  * @property {string} created_at - Data de criação em ISO UTC.
  */
 export interface UserDto {
   id: string;
   name: string;
   email: string;
-  phone: string;
   status: AccountStatus;
   email_verified_at: string | null;
-  phone_verified_at: string | null;
   created_at: string;
 }
 /**
@@ -38,10 +35,9 @@ export interface AuthIdentity { user_id: string; session_id: string }
  * Forma validada da entrada de cadastro; o corpo HTTP começa como unknown.
  * @property {string} name - Nome normalizado.
  * @property {string} email - E-mail normalizado.
- * @property {string} phone - Telefone normalizado.
  * @property {string} password - Senha original, sem transformações, restrita à camada interna.
  */
-export interface RegisterRequest { name: string; email: string; phone: string; password: string }
+export interface RegisterRequest { name: string; email: string; password: string }
 /**
  * Contrato de entrada do login; não transporta papel, estado ou ID de usuário.
  * @property {string} email - Normalizado pela mesma rotina usada no cadastro.

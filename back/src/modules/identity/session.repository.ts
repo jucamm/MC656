@@ -125,7 +125,9 @@ export class PostgresSessionRepository implements SessionRepository {
       consumed_at: verificationChallenges.consumed_at, revoked_at: verificationChallenges.revoked_at,
     }).from(verificationChallenges).where(eq(verificationChallenges.user_id, BigInt(userId)))
       .orderBy(verificationChallenges.channel);
-    return rows.map(row => ({ ...row, expires_at: row.expires_at.toISOString(),
-      consumed_at: row.consumed_at?.toISOString() ?? null, revoked_at: row.revoked_at?.toISOString() ?? null }));
+    return rows
+      .filter((row): row is typeof row & { channel: 'email' } => row.channel === 'email')
+      .map(row => ({ ...row, expires_at: row.expires_at.toISOString(),
+        consumed_at: row.consumed_at?.toISOString() ?? null, revoked_at: row.revoked_at?.toISOString() ?? null }));
   }
 }

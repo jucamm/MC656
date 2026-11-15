@@ -7,10 +7,9 @@ import 'dotenv/config';
 
 import { PostgresVerificationRepository } from './modules/identity/verification.repository';
 import { VerificationService } from './modules/identity/verification.service';
-import { MockChannelVerificationDelivery, HybridVerificationDelivery } from './modules/identity/notifications/verification-delivery';
-import { ResendEmailAdapter } from './modules/identity/notifications/resend-email.adapter';
+import { MockChannelVerificationDelivery } from './modules/identity/notifications/verification-delivery';
 import { RegistrationService } from './modules/identity/registration.service';
-
+import { GmailEmailAdapter } from './modules/identity/notifications/gmail-email.adapter';
 
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -34,16 +33,15 @@ const database = pool ? drizzle({ client: pool }) : undefined;
 const sessions = database
   ? new SessionService(new PostgresUserRepository(database), new PostgresSessionRepository(database))
   : undefined;
-const emailDelivery = process.env.RESEND_API_KEY
-  ? new ResendEmailAdapter()
+
+const emailDelivery = (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)
+  ? new GmailEmailAdapter()
   : new MockChannelVerificationDelivery('email');
-    
-const phoneDelivery = new MockChannelVerificationDelivery('phone');
-const delivery = new HybridVerificationDelivery(emailDelivery, phoneDelivery);
-    
+
 const verification = database
-  ? new VerificationService(new PostgresVerificationRepository(database), delivery)
+  ? new VerificationService(new PostgresVerificationRepository(database), emailDelivery)
   : undefined;
+
 // O mesmo emissor é usado no cadastro e no reenvio; assim, cotas, validade e
 // armazenamento protegido não podem divergir entre os dois caminhos.
 const onboarding = database && verification

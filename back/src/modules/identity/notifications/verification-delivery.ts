@@ -67,43 +67,22 @@ export class MockChannelVerificationDelivery implements VerificationDelivery {
  * Outboxes são fixtures internas: nunca publicar nem logar seus códigos.
  */
 /**
- * Compõe instâncias independentes de e-mail/telefone e mantém a fixture agregada.
- * @remarks fail atua sobre os dois canais; email.fail e phone.fail permitem falhas isoladas.
+ * Adaptador mockado de verificação de e-mail com controle de falha e outbox.
  */
 export class MockVerificationDelivery implements VerificationDelivery {
   readonly email = new MockChannelVerificationDelivery('email');
-  readonly phone = new MockChannelVerificationDelivery('phone');
   readonly outbox: VerificationMessage[] = [];
   fail = false;
 
   /**
-   * Encaminha ao canal correto, registrando no agregado somente envios aceitos.
+   * Encaminha ao adaptador de e-mail, registrando somente envios aceitos.
    * @param {VerificationMessage} message - Mensagem de canal validado pelo emissor.
-   * @returns {Promise<void>} Confirma aceitação pelo mock selecionado.
+   * @returns {Promise<void>} Confirma aceitação pelo mock.
    * @throws {VerificationDeliveryError} Recusa global ou específica do adaptador.
    */
   async sendVerification(message: VerificationMessage): Promise<void> {
     if (this.fail) throw new VerificationDeliveryError();
-    await this[message.channel].sendVerification(message);
+    await this.email.sendVerification(message);
     this.outbox.push({ ...message });
   }
 }
-
-  /**
-     * Roteia cada canal para o adaptador correspondente:
-     * Permite usar provedores reais para e-mail e manter telefone como mock em desenvolvimento.
-     */
-    export class HybridVerificationDelivery implements VerificationDelivery {
-      constructor(
-        private readonly emailDelivery: VerificationDelivery,
-        private readonly phoneDelivery: VerificationDelivery,
-      ) {}
-    
-      async sendVerification(message: VerificationMessage): Promise<void> {
-        if (message.channel === 'email') {
-          await this.emailDelivery.sendVerification(message);
-        } else {
-          await this.phoneDelivery.sendVerification(message);
-        }
-      }
-    }
