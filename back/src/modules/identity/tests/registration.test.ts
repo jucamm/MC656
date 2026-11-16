@@ -121,4 +121,23 @@ describe('normalização e senha reutilizáveis', () => {
       expect(() => readPasswordConfig({ PASSWORD_MIN_LENGTH: minimum })).toThrow('Configuração');
     }
   });
+  it.each([
+    [4, 1],
+    [16, 72],
+  ])('aceita os limites válidos de configuração: custo %i e mínimo %i', (cost, min_length) => {
+    expect(readPasswordConfig({
+      BCRYPT_COST: String(cost), PASSWORD_MIN_LENGTH: String(min_length),
+    })).toEqual({ cost, min_length });
+    expect(() => new PasswordService({ cost, min_length })).not.toThrow();
+  });
+  it.each([
+    { cost: 3, min_length: 8 },
+    { cost: 17, min_length: 8 },
+    { cost: 4.5, min_length: 8 },
+    { cost: 4, min_length: 0 },
+    { cost: 4, min_length: 73 },
+    { cost: 4, min_length: 1.5 },
+  ])('recusa configuração inválida injetada no construtor: %j', config => {
+    expect(() => new PasswordService(config)).toThrow('Configuração de senha inválida');
+  });
 });
