@@ -71,6 +71,19 @@ describe('cadastro', () => {
     expect(delivery.requests).toEqual([]);
   });
 
+  it.each([
+    ['curta', 'A senha deve ter ao menos 8 caracteres.'],
+    ['a'.repeat(73), 'A senha deve ter no máximo 72 bytes em UTF-8.'],
+    ['á'.repeat(37), 'A senha deve ter no máximo 72 bytes em UTF-8.'],
+  ])('informa o campo e a orientação de senha inválida (%s)', async (password, message) => {
+    const { service, create, delivery } = setup();
+    await expect(service.register({ ...input, password })).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR', details: { fields: { password: message } },
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(delivery.requests).toEqual([]);
+  });
+
   it('isola política de domínio com fixture, sem lista de provedores embutida', async () => {
     const { service, create } = setup(sent, new MockEmailPolicy(new Set(['example.com'])));
     await expect(service.register(input)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
@@ -99,6 +112,14 @@ describe('normalização e senha reutilizáveis', () => {
     const value = 'á'.repeat(36);
     const hash = await passwords.hash(value);
     expect(await passwords.compare(value, hash)).toBe(true);
+  });
+  it.each([
+    ['ASCII', 'a'.repeat(72)],
+    ['UTF-8', 'á'.repeat(36)],
+  ])('recusa senha %s acima de 72 bytes mesmo com prefixo válido idêntico', async (_kind, prefix) => {
+    const hash = await passwords.hash(prefix);
+    expect(await passwords.compare(prefix, hash)).toBe(true);
+    expect(await passwords.compare(`${prefix}x`, hash)).toBe(false);
   });
   it('respeita política mínima configurada', async () => {
     const configured = new PasswordService({ cost: 4, min_length: 12 });
