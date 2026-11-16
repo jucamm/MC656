@@ -14,3 +14,8 @@ dist/
 temp/*
 # Permitir somente o template sem segredos.
 !.env.example
+
+# Evidências locais; a entrega será consolidada em relatório ao final.
+/back/evidence/
+/back/reports/mutation/
+/back/.stryker-tmp/

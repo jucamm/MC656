@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 import { defineConfig, globalIgnores } from "eslint/config";
 
 export default defineConfig([
-  globalIgnores(["dist", "coverage"]),
+  globalIgnores(["dist", "coverage", "evidence", "reports/mutation", ".stryker-tmp"]),
   {
     files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
     extends: [js.configs.recommended, tseslint.configs.recommended],
