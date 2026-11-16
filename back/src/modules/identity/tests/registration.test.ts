@@ -71,6 +71,19 @@ describe('cadastro', () => {
     expect(delivery.requests).toEqual([]);
   });
 
+  it.each([
+    ['curta', 'A senha deve ter ao menos 8 caracteres.'],
+    ['a'.repeat(73), 'A senha deve ter no máximo 72 bytes em UTF-8.'],
+    ['á'.repeat(37), 'A senha deve ter no máximo 72 bytes em UTF-8.'],
+  ])('informa o campo e a orientação de senha inválida (%s)', async (password, message) => {
+    const { service, create, delivery } = setup();
+    await expect(service.register({ ...input, password })).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR', details: { fields: { password: message } },
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(delivery.requests).toEqual([]);
+  });
+
   it('isola política de domínio com fixture, sem lista de provedores embutida', async () => {
     const { service, create } = setup(sent, new MockEmailPolicy(new Set(['example.com'])));
     await expect(service.register(input)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
@@ -100,9 +113,25 @@ describe('normalização e senha reutilizáveis', () => {
     const hash = await passwords.hash(value);
     expect(await passwords.compare(value, hash)).toBe(true);
   });
+  it.each([
+    ['ASCII', 'a'.repeat(72)],
+    ['UTF-8', 'á'.repeat(36)],
+  ])('recusa senha %s acima de 72 bytes mesmo com prefixo válido idêntico', async (_kind, prefix) => {
+    const hash = await passwords.hash(prefix);
+    expect(await passwords.compare(prefix, hash)).toBe(true);
+    expect(await passwords.compare(`${prefix}x`, hash)).toBe(false);
+  });
   it('respeita política mínima configurada', async () => {
     const configured = new PasswordService({ cost: 4, min_length: 12 });
     await expect(configured.hash('12345678901')).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+  it.each([
+    ['ASCII', 'a'.repeat(12)],
+    ['Unicode', '🔐'.repeat(12)],
+  ])('aceita senha %s com exatamente o mínimo configurado de caracteres', async (_kind, value) => {
+    const configured = new PasswordService({ cost: 4, min_length: 12 });
+    const hash = await configured.hash(value);
+    expect(await configured.compare(value, hash)).toBe(true);
   });
   it('valida configurações e defaults sem atribuir parâmetros à ISO', () => {
     expect(readPasswordConfig({})).toEqual({ cost: 12, min_length: 8 });
@@ -112,5 +141,24 @@ describe('normalização e senha reutilizáveis', () => {
     for (const minimum of ['x', '', '0', '73', '1.5']) {
       expect(() => readPasswordConfig({ PASSWORD_MIN_LENGTH: minimum })).toThrow('Configuração');
     }
+  });
+  it.each([
+    [4, 1],
+    [16, 72],
+  ])('aceita os limites válidos de configuração: custo %i e mínimo %i', (cost, min_length) => {
+    expect(readPasswordConfig({
+      BCRYPT_COST: String(cost), PASSWORD_MIN_LENGTH: String(min_length),
+    })).toEqual({ cost, min_length });
+    expect(() => new PasswordService({ cost, min_length })).not.toThrow();
+  });
+  it.each([
+    { cost: 3, min_length: 8 },
+    { cost: 17, min_length: 8 },
+    { cost: 4.5, min_length: 8 },
+    { cost: 4, min_length: 0 },
+    { cost: 4, min_length: 73 },
+    { cost: 4, min_length: 1.5 },
+  ])('recusa configuração inválida injetada no construtor: %j', config => {
+    expect(() => new PasswordService(config)).toThrow('Configuração de senha inválida');
   });
 });
