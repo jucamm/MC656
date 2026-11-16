@@ -104,6 +104,14 @@ describe('normalização e senha reutilizáveis', () => {
     const configured = new PasswordService({ cost: 4, min_length: 12 });
     await expect(configured.hash('12345678901')).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
+  it.each([
+    ['ASCII', 'a'.repeat(12)],
+    ['Unicode', '🔐'.repeat(12)],
+  ])('aceita senha %s com exatamente o mínimo configurado de caracteres', async (_kind, value) => {
+    const configured = new PasswordService({ cost: 4, min_length: 12 });
+    const hash = await configured.hash(value);
+    expect(await configured.compare(value, hash)).toBe(true);
+  });
   it('valida configurações e defaults sem atribuir parâmetros à ISO', () => {
     expect(readPasswordConfig({})).toEqual({ cost: 12, min_length: 8 });
     for (const cost of ['x', '', '3', '17', '4.5']) {
