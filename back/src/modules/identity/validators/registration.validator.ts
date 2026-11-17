@@ -47,13 +47,9 @@ export function validateRegistrationFields(input: unknown): RegisterRequest {
   }
   const fields = input as Record<string, unknown>;
   const extraKeys = Object.keys(fields).filter(key => !['name', 'email', 'password'].includes(key));
-if (extraKeys.length) {
-  if (extraKeys.includes('phone')) {
-    invalidField('phone', 'Telefone não é permitido no cadastro.');
-  } else {
+  if (extraKeys.length) {
     invalidField('body', 'O cadastro contém campos não permitidos.');
   }
-}
   if (typeof fields.name !== 'string' || !fields.name.trim() || [...fields.name.trim()].length > 150) {
     invalidField('name', 'Informe um nome completo de até 150 caracteres.');
   }

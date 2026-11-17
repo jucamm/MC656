@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DomainError } from '../../../errors/domain.error';
 import type { UserDto } from '../identity.types';
 import { MockInitialEmailVerificationRequester } from '../notifications/initial-email-verification';
-import { PasswordService } from '../password.service';
+import { PasswordService, readPasswordConfig } from '../password.service';
 import { RegistrationService } from '../registration.service';
 import type { NewUser, UserRepository } from '../user.repository';
 import { MockEmailPolicy } from '../validators/email-policy';
@@ -28,7 +28,6 @@ describe('cadastro', () => {
     const result = await service.register(input);
     const stored = create.mock.calls[0][0];
     expect(stored).toMatchObject({ name: 'Ana Silva', email: 'ana@example.com' });
-    expect(stored).not.toHaveProperty('phone');
     expect(stored).not.toHaveProperty('password');
     expect(stored.password_hash).not.toBe(input.password);
     expect(await passwords.compare(input.password, stored.password_hash)).toBe(true);
@@ -60,7 +59,6 @@ describe('cadastro', () => {
     null, [], {}, { ...input, name: ' ' }, { ...input, name: 'a'.repeat(151) },
     { ...input, email: 'a..b@example.com' }, { ...input, email: 'a@-example.com' },
     { ...input, email: 'a@localhost' }, { ...input, email: 42 },
-    { ...input, phone: '11987654321' },
     { ...input, password: 12345678 }, { ...input, password: 'curta' },
     { ...input, password: 'a'.repeat(73) }, { ...input, password: 'á'.repeat(37) },
     { ...input, status: 'verified' },

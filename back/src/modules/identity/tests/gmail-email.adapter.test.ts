@@ -37,7 +37,7 @@ describe('GmailEmailAdapter', () => {
 
     await expect(
       adapter.sendVerification({
-        channel: 'phone' as unknown as 'email',
+        channel: 'sms' as unknown as 'email',
         destination: '123',
         code: '123456',
       })

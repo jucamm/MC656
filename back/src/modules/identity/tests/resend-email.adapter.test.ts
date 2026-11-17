@@ -55,14 +55,4 @@ describe('ResendEmailAdapter (Padrão Adapter)', () => {
         code: '123456',
     })).rejects.toThrow(VerificationDeliveryError);
     });
-
-    it('rejeita envio se o canal for phone', async () => {
-    const adapter = new ResendEmailAdapter({ apiKey: 'test-key' });
-
-    await expect(adapter.sendVerification({
-        channel: 'phone',
-        destination: '+55 19 99999-9999',
-        code: '123456',
-    })).rejects.toThrow(VerificationDeliveryError);
-    });
 });

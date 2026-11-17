@@ -17,7 +17,7 @@ describe('contratos de verificação', () => {
     { challenge_id: id, code: '123456', user_id: '2' }])('rejeita entrada inválida %j', input => {
     expect(() => validateConfirmation(input)).toThrowError(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
   });
-  it.each(['sms', 'phone', 'EMAIL', '', null])('rejeita canal %j', channel => {
+  it.each(['sms', 'EMAIL', '', null])('rejeita canal %j', channel => {
     expect(() => validateChannel(channel)).toThrowError(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
   });
   it('exige chave HMAC externa com ao menos 32 bytes', () => {

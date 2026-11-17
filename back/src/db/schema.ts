@@ -11,7 +11,7 @@ export const accountStatus = pgEnum('account_status', ['pending', 'verified']);
 /**
  * Enum compartilhado por desafios e cotas para impedir canais divergentes na persistência.
  */
-export const verificationChannel = pgEnum('verification_channel', ['email', 'phone']);
+export const verificationChannel = pgEnum('verification_channel', ['email']);
 /**
  * Duas janelas independentes por conta/canal, com durações definidas pelo serviço.
  */

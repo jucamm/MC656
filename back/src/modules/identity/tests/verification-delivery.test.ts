@@ -25,7 +25,7 @@ describe('adaptadores mockados de comunicação', () => {
 
   it('recusa mensagem roteada ao adaptador de canal inválido', async () => {
     const email = new MockChannelVerificationDelivery('email');
-    await expect(email.sendVerification({ channel: 'phone' as unknown as 'email', destination: 'fixture', code: '001234' }))
+    await expect(email.sendVerification({ channel: 'sms' as unknown as 'email', destination: 'fixture', code: '001234' }))
       .rejects.toBeInstanceOf(VerificationDeliveryError);
     expect(email.outbox).toEqual([]);
   });

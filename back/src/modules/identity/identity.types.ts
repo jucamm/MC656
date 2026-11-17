@@ -12,7 +12,6 @@ export type AccountStatus = 'pending' | 'verified';
  * @property {string} id - bigint decimal serializado sem perda de precisão.
  * @property {string} name - Nome validado no cadastro.
  * @property {string} email - E-mail canônico usado também no login.
- * @property {string} phone - Celular com máscara +55 (XX) 9XXXX-XXXX.
  * @property {AccountStatus} status - verified quando o e-mail está confirmado.
  * @property {string | null} email_verified_at - Confirmação em ISO UTC ou null.
  * @property {string} created_at - Data de criação em ISO UTC.
