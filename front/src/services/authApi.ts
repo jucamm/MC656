@@ -56,7 +56,7 @@ class AuthApiService {
     return json.data as T;
     }
 
-    async register(data: { name: string; email: string; phone: string; password: string }) {
+    async register(data: { name: string; email: string; password: string }) {
     return this.request<{
         user: User;
         email_verification: { delivery_status: string; challenge_id: string | null; expires_at: string | null };
@@ -79,14 +79,14 @@ class AuthApiService {
         return this.request<MeData>('/auth/me');
     }
 
-    async sendVerification(channel: 'email' | 'phone') {
+    async sendVerification(channel: 'email' = 'email') {
     return this.request<ChallengeInfo>(`/auth/verifications/${channel}/send`, {
         method: 'POST',
         body: JSON.stringify({}),
     });
     }
 
-    async confirmVerification(channel: 'email' | 'phone', challenge_id: string, code: string) {
+    async confirmVerification(channel: 'email' = 'email', challenge_id: string, code: string) {
     return this.request<{ user: User }>(`/auth/verifications/${channel}/confirm`, {
         method: 'POST',
         body: JSON.stringify({ challenge_id, code }),

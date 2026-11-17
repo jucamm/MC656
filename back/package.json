@@ -4,13 +4,16 @@
     "dotenv": "^18.0.1",
     "drizzle-orm": "^1.0.0-rc.4",
     "express": "^5.2.1",
+    "nodemailer": "^10.5.0",
     "pg": "^8.23.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stryker-mutator/core": "10.1.1",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.2",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.1",
@@ -27,12 +30,15 @@
     "esbuild@0.28.2": true
   },
   "scripts": {
+    "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:mutation": "stryker run",
+    "test:mutation:dry-run": "stryker run --dryRunOnly",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   }

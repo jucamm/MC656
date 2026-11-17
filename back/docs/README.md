@@ -67,6 +67,7 @@ Depois, execute `npm run db:migrate`, `npm run build` e `npm start`. Para valida
 
 | Documento | Assunto |
 |---|---|
+| [Testes de mutação de identidade](identity-mutation-testing.md) | Configuração do StrykerJS, execução e interpretação dos relatórios locais. |
 | [Issue 1 — Contratos](identity-1-contracts.md) | Endpoints, DTOs, convenções e exemplos. |
 | [Issue 2 — Banco e migrations](identity-2-database-runbook.md) | Ambiente, criação/aplicação de migrations e restrições. |
 | [Issue 3 — Cadastro e senhas](identity-3-registration.md) | Normalização, Bcrypt, defaults e política mockada de domínios. |

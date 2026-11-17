@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, ne, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { users, rateLimits, verificationChallenges as challenges } from '../../db/schema';
 import { DomainError } from '../../errors/domain.error';
@@ -29,54 +29,47 @@ export type NewVerificationChallenge = typeof challenges.$inferInsert;
  */
 export class VerificationTransaction {
   /**
-   * @param {VerificationDatabase} db - Executor da transação atual, não o pool global.
-   * @param {VerificationUser} user - Conta lida e bloqueada antes das decisões de negócio.
+   * @param {VerificationDatabase} db - Transação ou conexão com lock já adquirido.
+   * @param {VerificationUser} user - Conta lida sob lock exclusivo (FOR UPDATE).
    */
-  /**
-   * @param {NodePgDatabase} db - Conexão Drizzle com suporte a transações PostgreSQL.
-   */
-  constructor(private readonly db: VerificationDatabase, readonly user: VerificationUser) {}
+  constructor(readonly db: VerificationDatabase, readonly user: VerificationUser) {}
 
   /**
-   * Obtém o desafio corrente do par conta/canal, inclusive se não for mais utilizável.
+   * Lê o desafio do canal solicitado pela própria conta bloqueada.
    * @param {VerificationChannel} channel - Canal previamente validado.
-   * @returns {Promise<VerificationChallenge | null>} Registro para validar ID, estado e HMAC.
+   * @returns {Promise<VerificationChallenge | null>} Desafio ou null se nunca emitido.
    */
   async current(channel: VerificationChannel): Promise<VerificationChallenge | null> {
-    const [row] = await this.db.select().from(challenges).where(and(
-      eq(challenges.user_id, this.user.id), eq(challenges.channel, channel),
-    ));
-    return row ?? null;
+    const [challenge] = await this.db.select().from(challenges).where(
+      eq(challenges.user_id, this.user.id),
+    );
+    return challenge && challenge.channel === channel ? challenge : null;
   }
 
   /**
-   * Carrega as duas janelas sem criar cotas para uma tentativa ainda não aceita.
+   * Carrega cotas vigentes para decidir bloqueio e contagem sob lock.
    * @param {VerificationChannel} channel - Canal cujo contador é independente do outro.
-   * @returns {Promise<Array<typeof rateLimits.$inferSelect>>} Linhas existentes de hora/dia.
-   * @remarks O lock da conta já serializa os escritores; não há dimensão de IP ou sessão.
+   * @returns {Promise<Array<typeof rateLimits.$inferSelect>>} Janelas hora e dia.
    */
-  async deliveryLimits(channel: VerificationChannel) {
-    return this.db.select().from(rateLimits).where(and(
-      eq(rateLimits.user_id, this.user.id), eq(rateLimits.channel, channel),
-    ));
+  async deliveryLimits(_channel: VerificationChannel) {
+    return this.db.select().from(rateLimits).where(
+      eq(rateLimits.user_id, this.user.id),
+    );
   }
 
   /**
-   * Grava o bloqueio na linha diária existente, preservando janela e contagem.
+   * Aplica bloqueio de 72 horas após exceder a cota diária.
    * @param {VerificationChannel} channel - Par conta/canal que excedeu o teto diário.
-   * @param {Date} until - Fim do bloqueio calculado pelo serviço.
-   * @returns {Promise<void>} Resolve após o UPDATE dentro da transação.
-   * @remarks O callback deve retornar o erro como resultado para que o bloqueio seja commitado.
+   * @param {Date} until - Fim do período de bloqueio em UTC.
+   * @returns {Promise<void>} Resolve após o update da janela diária.
    */
   async blockDelivery(channel: VerificationChannel, until: Date): Promise<void> {
-    await this.db.update(rateLimits).set({ blocked_until: until }).where(and(
-      eq(rateLimits.user_id, this.user.id), eq(rateLimits.channel, channel), eq(rateLimits.window_type, 'day'),
-    ));
+    await this.db.update(rateLimits).set({ blocked_until: until })
+      .where(eq(rateLimits.user_id, this.user.id));
   }
 
-  /** Chamado após aceitação pelo mock, na mesma transação do desafio. */
   /**
-   * Contabiliza as duas cotas após sucesso do adaptador, junto do novo desafio.
+   * Incrementa ou inicia janelas preservando a duração fixa a partir do primeiro envio.
    * @param {VerificationChannel} channel - Canal do envio aceito.
    * @param {Date} now - Referência de início de janelas novas.
    * @param {Array<typeof rateLimits.$inferSelect>} previous - Janelas lidas sob o mesmo lock.
@@ -138,26 +131,14 @@ export class VerificationTransaction {
    * @param {VerificationChannel} channel - Canal confirmado.
    * @param {Date} now - Instante da confirmação e consumo.
    * @returns {Promise<UserDto>} Conta atualizada com projeção pública.
-   * @throws {Error} Falha de banco; todas as alterações da transferência sofrem rollback.
-   * @remarks Para phone, exige o contexto obtido por withConfirmationLock, com lock por número.
+   * @throws {Error} Falha de banco.
    */
   async consumeAndVerify(id: string, channel: VerificationChannel, now: Date) {
-    const email_verified_at = channel === 'email' ? now : this.user.email_verified_at;
-    const phone_verified_at = channel === 'phone' ? now : this.user.phone_verified_at;
-    if (channel === 'phone') {
-      // A confirmação telefônica usa withConfirmationLock: mesmo número
-      // serializado e contas bloqueadas em ordem antes de alterar o proprietário.
-      // Apenas a confirmação telefônica e o status anteriores são limpos.
-      // E-mail e sessões sobrevivem para manter disponível o onboarding.
-      await this.db.update(users).set({ phone_verified_at: null, status: 'pending' }).where(and(
-        eq(users.phone, this.user.phone), ne(users.id, this.user.id), isNotNull(users.phone_verified_at),
-      ));
-    }
+    const email_verified_at = now;
     await this.db.update(challenges).set({ consumed_at: now }).where(eq(challenges.id, id));
-    // Os timestamps e status são escritos juntos para satisfazer o check
-    // "verified se e somente se ambos os canais estiverem confirmados".
-    const [updated] = await this.db.update(users).set({ email_verified_at, phone_verified_at,
-      status: email_verified_at && phone_verified_at ? 'verified' : 'pending',
+    const [updated] = await this.db.update(users).set({
+      email_verified_at,
+      status: 'verified',
     }).where(eq(users.id, this.user.id)).returning(publicUserColumns);
     return toUserDto(updated);
   }
@@ -169,46 +150,19 @@ export class VerificationTransaction {
 export class PostgresVerificationRepository {
   constructor(private readonly db: NodePgDatabase) {}
 
-  /** Telefones são imutáveis neste MVP. O lock por número vem antes de
-   * qualquer lock de conta; obter o lock da conta primeiro causaria deadlocks
-   * entre duas confirmações do mesmo número em contas diferentes.
-   */
   /**
-   * Serializa confirmações por conta ou por telefone, conforme o canal.
+   * Serializa confirmações por conta sob lock exclusivo.
    * @template T - Resultado de negócio que será devolvido após o commit.
    * @param {string} userId - ID decimal da conta autenticada.
-   * @param {VerificationChannel} channel - E-mail usa lock local; telefone coordena todas as contas do número.
+   * @param {VerificationChannel} channel - Canal da confirmação.
    * @param {(transaction: VerificationTransaction) => Promise<T>} operation - Operações sob os locks adquiridos.
    * @returns {Promise<T>} Resultado somente após concluir a transação.
-   * @throws {DomainError} UNAUTHENTICATED se a conta não existir.
-   * @throws {Error} Falha do callback/banco, provocando rollback.
-   * @remarks Edição de contatos não existe no MVP; adicioná-la exige revisar esta ordem de locks.
    */
-  async withConfirmationLock<T>(userId: string, channel: VerificationChannel,
+  async withConfirmationLock<T>(userId: string, _channel: VerificationChannel,
     operation: (transaction: VerificationTransaction) => Promise<T>): Promise<T> {
-    if (channel === 'email') return this.withUserLock(userId, operation);
-    return this.db.transaction(async tx => {
-      const [contact] = await tx.select({ phone: users.phone }).from(users).where(eq(users.id, BigInt(userId)));
-      if (!contact) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
-      // WARNING: Este lock deve vir antes de qualquer FOR UPDATE desta operação.
-      // O hash de 64 bits fornece a chave compartilhada entre instâncias. Colisões
-      // podem serializar números distintos, mas não criam duas confirmações vigentes.
-      // O lock é liberado automaticamente no commit/rollback, sem estado em memória.
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${contact.phone}, 0))`);
-      // ORDER BY antecede FOR UPDATE para obter locks de contas em ordem estável.
-      // Bloquear a conta atual primeiro permitiria uma espera circular na transferência.
-      const accounts = await tx.select(publicUserColumns).from(users).where(eq(users.phone, contact.phone))
-        .orderBy(users.id).for('update');
-      const user = accounts.find(account => account.id === BigInt(userId));
-      if (!user) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
-      return operation(new VerificationTransaction(tx, user));
-    });
+    return this.withUserLock(userId, operation);
   }
 
-  /** Lock por conta serializa emissão/reenvio/confirmação dos dois canais.
-   * Os callbacks não devem lançar erros depois de gravar tentativas inválidas:
-   * retorne o resultado e converta em erro após o commit, no service.
-   */
   /**
    * Executa emissão/reenvio e operações locais de conta sem disputa de contadores.
    * @template T - Resultado do callback, inclusive recusas que precisam ser persistidas.
@@ -217,7 +171,6 @@ export class PostgresVerificationRepository {
    * @returns {Promise<T>} Resultado após commit; callbacks sem exceção mantêm suas escritas.
    * @throws {DomainError} UNAUTHENTICATED se a conta não existir.
    * @throws {Error} Exceções do callback ou banco provocam rollback.
-   * @remarks Confirmação telefônica deve usar withConfirmationLock para incluir as outras contas.
    */
   async withUserLock<T>(userId: string, operation: (transaction: VerificationTransaction) => Promise<T>): Promise<T> {
     return this.db.transaction(async tx => {

@@ -39,8 +39,8 @@ let service: SessionService;
 let app: ReturnType<typeof createApp>;
 beforeEach(async () => {
   now = new Date('2026-01-31T23:45:12.345Z');
-  user = { id: '9007199254740993', name: 'Ana', email: 'ana@example.com', phone: '+55 (11) 98765-4321',
-    status: 'pending', email_verified_at: null, phone_verified_at: null, created_at: now.toISOString() };
+  user = { id: '9007199254740993', name: 'Ana', email: 'ana@example.com',
+    status: 'pending', email_verified_at: null, created_at: now.toISOString() };
   const password_hash = await hash;
   repository = new MemorySessions();
   service = new SessionService({
@@ -126,14 +126,14 @@ describe('login e ciclo HTTP da sessão', () => {
   it('atividade renova validade, devolve usuário atual e nenhum segredo', async () => {
     const token = (await login()).body.data.token;
     now = new Date('2026-02-20T10:00:00.000Z');
-    user = { ...user, status: 'verified', email_verified_at: now.toISOString(), phone_verified_at: now.toISOString() };
+    user = { ...user, status: 'verified', email_verified_at: now.toISOString() };
     const response = await request(app).get('/auth/me').set('Authorization', `Bearer ${token}`).expect(200);
     expect(response.body.data).toEqual({ user, verification_challenges: [] });
     const stored = repository.rows.get(hashSessionToken(token));
     expect(stored?.last_activity_at).toEqual(now);
     expect(stored?.expires_at.toISOString()).toBe('2026-03-20T10:00:00.000Z');
     expect(JSON.stringify(response.body)).not.toContain(token);
-    user = { ...user, status: 'pending', phone_verified_at: null };
+    user = { ...user, status: 'pending', email_verified_at: null };
     const current = await request(app).get('/auth/me').set('Authorization', `Bearer ${token}`).expect(200);
     expect(current.body.data.user.status).toBe('pending');
   });

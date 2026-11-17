@@ -11,7 +11,7 @@ export const accountStatus = pgEnum('account_status', ['pending', 'verified']);
 /**
  * Enum compartilhado por desafios e cotas para impedir canais divergentes na persistência.
  */
-export const verificationChannel = pgEnum('verification_channel', ['email', 'phone']);
+export const verificationChannel = pgEnum('verification_channel', ['email']);
 /**
  * Duas janelas independentes por conta/canal, com durações definidas pelo serviço.
  */
@@ -25,22 +25,14 @@ export const users = pgTable('users', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   name: varchar('name', { length: 150 }).notNull(),
   email: varchar('email', { length: 254 }).notNull().unique(),
-  // A máscara canônica cabe em varchar(20). Não adicionar UNIQUE: contas distintas
-  // podem cadastrar o mesmo número, e só a confirmação é transferida atomicamente.
-  phone: varchar('phone', { length: 20 }).notNull(),
   password_hash: text('password_hash').notNull(),
   status: accountStatus('status').notNull().default('pending'),
   email_verified_at: timestamp('email_verified_at', { withTimezone: true }),
-  phone_verified_at: timestamp('phone_verified_at', { withTimezone: true }),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  // A equivalência booleana proíbe tanto verified sem os dois canais quanto
-  // pending com ambos preenchidos. O serviço deve atualizar status/timestamps juntos.
   check('users_verification_status_check', sql`
-    (${table.status} = 'verified') =
-    (${table.email_verified_at} IS NOT NULL AND ${table.phone_verified_at} IS NOT NULL)
+    (${table.status} = 'verified') = (${table.email_verified_at} IS NOT NULL)
   `),
-  index('users_phone_idx').on(table.phone),
 ]);
 
 /**

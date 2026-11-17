@@ -4,12 +4,12 @@ import { invalidField } from './registration.validator';
 /**
  * Restringe o parâmetro de rota aos canais do schema e do contrato público.
  * @param {unknown} channel - Valor externo do parâmetro :channel.
- * @returns {VerificationChannel} Literal email ou phone.
+ * @returns {VerificationChannel} Literal email.
  * @throws {DomainError} VALIDATION_ERROR para valores não reconhecidos.
  */
 export function validateChannel(channel: unknown): VerificationChannel {
-  if (channel !== 'email' && channel !== 'phone') invalidField('channel', 'Canal de verificação inválido.');
-  return channel;
+  if (channel !== 'email') invalidField('channel', 'Canal de verificação inválido.');
+  return 'email';
 }
 
 /**
