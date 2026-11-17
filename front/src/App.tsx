@@ -113,7 +113,7 @@
                 <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg shadow-sm">
                   <h3 className="font-bold text-green-800">Bem-vindo(a) à Área Protegida!</h3>
                   <p className="text-sm text-green-700">
-                    Sua conta foi autenticada e validada com dois fatores (e-mail e celular).
+                    Sua conta foi autenticada e validada com e-mail.
                   </p>
                 </div>
                 {/* Componentes de negócio já existentes */}

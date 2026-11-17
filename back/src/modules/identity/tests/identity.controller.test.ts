@@ -272,28 +272,6 @@ describe('IdentityVerificationController', () => {
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({ data: challengeResult });
     });
-
-    it('deve aceitar o envio quando o body for um objeto vazio ({}) e canal for phone', async () => {
-      const challengeResult = {
-        challenge_id: FIXTURE_CHALLENGE_ID,
-        channel: 'phone' as const,
-        expires_at: FIXTURE_TIMESTAMP,
-      };
-      mockVerification.send.mockResolvedValueOnce(challengeResult);
-
-      const req = createMockRequest({
-        auth: mockAuth,
-        params: { channel: 'phone' },
-        body: {},
-      });
-      const res = createMockResponse();
-
-      await controller.send(req, res, vi.fn());
-
-      expect(mockVerification.send).toHaveBeenCalledWith(mockAuth, 'phone');
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith({ data: challengeResult });
-    });
   });
 
   describe('confirm', () => {

@@ -10,7 +10,6 @@ describe('contratos de verificação', () => {
   it('preserva zeros iniciais e normaliza somente a representação do UUID', () => {
     expect(validateConfirmation({ challenge_id: id.toUpperCase(), code: '001234' })).toEqual({ challenge_id: id, code: '001234' });
     expect(validateChannel('email')).toBe('email');
-    expect(validateChannel('phone')).toBe('phone');
   });
   it.each([undefined, null, [], {}, { challenge_id: id, code: 123456 },
     { challenge_id: id, code: '12345' }, { challenge_id: id, code: '1234567' },

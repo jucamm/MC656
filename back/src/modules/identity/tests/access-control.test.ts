@@ -18,9 +18,9 @@ let verified: UserDto;
 let groupUsers: MockUser[];
 beforeEach(() => {
   const date = '2026-10-23T12:00:00.000Z';
-  pending = { id: '1', name: 'Ana', email: 'ana@example.com', phone: '+55 (11) 98765-4321', status: 'pending',
-    email_verified_at: null, phone_verified_at: null, created_at: date };
-  verified = { ...pending, id: '2', status: 'verified', email_verified_at: date, phone_verified_at: date };
+  pending = { id: '1', name: 'Ana', email: 'ana@example.com', status: 'pending',
+    email_verified_at: null, created_at: date };
+  verified = { ...pending, id: '2', status: 'verified', email_verified_at: date };
   const repository: SessionRepository = { create: vi.fn(), renewIfValid: vi.fn(), findByTokenHash: vi.fn(), revoke: vi.fn(), currentChallenges: vi.fn() };
   sessions = new SessionService({ findById: vi.fn(), findCredentialsByEmail: vi.fn() }, repository,
     new PasswordService({ cost: 4, min_length: 8 }));
@@ -62,7 +62,7 @@ describe('controle global de acesso', () => {
   });
   it('desverificação perde acesso com o mesmo token na requisição seguinte', async () => {
     await request(app).get('/api/pautas').set('Authorization', `Bearer ${verifiedToken}`).expect(200);
-    verified = { ...verified, status: 'pending', phone_verified_at: null };
+    verified = { ...verified, status: 'pending', email_verified_at: null };
     expect((await request(app).get('/api/pautas').set('Authorization', `Bearer ${verifiedToken}`).expect(403)).body.error.code).toBe('ACCOUNT_NOT_VERIFIED');
     expect(sessions.authenticate).toHaveBeenCalledTimes(2);
   });

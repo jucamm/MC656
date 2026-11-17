@@ -43,7 +43,7 @@ export const requireVerifiedAccount: RequestHandler = (request, _response, next)
     throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
   }
   if (request.account.status !== 'verified') {
-    throw new DomainError('ACCOUNT_NOT_VERIFIED', 'Confirme e-mail e telefone para acessar este recurso.', {});
+    throw new DomainError('ACCOUNT_NOT_VERIFIED', 'Confirme e-mail para acessar este recurso.', {});
   }
   next();
 };

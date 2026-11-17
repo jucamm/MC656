@@ -38,7 +38,7 @@ export class RegistrationService {
     await this.emailPolicy.validate(validated.email);
     const password_hash = await this.passwords.hash(validated.password);
     const user = await this.users.create({
-      name: validated.name, email: validated.email, phone: validated.phone, password_hash,
+      name: validated.name, email: validated.email, password_hash,
     });
 
     // A criação é confirmada antes da comunicação. Uma falha de envio nunca

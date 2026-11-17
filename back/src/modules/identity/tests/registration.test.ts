@@ -6,15 +6,15 @@ import { PasswordService, readPasswordConfig } from '../password.service';
 import { RegistrationService } from '../registration.service';
 import type { NewUser, UserRepository } from '../user.repository';
 import { MockEmailPolicy } from '../validators/email-policy';
-import { normalizeEmail, normalizePhone } from '../validators/registration.validator';
+import { normalizeEmail } from '../validators/registration.validator';
 
-const input = { name: ' Ana Silva ', email: ' Ana@Example.COM ', phone: '11987654321', password: ' senhaSegura ' };
+const input = { name: ' Ana Silva ', email: ' Ana@Example.COM ', password: ' senhaSegura ' };
 const sent = { delivery_status: 'sent' as const, challenge_id: '11111111-1111-4111-8111-111111111111', expires_at: '2026-10-22T12:30:00.000Z' };
 const passwords = new PasswordService({ cost: 4, min_length: 8 });
 function setup(result: typeof sent | Error = sent, emailPolicy = new MockEmailPolicy()) {
   const create = vi.fn(async (data: NewUser): Promise<UserDto> => ({
-    id: '9007199254740993', name: data.name, email: data.email, phone: data.phone,
-    status: 'pending', email_verified_at: null, phone_verified_at: null,
+    id: '9007199254740993', name: data.name, email: data.email,
+    status: 'pending', email_verified_at: null,
     created_at: '2026-10-22T12:00:00.000Z',
   }));
   const repository: UserRepository = { create, findById: vi.fn() };
@@ -27,14 +27,14 @@ describe('cadastro', () => {
     const { service, create, delivery } = setup();
     const result = await service.register(input);
     const stored = create.mock.calls[0][0];
-    expect(stored).toMatchObject({ name: 'Ana Silva', email: 'ana@example.com', phone: '+55 (11) 98765-4321' });
+    expect(stored).toMatchObject({ name: 'Ana Silva', email: 'ana@example.com' });
     expect(stored).not.toHaveProperty('password');
     expect(stored.password_hash).not.toBe(input.password);
     expect(await passwords.compare(input.password, stored.password_hash)).toBe(true);
     expect(await passwords.compare(input.password.trim(), stored.password_hash)).toBe(false);
     expect(delivery.requests).toEqual([{ user_id: result.user.id, email: result.user.email }]);
     expect(result.email_verification).toEqual(sent);
-    expect(result.user).toMatchObject({ status: 'pending', email_verified_at: null, phone_verified_at: null });
+    expect(result.user).toMatchObject({ status: 'pending', email_verified_at: null });
     expect(result.user).not.toHaveProperty('password_hash');
     expect(input.email).toBe(' Ana@Example.COM ');
   });
@@ -59,8 +59,6 @@ describe('cadastro', () => {
     null, [], {}, { ...input, name: ' ' }, { ...input, name: 'a'.repeat(151) },
     { ...input, email: 'a..b@example.com' }, { ...input, email: 'a@-example.com' },
     { ...input, email: 'a@localhost' }, { ...input, email: 42 },
-    { ...input, phone: '+1 11987654321' }, { ...input, phone: '1187654321' },
-    { ...input, phone: 'abc11987654321' }, { ...input, phone: '(11 98765-4321' },
     { ...input, password: 12345678 }, { ...input, password: 'curta' },
     { ...input, password: 'a'.repeat(73) }, { ...input, password: 'á'.repeat(37) },
     { ...input, status: 'verified' },
@@ -92,13 +90,9 @@ describe('cadastro', () => {
 });
 
 describe('normalização e senha reutilizáveis', () => {
-  it.each(['11987654321', '5511987654321', '+5511987654321', '(11) 98765-4321', '+55 (11) 98765-4321'])('normaliza %s', phone => {
-    expect(normalizePhone(phone)).toBe('+55 (11) 98765-4321');
-  });
   it('normalização é idempotente e mantém alias de e-mail', () => {
     expect(normalizeEmail(' ANA+tag@Example.COM ')).toBe('ana+tag@example.com');
     expect(normalizeEmail(normalizeEmail(input.email))).toBe(normalizeEmail(input.email));
-    expect(normalizePhone(normalizePhone(input.phone))).toBe(normalizePhone(input.phone));
   });
   it('gera salts independentes e distingue senha correta/incorreta', async () => {
     const first = await passwords.hash(input.password);
