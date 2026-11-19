@@ -6,7 +6,14 @@ export class PautasController {
 
   async create(req: Request, res: Response) {
     try {
-      const pauta = await this.pautasService.createPauta(req.body);
+      const body = req.body || {};
+      const pauta = await this.pautasService.createPauta({
+        title: body.title ?? body.titulo ?? '',
+        description: body.description ?? body.descricao ?? '',
+        author: body.author ?? body.autor ?? 'Membro',
+        context: body.context ?? body.contexto ?? 'CENTRO_ACADEMICO',
+        submissionDeadline: body.submissionDeadline ?? body.prazo ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
       
       return res.status(201).json({
         success: true,
