@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authApi } from '../services/authApi';
 
 interface FormData {
   titulo: string;
@@ -58,15 +59,19 @@ export default function FormularioPauta() {
     setIsSubmitting(true);
 
     try {
-      // Deve ser substituido depois pela rota correta da API no Express
-      // Adicionando quais os nomes dos campos do formulário e o caminho da rota
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const token = authApi.getToken();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
       const response = await fetch(`${API_URL}/api/pautas`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(formData),
       });
 
