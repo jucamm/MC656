@@ -14,6 +14,8 @@ O repositório é organizado no formato de monorepo:
 * `front/`: Interface web desenvolvida em **React 19**, **Vite** e **Tailwind CSS**.
 * `.github/workflows/`: Pipeline de Integração Contínua (CI) com GitHub Actions.
 
+Para integrar as próximas histórias, consulte o [guia de reuso da HU02](back/docs/groups-contracts.md#reuso-da-hu02).
+
 ---
 
 ## Pré-requisitos

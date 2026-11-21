@@ -65,17 +65,25 @@ HU02_TEST_DATABASE_URL='postgresql://localhost/mc656_groups_test' npm test -- sr
 
 As suítes PostgreSQL aplicam as migrations na base de teste. Veja o [runbook do banco](identity-2-database-runbook.md) para a configuração local.
 
-## Uso por processos decisórios e reuniões
+## Reuso da HU02
 
-As rotas existentes em `/groups/:groupId/decision-processes` consultam os vínculos persistidos da HU02. Integrantes de grupo ativo podem ler processos e versões. Administradores podem criar ou publicar versões, e cada ID em `requiredParticipantIds` deve identificar um integrante atual do próprio grupo. A escrita do processo ocorre com o grupo bloqueado. O histórico já publicado preserva os identificadores que tinha no momento da publicação.
+- **Identidade.** A aplicação obtém o ator de `request.auth.user_id` após validar a sessão Bearer. As rotas protegidas da HU02 também exigem conta verificada por e-mail. Ao integrar outro recurso privado, valide o acesso no servidor. Use o ID da conta como string decimal no HTTP e `bigint` no PostgreSQL. [Composição da aplicação](../src/app.ts) · [Controle de sessão](../src/modules/identity/session.middleware.ts)
+- **Grupos, vínculos e convites.** `groups.id` é um UUID persistido. O papel `ADMIN` ou `MEMBER` pertence ao vínculo daquele grupo. O aceite do convite cria o vínculo. A remoção ou mudança de papel vale na próxima requisição, inclusive com o mesmo token. A exclusão lógica bloqueia o acesso usual. A recuperação administrativa em até um ano preserva o ID e os papéis existentes. [Schema](../src/db/schema.ts) · [Repositório](../src/modules/groups/groups.repository.ts)
+- **Autorização reutilizável.** Use `requireActiveGroupAccess` para consultar grupo ativo, vínculo e papel. `withActiveGroupAccess` mantém o lock do grupo enquanto executa a operação autorizada. Para futuras escritas com FK para `groups.id`, inclua as operações do novo recurso no mesmo contexto transacional PostgreSQL. O contexto atual oferece operações do grupo. [Código de autorização](../src/modules/groups/group-access.ts)
+- **Frontend.** O dashboard já oferece gestão de grupos e convites. Novos recursos com o envelope `{ data: ... }` podem usar `authApi.request`, que reaproveita o Bearer e a URL definida por `VITE_API_URL`. Use `my_role` para exibir ações de grupo na interface e valide a permissão novamente na API. [Dashboard](../../front/src/components/groups/GroupsDashboard.tsx) · [Cliente autenticado](../../front/src/services/authApi.ts)
 
-Os processos decisórios seguem seu contrato HTTP existente. Retornam `403 FORBIDDEN` para papel ou vínculo insuficiente em grupo ativo, `404 GROUP_NOT_FOUND` para grupo inexistente ou excluído, `404 PROCESS_NOT_FOUND` quando o processo está fora do grupo consultado e `422 VALIDATION_ERROR` para participante obrigatório inválido. O repositório de processos e versões opera em memória. Recuperar o grupo pode restabelecer o acesso a esse histórico enquanto ele estiver na instância.
+| Histórias seguintes | Ponto de integração |
+|---|---|
+| **HU03 — Reuniões** | Usar `group_id` anulável como FK para `groups.id`. Reuniões de grupo são privadas por padrão. Conferir grupo ativo e vínculo na listagem, no detalhe e na entrada, além de eventual lista restrita da reunião. Reuniões avulsas usam a própria política de acesso. O administrador do grupo pode criar a reunião, e o criador é o administrador único que pode alterar suas especificações. Visibilidade pública de reunião de grupo e saída do criador ficam para decisão na HU03. |
+| **HU04 a HU08 — Pautas, sala, moderação e atas** | Os recursos privados associados devem seguir a autorização da reunião. A rota atual `/api/pautas` guarda dados em memória e aplica somente o controle global de conta verificada. Ao associar pautas a reuniões, limitar as consultas pela autorização da reunião. A designação de moderadores e a aprovação da ata também pertencem ao encontro. |
+| **HU09 e HU10 — Decisões e tarefas** | Relacionar a decisão à pauta e a tarefa à decisão. Usar a autorização da reunião para o acesso e as regras da própria tarefa para validar o responsável. O processo decisório existente configura e versiona regras de deliberação. O registro da decisão final e dos resultados pertence à HU09. |
+| **HU11 a HU13 — Projetos de lei e opinião** | O catálogo de PLs e o voto de opinião independem de vínculo com grupo. A síntese pública usa atas públicas aprovadas. Preservar a privacidade de reuniões de grupo, rascunhos e atas privadas ao selecionar as fontes. |
 
-A HU03 pode consultar grupo ativo e vínculo vigente com `requireActiveGroupAccess` e proteger escritas com `withActiveGroupAccess`. As regras de audiência e de administração individual de cada reunião pertencem ao módulo de reuniões.
+### Processos decisórios existentes
 
-- Para reunião privada de grupo, a HU03 deve aplicar o vínculo ativo à listagem, ao detalhe e à entrada. Uma lista de acesso da reunião pode restringir o conjunto de integrantes. Reuniões avulsas seguem a política da própria reunião.
-- A FK anulável para `groups.id` preserva a associação e permite reuniões avulsas. A HU03 também deve consultar o estado do grupo, pois a exclusão é lógica.
-- O papel `ADMIN` permite criar reuniões no grupo. A HU03 deve guardar o ID do criador como administrador único da reunião e exigir esse ID para alterar suas especificações. Publicação explícita de uma reunião de grupo e o destino de uma reunião cujo criador sai do grupo ficam para a HU03.
+Em `/groups/:groupId/decision-processes`, integrantes podem ler processos e versões. Administradores podem criar processos ou publicar versões. Cada ID em `requiredParticipantIds` deve corresponder a um integrante atual do mesmo grupo no momento da publicação. Versões já publicadas conservam seus IDs históricos.
+
+O contrato dessas rotas retorna `403 FORBIDDEN` para vínculo ou papel insuficiente em grupo ativo, `404 GROUP_NOT_FOUND` para grupo inexistente ou excluído, `404 PROCESS_NOT_FOUND` para processo fora do grupo consultado e `422 VALIDATION_ERROR` para participante obrigatório inválido. Grupos e vínculos ficam no PostgreSQL. Processos e versões ficam em memória, com histórico disponível enquanto a instância estiver ativa. [Rotas de processos decisórios](../src/modules/decision-process/decision-process.routes.ts)
 
 ## Validação da entrega
 
