@@ -3,14 +3,13 @@ import { and, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { alias } from 'drizzle-orm/pg-core';
 import { groupInvitations, groupMemberships, groups, users } from '../../db/schema';
+import type { GroupListState, GroupRole, PageInput } from './groups.types';
 
 type DatabaseQueries = Pick<NodePgDatabase, 'select' | 'insert' | 'update' | 'delete'>;
 type Group = typeof groups.$inferSelect;
 type Invitation = typeof groupInvitations.$inferSelect;
-type Role = typeof groupMemberships.$inferSelect.role;
 type DeletionReason = NonNullable<Group['deletion_reason']>;
 type InvitationResolution = Exclude<Invitation['status'], 'PENDING'>;
-type PageInput<Cursor> = { limit: number; after?: Cursor };
 
 const recipient = alias(users, 'recipient');
 const inviter = alias(users, 'inviter');
@@ -54,9 +53,9 @@ class LockedGroupTransaction {
   ) {}
 
   async findMembership(userId: bigint) {
-    const [membership] = await this.db.select().from(groupMemberships).where(and(
-      eq(groupMemberships.group_id, this.group.id), eq(groupMemberships.user_id, userId),
-    ));
+    const [membership] = await this.db.select(memberProjection).from(groupMemberships)
+      .innerJoin(users, eq(users.id, groupMemberships.user_id))
+      .where(and(eq(groupMemberships.group_id, this.group.id), eq(groupMemberships.user_id, userId)));
     return membership ?? null;
   }
 
@@ -80,7 +79,7 @@ class LockedGroupTransaction {
     return membership;
   }
 
-  async setMemberRole(userId: bigint, role: Role) {
+  async setMemberRole(userId: bigint, role: GroupRole) {
     const [membership] = await this.db.update(groupMemberships).set({ role }).where(and(
       eq(groupMemberships.group_id, this.group.id), eq(groupMemberships.user_id, userId),
     )).returning();
@@ -118,10 +117,10 @@ class LockedGroupTransaction {
   }
 
   async findInvitation(invitationId: string) {
-    const [invitation] = await this.db.select().from(groupInvitations).where(and(
-      eq(groupInvitations.group_id, this.group.id), eq(groupInvitations.id, invitationId),
-    ));
-    return invitation ?? null;
+    const [row] = await this.db.select({ invitation: groupInvitations, inviterName: users.name })
+      .from(groupInvitations).innerJoin(users, eq(users.id, groupInvitations.invited_by_user_id))
+      .where(and(eq(groupInvitations.group_id, this.group.id), eq(groupInvitations.id, invitationId)));
+    return row ? { ...row.invitation, invited_by_user_name: row.inviterName } : null;
   }
 
   async findPendingInvitation(userId: bigint) {
@@ -186,7 +185,7 @@ export class PostgresGroupsRepository {
     return row ?? null;
   }
 
-  async listGroupsForMember(userId: bigint, state: 'active' | 'deleted', page: PageInput<string>, now: Date) {
+  async listGroupsForMember(userId: bigint, state: GroupListState, page: PageInput<string>, now: Date) {
     const stateFilter = state === 'active'
       ? isNull(groups.deleted_at)
       : and(eq(groupMemberships.role, 'ADMIN'), sql`${recoveryDeadline} >= ${now.toISOString()}::timestamptz`);
