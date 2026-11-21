@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, gt, isNull, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { alias } from 'drizzle-orm/pg-core';
 import { groupInvitations, groupMemberships, groups, users } from '../../db/schema';
@@ -57,6 +57,13 @@ class LockedGroupTransaction {
       .innerJoin(users, eq(users.id, groupMemberships.user_id))
       .where(and(eq(groupMemberships.group_id, this.group.id), eq(groupMemberships.user_id, userId)));
     return membership ?? null;
+  }
+
+  async findMemberIds(userIds: bigint[]) {
+    if (!userIds.length) return [];
+    const rows = await this.db.select({ id: groupMemberships.user_id }).from(groupMemberships)
+      .where(and(eq(groupMemberships.group_id, this.group.id), inArray(groupMemberships.user_id, userIds)));
+    return rows.map(row => row.id);
   }
 
   async hasOtherMembers(userId: bigint) {
@@ -181,6 +188,14 @@ export class PostgresGroupsRepository {
 
   async findActiveGroupForMember(groupId: string, userId: bigint) {
     const [row] = await this.groupsForUser(userId)
+      .where(and(eq(groups.id, groupId), isNull(groups.deleted_at)));
+    return row ?? null;
+  }
+
+  /** Distingue grupo indisponível de grupo ativo sem vínculo para o contrato legado. */
+  async findActiveGroupRole(groupId: string, userId: bigint) {
+    const [row] = await this.db.select({ groupId: groups.id, role: groupMemberships.role }).from(groups)
+      .leftJoin(groupMemberships, and(eq(groupMemberships.group_id, groups.id), eq(groupMemberships.user_id, userId)))
       .where(and(eq(groups.id, groupId), isNull(groups.deleted_at)));
     return row ?? null;
   }

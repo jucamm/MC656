@@ -60,7 +60,15 @@ O DTO de convite tem `id`, `group_id`, `group_name`, `status`, `created_at` e `r
 Para testar a API com PostgreSQL, use um banco descartável e execute em `back/`.
 
 ```bash
-HU02_TEST_DATABASE_URL='postgresql://localhost/mc656_groups_test' npm test -- src/modules/groups/tests
+HU02_TEST_DATABASE_URL='postgresql://localhost/mc656_groups_test' npm test -- src/modules/groups/tests src/modules/decision-process/tests
 ```
 
 As suítes PostgreSQL aplicam as migrations na base de teste. Veja o [runbook do banco](identity-2-database-runbook.md) para a configuração local.
+
+## Uso por processos decisórios e reuniões
+
+As rotas existentes em `/groups/:groupId/decision-processes` consultam os vínculos persistidos da HU02. Integrantes de grupo ativo podem ler processos e versões. Administradores podem criar ou publicar versões, e cada ID em `requiredParticipantIds` deve identificar um integrante atual do próprio grupo. A escrita do processo ocorre com o grupo bloqueado. O histórico já publicado preserva os identificadores que tinha no momento da publicação.
+
+Os processos decisórios seguem seu contrato HTTP existente. Retornam `403 FORBIDDEN` para papel ou vínculo insuficiente em grupo ativo, `404 GROUP_NOT_FOUND` para grupo inexistente ou excluído, `404 PROCESS_NOT_FOUND` quando o processo está fora do grupo consultado e `422 VALIDATION_ERROR` para participante obrigatório inválido. O repositório de processos e versões opera em memória. Recuperar o grupo pode restabelecer o acesso a esse histórico enquanto ele estiver na instância.
+
+A HU03 pode consultar grupo ativo e vínculo vigente com `requireActiveGroupAccess` e proteger escritas com `withActiveGroupAccess`. As regras de audiência e de administração individual de cada reunião pertencem ao módulo de reuniões.

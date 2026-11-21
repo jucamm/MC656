@@ -4,19 +4,26 @@ import type { GroupListState, GroupRole, PageInput } from './groups.types';
 const maxUserId = 9_223_372_036_854_775_807n;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && uuidPattern.test(value);
+}
+
 export function validateUuid(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !uuidPattern.test(value)) {
+  if (!isUuid(value)) {
     invalidField(field, 'Informe um UUID válido.');
   }
   return value.toLowerCase();
 }
 
-export function validateUserId(value: unknown, field: string): bigint {
-  if (typeof value !== 'string' || !/^[1-9][0-9]{0,18}$/.test(value)) {
-    invalidField(field, 'Informe um identificador de usuário decimal positivo.');
-  }
+export function parseUserId(value: unknown): bigint | null {
+  if (typeof value !== 'string' || !/^[1-9][0-9]{0,18}$/.test(value)) return null;
   const id = BigInt(value);
-  if (id > maxUserId) invalidField(field, 'O identificador de usuário está fora do intervalo permitido.');
+  return id <= maxUserId ? id : null;
+}
+
+export function validateUserId(value: unknown, field: string): bigint {
+  const id = parseUserId(value);
+  if (id === null) invalidField(field, 'Informe um identificador de usuário decimal positivo na faixa permitida.');
   return id;
 }
 

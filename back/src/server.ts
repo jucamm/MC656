@@ -16,6 +16,7 @@ import { GmailEmailAdapter } from './modules/identity/notifications/gmail-email.
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { createApp } from './app';
+import { PersistedDecisionProcessGroupAccess } from './modules/decision-process/decision-process.group-access';
 import { PostgresUserRepository } from './modules/identity/user.repository';
 import { PostgresSessionRepository } from './modules/identity/session.repository';
 import { SessionService } from './modules/identity/session.service';
@@ -49,6 +50,7 @@ const verification = new VerificationService(new PostgresVerificationRepository(
 const onboarding = { verification, registration: new RegistrationService(users, verification) };
 const groupsRepository = new PostgresGroupsRepository(database);
 const app = createApp(undefined, sessions, onboarding, {
+  decisionProcessGroupAccess: new PersistedDecisionProcessGroupAccess(groupsRepository),
   groups: {
     groups: new GroupsService(groupsRepository),
     invitations: new GroupInvitationsService(groupsRepository),

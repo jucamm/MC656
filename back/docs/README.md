@@ -57,7 +57,7 @@ Depois, execute `npm run db:migrate`, `npm run build` e `npm start`. Para valida
 
 - **Contratos:** consulte `identity.types.ts` (DTOs, estruturas de dados trocadas entre componentes) e `identity.errors.ts`. Identidade usa `{ "data": ... }` no sucesso e `{ "error": { "code", "message", "details" } }` no erro; logout não tem corpo. Outros módulos preservam formatos próprios.
 - **Convenções:** campos em inglês e `snake_case`, IDs `bigint` como strings, desafios identificados por UUID e datas ISO UTC. Códigos também são strings, preservando zeros iniciais. Entradas HTTP precisam de validação, além da tipagem TypeScript.
-- **Acesso:** monte novos routers de negócio depois da autenticação e da verificação globais. Permissões de grupo vêm do servidor, associadas ao ID real. Sem vínculo configurado, mesmo uma conta `verified` recebe `403` nesses recursos; headers mockados não concedem acesso.
+- **Acesso:** monte novos routers de negócio depois da autenticação e da verificação globais. A HU02 resolve os papéis a partir do vínculo persistido da conta autenticada. Os processos decisórios retornam `403` quando a conta verificada está sem o vínculo ou papel exigido em um grupo ativo. [Contratos da HU02](groups-contracts.md)
 - **Frontend:** envie o Bearer explicitamente. Trate `401` como autenticação inválida, examine a causa de `403` e respeite `Retry-After`/`details.retry_at` em `429`. O armazenamento do token no navegador ainda é escolha da equipe. CORS exige a origem exata, permite preflight sem Bearer e não substitui autenticação.
 - **Evolução:** preserve transações e a ordem dos locks. Tentativas incorretas e bloqueios precisam permanecer gravados mesmo quando o HTTP retorna erro. Crie novas migrations, sem editar as já aplicadas. Provedores futuros devem integrar pela interface `sendVerification`, respeitando as garantias de falha e a proteção dos códigos.
 
@@ -78,4 +78,4 @@ Os guias por Issue registram as decisões da época. Use os DTOs no código e o 
 
 **Atenção às diferenças entre as etapas:** o modo sem banco descrito na Issue 4 foi substituído pela exigência de `DATABASE_URL` na Issue 8. O emissor simulado da Issue 3 foi integrado ao serviço persistido na Issue 5. Pendências e contagens de testes antigas retratam aquela entrega; consulte o runbook para inicializar o banco com a migration atual.
 
-**Lacunas explícitas:** filtro definitivo de e-mails, persistência dos vínculos de grupo e escolha de armazenamento do token ainda dependem de outras implementações ou decisões. Alguns exemplos da Issue 1 têm comentários e campos omitidos: são ilustrações, não JSON pronto para envio. Use os DTOs e os documentos específicos para montar requisições completas.
+**Lacunas explícitas:** filtro definitivo de e-mails e escolha de armazenamento do token ainda dependem de outras implementações ou decisões. Use os DTOs e os documentos vigentes para montar requisições completas.
