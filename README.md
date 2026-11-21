@@ -77,6 +77,8 @@ npm run dev
 
 A interface estará acessível no navegador pelo endereço indicado pelo Vite (normalmente `http://localhost:5173`).
 
+O frontend usa `https://localhost:3000` para autenticação, grupos e pautas. Se usar outro endereço de API, configure `VITE_API_URL` em `front/.env.local`. Quando o backend local usar um certificado autoassinado, abra a URL da API no navegador para aceitar o certificado de desenvolvimento antes de entrar pelo frontend. Configure `TRUSTED_ORIGIN` no backend com a origem efetiva do Vite.
+
 ---
 
 ## Testes Automatizados e Qualidade

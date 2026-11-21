@@ -1,6 +1,5 @@
 import type { User, ChallengeInfo, ApiError, MeData } from '../types/auth';
-
-const API_BASE = 'http://localhost:3000';
+import { API_BASE } from './apiBase';
 
 class AuthApiService {
     private token: string | null = null;
@@ -22,14 +21,12 @@ class AuthApiService {
     return this.token;
     }
 
-    private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(options.headers as Record<string, string>),
-    };
+    async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const headers = new Headers(options.headers);
+    if (options.body != null) headers.set('Content-Type', 'application/json');
 
     if (this.token) {
-        headers['Authorization'] = `Bearer ${this.token}`;
+        headers.set('Authorization', `Bearer ${this.token}`);
     }
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -38,7 +35,7 @@ class AuthApiService {
     });
 
     if (response.status === 204) {
-        return {} as T;
+        return undefined as T;
     }
 
     const json = await response.json();

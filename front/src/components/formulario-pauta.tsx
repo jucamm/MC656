@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { authApi } from '../services/authApi';
+import { API_BASE } from '../services/apiBase';
 
 interface FormData {
   titulo: string;
@@ -59,7 +60,6 @@ export default function FormularioPauta() {
     setIsSubmitting(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const token = authApi.getToken();
 
       const headers: Record<string, string> = {
@@ -69,7 +69,7 @@ export default function FormularioPauta() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${API_URL}/api/pautas`, {
+      const response = await fetch(`${API_BASE}/api/pautas`, {
         method: 'POST',
         headers,
         body: JSON.stringify(formData),

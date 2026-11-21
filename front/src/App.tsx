@@ -4,6 +4,7 @@
     import { LoginForm } from './components/auth/LoginForm';
     import { RegisterForm } from './components/auth/RegisterForm';
     import { VerificationView } from './components/auth/VerificationView';
+    import { GroupsDashboard } from './components/groups/GroupsDashboard';
     import Historico from './components/Historico';
     import FormularioPauta from './components/formulario-pauta';
     import './App.css';
@@ -34,9 +35,14 @@
       }, []);
     
       const handleLogout = async () => {
-        await authApi.logout();
-        setCurrentUser(null);
-        setCurrentScreen('login');
+        try {
+          await authApi.logout();
+        } catch {
+          // O cliente de autenticação já encerrou a sessão local.
+        } finally {
+          setCurrentUser(null);
+          setCurrentScreen('login');
+        }
       };
     
       if (loadingInitial) {
@@ -53,7 +59,6 @@
           <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm">
             <div className="flex items-center gap-3">
               <span className="text-xl font-bold text-indigo-600">MC656</span>
-              <span className="text-sm bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full font-mono">HU01</span>
             </div>
     
             {currentUser && (
@@ -63,7 +68,7 @@
                   <div className="text-xs text-gray-500">
                     Status:{' '}
                     <span className={`font-semibold ${currentUser.status === 'verified' ? 'text-green-600' : 'text-amber-600'}`}>
-                      {currentUser.status === 'verified' ? 'Verificado' : 'Pendente (2FA)'}
+                      {currentUser.status === 'verified' ? 'Verificado' : 'E-mail pendente'}
                     </span>
                   </div>
                 </div>
@@ -78,7 +83,7 @@
           </header>
     
           {/* Conteúdo Principal */}
-          <main className="flex-1 p-8">
+          <main className="flex-1 p-4 sm:p-8">
             {currentScreen === 'login' && (
               <LoginForm
                 onSuccess={(user) => {
@@ -108,15 +113,9 @@
               />
             )}
     
-            {currentScreen === 'dashboard' && currentUser && (
+            {currentScreen === 'dashboard' && currentUser?.status === 'verified' && (
               <div className="max-w-6xl mx-auto flex flex-col gap-8">
-                <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg shadow-sm">
-                  <h3 className="font-bold text-green-800">Bem-vindo(a) à Área Protegida!</h3>
-                  <p className="text-sm text-green-700">
-                    Sua conta foi autenticada e validada com e-mail.
-                  </p>
-                </div>
-                {/* Componentes de negócio já existentes */}
+                <GroupsDashboard key={currentUser.id} userId={currentUser.id} />
                 <Historico />
                 <FormularioPauta />
               </div>
@@ -127,5 +126,3 @@
     }
     
     export default App;
-
-    
