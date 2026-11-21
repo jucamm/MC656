@@ -5,7 +5,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 /**
- * Estados da conta; a coerência com os dois timestamps é imposta também por check no PostgreSQL.
+ * Estados da conta; a coerência com o timestamp de confirmação é imposta também por check no PostgreSQL.
  */
 export const accountStatus = pgEnum('account_status', ['pending', 'verified']);
 /**
@@ -18,7 +18,7 @@ export const verificationChannel = pgEnum('verification_channel', ['email']);
 export const rateLimitWindow = pgEnum('rate_limit_window', ['hour', 'day']);
 
 /**
- * Schema de identidade: e-mail único, telefone reutilizável e apenas hash de senha.
+ * Schema de identidade: e-mail único e apenas hash de senha.
  * @remarks bigint fica como bigint no ORM; a camada de DTO converte para string decimal.
  */
 export const users = pgTable('users', {
@@ -80,7 +80,7 @@ export const verificationChallenges = pgTable('verification_challenges', {
 
 /**
  * Persistência de cotas por conta, canal e tipo de janela, sem dimensão de IP.
- * @remarks A PK permite quatro combinações por conta. O serviço cria as linhas somente
+ * @remarks A PK permite uma linha por janela para o e-mail de cada conta. O serviço cria as linhas somente
  * após envio aceito e preserva blocked_until mesmo quando a janela diária expira.
  */
 export const rateLimits = pgTable('rate_limits', {

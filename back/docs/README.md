@@ -1,14 +1,14 @@
 # Cadastro e Autenticação (HU01)
 
-Este guia apresenta as entregas das Issues #36 a #43 e orienta a leitura dos detalhes. A documentação está em `back/docs`. Os documentos de cada issue retratam aquela etapa; esta introdução considera a integração final da Issue #43 e o código atual.
+Este guia apresenta as entregas das Issues #36 a #43 e orienta a leitura dos detalhes. A documentação está em `back/docs`. Os documentos de cada issue retratam aquela etapa; este guia e o runbook de banco descrevem o fluxo vigente.
 
 ## 1. Visão geral
 
-A HU01 implementa a identificação dos usuários e o controle de entrada na plataforma. Uma pessoa pode criar conta e fazer login, mas só acessa recursos de negócio depois de confirmar e-mail e telefone.
+A HU01 implementa a identificação dos usuários e o controle de entrada na plataforma. Uma pessoa pode criar conta e fazer login, mas só acessa recursos de negócio depois de confirmar seu e-mail.
 
-O backend entrega cadastro, senhas protegidas, sessões persistidas, logout, consulta da própria conta, verificação de canais, limites de envio, reciclagem de telefone e controle de acesso com CORS.
+O backend entrega cadastro, senhas protegidas, sessões persistidas, logout, consulta da própria conta, verificação de e-mail, limites de envio e controle de acesso com CORS.
 
-**Limites da entrega:** e-mail e telefone usam mocks, substitutos locais dos provedores. Não há entrega real nem comprovação efetiva dos contatos. As telas de autenticação e a persistência das associações em grupos não foram implementadas pela HU01. Outros módulos integrados ainda usam componentes em memória; a persistência da identidade não torna toda a plataforma persistente.
+**Entrega de códigos.** O servidor usa o adaptador Gmail quando as credenciais estão configuradas. O adaptador simulado é usado nos testes e em configuração local sem provedor, com captura interna das mensagens nos testes. O frontend já oferece cadastro, login e verificação.
 
 ## 2. Organização da solução
 
@@ -27,25 +27,23 @@ As quatro tabelas da HU01 guardam contas (`users`), sessões (`authentication_se
 
 ## 3. Conceitos e decisões essenciais
 
-- **Autenticação e autorização:** autenticar identifica a pessoa; autorizar decide seu acesso. Uma conta `pending` pode concluir o cadastro inicial, chamado de onboarding, e sair da sessão. Só fica `verified` após confirmar os dois canais. Mesmo assim, grupos exigem associação/papel próprios: não há concessão automática de administrador.
+- **Autenticação e autorização:** autenticar identifica a pessoa; autorizar decide seu acesso. Uma conta `pending` pode concluir o cadastro inicial, chamado de onboarding, e sair da sessão. Só fica `verified` após confirmar o e-mail. Mesmo assim, grupos exigem associação/papel próprios: não há concessão automática de administrador.
 - **Sessão:** cada login emite um token opaco, uma credencial aleatória sem permissões embutidas. Ele é enviado exclusivamente em `Authorization: Bearer <token>`; o banco guarda apenas seu hash. Não há autenticação por cookies, JWT ou refresh token. A sessão expira após um mês de calendário UTC sem atividade; requisições válidas renovam o prazo. Logout revoga somente a sessão atual.
-- **Desafio:** é uma solicitação de confirmação, com UUID e código de seis dígitos. E-mail dura 30 minutos; telefone dura 5 minutos e exige e-mail confirmado. O código é protegido por HMAC, calculado com chave secreta externa ao banco. Reenvio substitui o desafio; três códigos incorretos exigem novo envio.
+- **Desafio:** é uma solicitação de confirmação, com UUID e código de seis dígitos. O desafio de e-mail expira em 30 minutos. O código é protegido por HMAC, calculado com chave secreta externa ao banco. Reenvio substitui o desafio; três códigos incorretos exigem novo envio.
 - **Cotas e falhas:** cada conta/canal permite três envios por hora e seis por dia. Exceder o diário bloqueia envios por 72 horas. As janelas começam no primeiro envio aceito. Falhas do mock não consomem cota nem substituem um desafio válido. Falha no envio inicial preserva o cadastro com `201` e `delivery_status: failed`.
-- **Reciclagem de telefone:** contas distintas podem cadastrar o mesmo número. Quando outra conta o confirma, a anterior perde essa confirmação e volta a `pending`, preservando o e-mail. Sua sessão mantém o onboarding disponível, mas a próxima requisição protegida é recusada. Transações e locks evitam duas confirmações vigentes sob concorrência.
 - **Senha:** Bcrypt protege a senha sem alterar seu conteúdo. O máximo é 72 bytes, não necessariamente 72 caracteres. Os defaults de custo e mínimo são escolhas técnicas configuráveis; a referência ISO 27100 registrada pela equipe não implica certificação nem define esses valores nos materiais fornecidos.
 
 ## 4. Fluxo de funcionamento
 
 Um exemplo com Ana:
 
-1. `POST /auth/register`: o serviço valida os contatos, protege a senha, persiste uma conta `pending` e solicita o desafio de e-mail ao mock.
+1. `POST /auth/register`: o serviço valida o e-mail, protege a senha, persiste uma conta `pending` e solicita o desafio de e-mail ao adaptador configurado.
 2. `POST /auth/login`: Ana recebe a sessão e passa a enviar o Bearer nos endpoints autenticados.
 3. `POST /auth/verifications/email/confirm`: confirma o e-mail com `challenge_id` e `code`.
-4. `POST /auth/verifications/phone/send` e `POST /auth/verifications/phone/confirm`: solicita e confirma o telefone.
-5. Com ambos confirmados, `GET /auth/me` informa `verified`. Ana pode acessar `/api/pautas`; grupos exigem também os vínculos correspondentes.
-6. `POST /auth/logout`: revoga aquela sessão e responde `204`, sem corpo.
+4. Após confirmar o e-mail, `GET /auth/me` informa `verified`. Ana pode acessar `/api/pautas`; grupos exigem também os vínculos correspondentes.
+5. `POST /auth/logout`: revoga aquela sessão e responde `204`, sem corpo.
 
-Os middlewares verificam acesso antes dos controllers; os serviços coordenam as regras e os repositories persistem os resultados. Neste exemplo, os códigos são obtidos das mensagens capturadas pelo mock em testes: não chegam por e-mail/SMS real nem são expostos pela API.
+Os middlewares verificam acesso antes dos controllers; os serviços coordenam as regras e os repositories persistem os resultados. Neste exemplo, os códigos são obtidos das mensagens capturadas pelo mock em testes: a API omite os códigos.
 
 ## 5. Como continuar o desenvolvimento
 
@@ -65,6 +63,8 @@ Depois, execute `npm run db:migrate`, `npm run build` e `npm start`. Para valida
 
 ## 6. Aprofundamentos
 
+Os guias por Issue registram as decisões da época. Use os DTOs no código e o runbook vigente para configurar o ambiente e verificar o contrato atual.
+
 | Documento | Assunto |
 |---|---|
 | [Testes de mutação de identidade](identity-mutation-testing.md) | Configuração do StrykerJS, execução e interpretação dos relatórios locais. |
@@ -74,9 +74,8 @@ Depois, execute `npm run db:migrate`, `npm run build` e `npm start`. Para valida
 | [Issue 4 — Sessões](identity-4-sessions.md) | Token, renovação, logout e estado por `/auth/me`. |
 | [Issue 5 — Verificação](identity-5-verification.md) | Desafios, HMAC, confirmação atômica e falhas. |
 | [Issue 6 — Comunicação e limites](identity-6-verification-delivery.md) | Mocks por canal, cotas, bloqueios e nova tentativa. |
-| [Issue 7 — Reciclagem de telefone](identity-7-phone-recycling.md) | Transferência, concorrência e perda de acesso. |
 | [Issue 8 — Acesso e frontend](identity-8-access-control.md) | Matriz final de acesso, CORS, grupos e respostas ao cliente. |
 
-**Atenção às diferenças entre as etapas:** o modo sem banco descrito na Issue 4 foi substituído pela exigência de `DATABASE_URL` na Issue 8. O emissor simulado da Issue 3 foi integrado ao serviço persistido na Issue 5. Pendências e contagens de testes antigas retratam aquela entrega; para acesso e inicialização atuais, consulte a Issue 8.
+**Atenção às diferenças entre as etapas:** o modo sem banco descrito na Issue 4 foi substituído pela exigência de `DATABASE_URL` na Issue 8. O emissor simulado da Issue 3 foi integrado ao serviço persistido na Issue 5. Pendências e contagens de testes antigas retratam aquela entrega; consulte o runbook para inicializar o banco com a migration atual.
 
-**Lacunas explícitas:** provedores reais, filtro definitivo de e-mails, persistência dos vínculos de grupo e escolha de armazenamento do token ainda dependem de outras implementações ou decisões. Alguns exemplos da Issue 1 têm comentários e campos omitidos: são ilustrações, não JSON pronto para envio. Use os DTOs e os documentos específicos para montar requisições completas.
+**Lacunas explícitas:** filtro definitivo de e-mails, persistência dos vínculos de grupo e escolha de armazenamento do token ainda dependem de outras implementações ou decisões. Alguns exemplos da Issue 1 têm comentários e campos omitidos: são ilustrações, não JSON pronto para envio. Use os DTOs e os documentos específicos para montar requisições completas.

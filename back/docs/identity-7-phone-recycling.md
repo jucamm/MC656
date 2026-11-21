@@ -1,5 +1,7 @@
 # HU01 — Issue 7: estado da conta e reciclagem de telefone
 
+> Registro histórico da entrega original. Consulte o [guia vigente](README.md) para o fluxo exclusivo por e-mail.
+
 ## Entrega
 
 Branch: `feature/hu01-phone-recycling`, criada da base `feature/hu01` atualizada.

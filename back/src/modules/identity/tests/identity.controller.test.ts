@@ -25,10 +25,8 @@ const mockUser: UserDto = {
   id: FIXTURE_USER_ID,
   name: 'Larissa Silva',
   email: 'larissa@unicamp.br',
-  phone: '+55 (19) 99999-9999',
   status: 'verified',
   email_verified_at: FIXTURE_TIMESTAMP,
-  phone_verified_at: FIXTURE_TIMESTAMP,
   created_at: FIXTURE_TIMESTAMP,
 };
 
@@ -173,7 +171,6 @@ describe('IdentityVerificationController', () => {
       const registerPayload = {
         name: 'Larissa Silva',
         email: 'larissa@unicamp.br',
-        phone: '+55 (19) 99999-9999',
         password: 'SenhaSegura123!',
       };
       const registrationResult = {

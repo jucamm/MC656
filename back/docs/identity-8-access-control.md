@@ -1,5 +1,7 @@
 # HU01 — Issue 8: controle de acesso e integração do frontend
 
+> Registro histórico da entrega original. Consulte o [guia vigente](README.md) para o fluxo exclusivo por e-mail.
+
 ## Entrega e inicialização
 
 Branch: `feature/hu01-access-control`, criada após atualizar `feature/hu01` com o

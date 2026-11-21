@@ -44,6 +44,8 @@ cp .env.example .env
 
 > **Atenção:** No arquivo `.env`, certifique-se de configurar a `DATABASE_URL` com os dados do seu PostgreSQL local e definir uma string de pelo menos 32 caracteres em `VERIFICATION_HMAC_KEY`.
 
+Use um banco vazio com a migration consolidada de identidade. Para reconstruir uma base local descartável ou rodar as suítes PostgreSQL, siga o [runbook de banco](back/docs/identity-2-database-runbook.md).
+
 Com o banco configurado, aplique as migrações e inicie o servidor:
 
 ```bash

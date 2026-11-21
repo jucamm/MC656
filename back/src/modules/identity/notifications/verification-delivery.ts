@@ -37,7 +37,6 @@ export class VerificationDeliveryError extends Error {
   }
 }
 
-/** Adaptador local instanciado separadamente para e-mail e telefone. */
 /**
  * Adaptador sem chamadas externas, com outbox e controle de falha próprios do canal.
  * @remarks WARNING: A outbox tem o código em claro; é fixture interna, não endpoint de depuração.
@@ -63,9 +62,6 @@ export class MockChannelVerificationDelivery implements VerificationDelivery {
   }
 }
 
-/** Composição dos canais; preserva fail/outbox agregados da Issue 5.
- * Outboxes são fixtures internas: nunca publicar nem logar seus códigos.
- */
 /**
  * Adaptador mockado de verificação de e-mail com controle de falha e outbox.
  */

@@ -23,7 +23,7 @@ describe.skipIf(!connectionString)('cadastro com PostgreSQL real', () => {
     delivery_status: 'sent', challenge_id: randomUUID(), expires_at: '2026-10-22T12:30:00.000Z',
   });
   const service = new RegistrationService(repository, delivery, passwords);
-  const input = { name: 'Ana', email: emails[0], phone: '11987654321', password: ' senhaSegura ' };
+  const input = { name: 'Ana', email: emails[0], password: ' senhaSegura ' };
 
   beforeAll(async () => { await migrateIdentityTestDatabase(pool); });
   afterAll(async () => {
@@ -37,7 +37,7 @@ describe.skipIf(!connectionString)('cadastro com PostgreSQL real', () => {
   it('persiste conta pendente, hash Bcrypt e DTO seguro consultável por id', async () => {
     const result = await service.register({ ...input, email: ` ${input.email.toUpperCase()} ` });
     const [stored] = await db.select().from(users).where(inArray(users.email, [emails[0]]));
-    expect(stored).toMatchObject({ status: 'pending', email_verified_at: null, phone_verified_at: null, phone: '+55 (11) 98765-4321' });
+    expect(stored).toMatchObject({ status: 'pending', email_verified_at: null });
     expect(await passwords.compare(input.password, stored.password_hash)).toBe(true);
     expect(await passwords.compare('senha-errada', stored.password_hash)).toBe(false);
     expect(await repository.findById(result.user.id)).toEqual(result.user);
@@ -46,7 +46,7 @@ describe.skipIf(!connectionString)('cadastro com PostgreSQL real', () => {
     expect(await repository.findById('9223372036854775807')).toBeNull();
   });
 
-  it('serializa duplicidade concorrente pelo índice único, permitindo telefone repetido', async () => {
+  it('serializa duplicidade concorrente pelo índice único de e-mail', async () => {
     const outcomes = await Promise.allSettled([
       service.register({ ...input, email: emails[1] }),
       service.register({ ...input, email: ` ${emails[1].toUpperCase()} ` }),

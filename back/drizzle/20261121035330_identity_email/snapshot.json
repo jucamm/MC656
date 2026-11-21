@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "89e4c462-0f62-49c3-8b91-a5482b79c207",
+  "id": "547c52a2-d6ab-4703-976e-0f3b664439bd",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -26,8 +26,7 @@
     },
     {
       "values": [
-        "email",
-        "phone"
+        "email"
       ],
       "name": "verification_channel",
       "entityType": "enums",
@@ -279,19 +278,6 @@
       "table": "users"
     },
     {
-      "type": "varchar(20)",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "phone",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "users"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -326,19 +312,6 @@
       "generated": null,
       "identity": null,
       "name": "email_verified_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "users"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "phone_verified_at",
       "entityType": "columns",
       "schema": "public",
       "table": "users"
@@ -493,27 +466,6 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "authentication_sessions"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "phone",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "users_phone_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "users"
     },
     {
       "nameExplicit": false,
@@ -671,7 +623,7 @@
       "table": "rate_limits"
     },
     {
-      "value": "\n    (\"status\" = 'verified') =\n    (\"email_verified_at\" IS NOT NULL AND \"phone_verified_at\" IS NOT NULL)\n  ",
+      "value": "\n    (\"status\" = 'verified') = (\"email_verified_at\" IS NOT NULL)\n  ",
       "name": "users_verification_status_check",
       "entityType": "checks",
       "schema": "public",

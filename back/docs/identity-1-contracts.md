@@ -1,5 +1,7 @@
 # HU01 — Issue 1 (Contratos de Identidade)
 
+> Registro histórico da entrega original. Consulte o [guia vigente](README.md) para o fluxo exclusivo por e-mail.
+
 Este documento descreve os contratos de integração (interfaces, rotas e payloads) para o módulo de Identidade.
 
 > **Atenção ao Escopo:** Esta *Issue* define **apenas os contratos**. A aplicação continuará iniciando normalmente, mas não haverá registro de *handlers* executáveis, *migrations*, autenticação real ou acesso ao banco de dados nesta etapa. Isso garante que o time de Front-end tenha os contratos (mocks) liberados o mais rápido possível, enquanto o Back-end constrói a lógica nas Issues subsequentes (3, 4 e 5).
