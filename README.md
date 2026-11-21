@@ -110,6 +110,8 @@ O repositório utiliza o **GitHub Actions** (`.github/workflows/ci.yml`). A cada
 2. Análise estática com ESLint (`npm run lint`);
 3. Execução completa dos testes automatizados e medição de cobertura com Vitest.
 
+O job de backend inicia um PostgreSQL descartável e configura as URLs de teste da HU01 e da HU02 para executar também as suítes de integração. O [runbook de banco](back/docs/identity-2-database-runbook.md#testar-em-postgresql-real) descreve como reproduzir a execução local.
+
 ---
 
 ## Histórico de Entregas e Tags

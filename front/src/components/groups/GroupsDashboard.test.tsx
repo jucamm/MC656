@@ -24,7 +24,8 @@ const empty = () => new Response(null, { status: 204 });
 const fail = (code: string, message: string, status: number) =>
   new Response(JSON.stringify({ error: { code, message, details: {} } }), { status });
 
-function serve(handler: (path: string, method: string, body: BodyInit | null | undefined, query: URLSearchParams) => Response) {
+function serve(handler: (path: string, method: string, body: BodyInit | null | undefined,
+  query: URLSearchParams) => Response | Promise<Response>) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, options) => {
     const url = new URL(String(input));
     expect(url.origin).toBe('https://localhost:3000');
@@ -49,6 +50,28 @@ afterEach(() => {
 });
 
 describe('dashboard de grupos', () => {
+  it('aguarda a resposta do servidor antes de confirmar a criação', async () => {
+    let finishCreation!: (response: Response) => void;
+    const creation = new Promise<Response>(resolve => { finishCreation = resolve; });
+    let created = false;
+    serve((path, method) => {
+      if (path === '/groups' && method === 'POST') return creation;
+      if (path === '/groups') return page(created ? [group] : []);
+      if (path === '/groups/group-1') return json(group);
+      return page([]);
+    });
+    render(<GroupsDashboard userId="1" />);
+    await screen.findByText('Você ainda não participa de grupos.');
+    type('Nome do novo grupo', 'Coletivo');
+    click('Criar grupo');
+    expect(screen.getByRole('button', { name: 'Criar grupo' })).toBeDisabled();
+    expect(screen.queryByText('Grupo criado.')).not.toBeInTheDocument();
+
+    created = true;
+    finishCreation(json(group, 201));
+    expect(await screen.findByText('Grupo criado.')).toBeVisible();
+  });
+
   it('cria, edita, exclui e recupera o grupo com confirmação e feedback', async () => {
     let stored: Group | null = null;
     vi.spyOn(window, 'confirm').mockReturnValue(true);

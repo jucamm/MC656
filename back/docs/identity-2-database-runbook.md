@@ -1,4 +1,4 @@
-# Banco local e testes de identidade
+# Banco local e testes de integração
 
 Execute os comandos a partir de `back/`. Use um servidor PostgreSQL local e um usuário com permissão para criar o banco e seus objetos.
 
@@ -18,7 +18,7 @@ npm run build
 npm start
 ```
 
-A migration inicial consolidada cria as tabelas de identidade com o enum `verification_channel` restrito a `email`. Em `users`, o PostgreSQL exige que `status = 'verified'` corresponda à presença de `email_verified_at`. O Drizzle registra a aplicação em `drizzle.__drizzle_migrations`. Repetir `npm run db:migrate` sobre a base atual mantém os dados.
+A migration inicial consolidada cria as tabelas de identidade com o enum `verification_channel` restrito a `email`. Em `users`, o PostgreSQL exige que `status = 'verified'` corresponda à presença de `email_verified_at`. A migration da HU02 acrescenta grupos, vínculos e convites. O Drizzle registra a aplicação em `drizzle.__drizzle_migrations`. Repetir `npm run db:migrate` sobre a base atual mantém os dados.
 
 ## Reconstruir uma base local antiga
 
@@ -37,10 +37,12 @@ npm run db:migrate
 Crie um banco dedicado. Ajuste a URL para os dados da sua instalação local.
 
 ```bash
-createdb mc656_identity_test
-HU01_TEST_DATABASE_URL='postgresql://localhost/mc656_identity_test' npm test -- src/modules/identity/tests
+createdb mc656_test
+export HU01_TEST_DATABASE_URL='postgresql://localhost/mc656_test'
+export HU02_TEST_DATABASE_URL="$HU01_TEST_DATABASE_URL"
+npm run test:coverage
 ```
 
-As suítes PostgreSQL aplicam a migration em seu próprio banco e removem as fixtures que criarem. Sem `HU01_TEST_DATABASE_URL`, essas suítes são puladas. Use uma base de testes vazia ao mudar de uma versão anterior das migrations.
+As suítes PostgreSQL aplicam as migrations e removem as fixtures que criarem. `HU01_TEST_DATABASE_URL` habilita as suítes de identidade. `HU02_TEST_DATABASE_URL` habilita as de grupos, convites e integração com processos decisórios. A execução local pode compartilhar uma base descartável entre as duas, como acontece no CI. Cada conjunto é pulado se sua variável estiver ausente. Use uma base de testes vazia ao mudar de uma versão anterior das migrations.
 
 Para evoluir o schema, altere `src/db/schema.ts`, execute `npm run db:generate`, revise o SQL e o snapshot e aplique a migration gerada no banco de teste.

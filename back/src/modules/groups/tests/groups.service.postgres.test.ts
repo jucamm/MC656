@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { groupInvitations, groupMemberships, groups, users } from '../../../db/schema';
 import { migrateIdentityTestDatabase } from '../../identity/tests/postgres-test-utils';
 import { GroupInvitationsService } from '../group-invitations.service';
@@ -15,7 +15,8 @@ const deadline = '2029-02-28T23:30:00.000Z';
 const page = { limit: 20 };
 
 describe.skipIf(!connectionString)('regras de grupos e convites com PostgreSQL', () => {
-  const pool = new Pool({ connectionString });
+  const applicationName = `hu02-groups-service-${randomUUID()}`;
+  const pool = new Pool({ connectionString, application_name: applicationName });
   const db = drizzle({ client: pool });
   const repository = new PostgresGroupsRepository(db);
   const groupsService = new GroupsService(repository, () => now);
@@ -150,6 +151,57 @@ describe.skipIf(!connectionString)('regras de grupos e convites com PostgreSQL',
     expect(Boolean(membership)).toBe(results[0].status === 'fulfilled');
   });
 
+  it.each(['aceite', 'exclusão'] as const)('serializa o aceite e a exclusão quando %s obtém o lock primeiro', async firstAction => {
+    const [ana, bruno] = fixtureUsers;
+    const group = await groupsService.createGroup(ana.id, 'Grupo');
+    const invitation = await invitations.invite(group.id, ana.id, bruno.email);
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const withGroupLock = repository.withGroupLock.bind(repository);
+    const lock = vi.spyOn(repository, 'withGroupLock').mockImplementationOnce((groupId, operation) =>
+      withGroupLock(groupId, async tx => {
+        entered.resolve();
+        await release.promise;
+        return operation(tx);
+      }));
+
+    const accept = () => invitations.accept(invitation.id, bruno.id);
+    const remove = () => groupsService.deleteGroup(group.id, ana.id);
+    const acceptFirst = firstAction === 'aceite';
+    const first = acceptFirst ? accept() : remove();
+    const second = Promise.race([entered.promise, first]).then(async () => {
+      if (acceptFirst) await remove();
+      else await accept();
+    });
+    const outcomes = Promise.allSettled([first, second]);
+
+    try {
+      await vi.waitFor(async () => {
+        const waiting = await pool.query(
+          "SELECT 1 FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock'", [applicationName],
+        );
+        expect(waiting.rowCount).toBe(1);
+      });
+      release.resolve();
+      const [winner, follower] = await outcomes;
+      expect(winner.status).toBe('fulfilled');
+      if (acceptFirst) {
+        expect(follower.status).toBe('fulfilled');
+      } else {
+        expect(follower).toMatchObject({ status: 'rejected', reason: { code: 'INVITATION_NOT_FOUND' } });
+      }
+      await groupsService.restoreGroup(group.id, ana.id);
+      expect(await repository.withGroupLock(group.id, tx => tx.findInvitation(invitation.id)))
+        .toMatchObject({ status: acceptFirst ? 'ACCEPTED' : 'CANCELLED' });
+      const membership = await repository.findActiveGroupForMember(group.id, bruno.id);
+      expect(membership?.role ?? null).toBe(acceptFirst ? 'MEMBER' : null);
+    } finally {
+      release.resolve();
+      await outcomes;
+      lock.mockRestore();
+    }
+  });
+
   it('preserva um administrador quando dois administradores tentam rebaixar a si mesmos', async () => {
     const [ana, bruno] = fixtureUsers;
     const group = await groupsService.createGroup(ana.id, 'Grupo');
@@ -162,6 +214,23 @@ describe.skipIf(!connectionString)('regras de grupos e convites com PostgreSQL',
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.find(result => result.status === 'rejected')).toMatchObject({ reason: { code: 'LAST_GROUP_ADMIN' } });
     const { items } = await groupsService.listMembers(group.id, ana.id, page);
+    expect(items.filter(member => member.role === 'ADMIN')).toHaveLength(1);
+  });
+
+  it('preserva um administrador quando dois tentam sair deixando um integrante comum', async () => {
+    const [ana, bruno, carla] = fixtureUsers;
+    const group = await groupsService.createGroup(ana.id, 'Grupo');
+    await addMember(group.id, ana.id, bruno);
+    await addMember(group.id, ana.id, carla);
+    await groupsService.changeMemberRole(group.id, ana.id, bruno.id, 'ADMIN');
+    const results = await Promise.allSettled([
+      groupsService.removeMember(group.id, ana.id, ana.id),
+      groupsService.removeMember(group.id, bruno.id, bruno.id),
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find(result => result.status === 'rejected')).toMatchObject({ reason: { code: 'LAST_GROUP_ADMIN' } });
+    const { items } = await groupsService.listMembers(group.id, carla.id, page);
+    expect(items).toHaveLength(2);
     expect(items.filter(member => member.role === 'ADMIN')).toHaveLength(1);
   });
 });

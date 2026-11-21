@@ -155,6 +155,23 @@ describe.skipIf(!connectionString)('persistência de grupos com PostgreSQL real'
     });
   });
 
+  it('reconstrói a leitura de grupo, vínculo e convite a partir de uma nova conexão', async () => {
+    const invitation = await repository.withGroupLock(groupId, async tx => {
+      await tx.addMember(member, now);
+      return tx.createInvitation(outsider, owner, now);
+    });
+    const nextPool = new Pool({ connectionString });
+    try {
+      const nextRepository = new PostgresGroupsRepository(drizzle({ client: nextPool }));
+      expect(await nextRepository.findActiveGroupForMember(groupId, member))
+        .toMatchObject({ group: { id: groupId, name: 'Grupo' }, role: 'MEMBER' });
+      expect((await nextRepository.listPendingInvitationsForRecipient(outsider, page)).items)
+        .toMatchObject([{ id: invitation!.id, group_id: groupId, status: 'PENDING' }]);
+    } finally {
+      await nextPool.end();
+    }
+  });
+
   it('bloqueia outra conexão até o commit e oferece o estado atualizado ao liberar o lock', async () => {
     const applicationName = `hu02-${randomUUID()}`;
     const secondPool = new Pool({ connectionString, application_name: applicationName });

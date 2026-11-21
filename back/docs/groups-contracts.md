@@ -72,3 +72,21 @@ As rotas existentes em `/groups/:groupId/decision-processes` consultam os víncu
 Os processos decisórios seguem seu contrato HTTP existente. Retornam `403 FORBIDDEN` para papel ou vínculo insuficiente em grupo ativo, `404 GROUP_NOT_FOUND` para grupo inexistente ou excluído, `404 PROCESS_NOT_FOUND` quando o processo está fora do grupo consultado e `422 VALIDATION_ERROR` para participante obrigatório inválido. O repositório de processos e versões opera em memória. Recuperar o grupo pode restabelecer o acesso a esse histórico enquanto ele estiver na instância.
 
 A HU03 pode consultar grupo ativo e vínculo vigente com `requireActiveGroupAccess` e proteger escritas com `withActiveGroupAccess`. As regras de audiência e de administração individual de cada reunião pertencem ao módulo de reuniões.
+
+- Para reunião privada de grupo, a HU03 deve aplicar o vínculo ativo à listagem, ao detalhe e à entrada. Uma lista de acesso da reunião pode restringir o conjunto de integrantes. Reuniões avulsas seguem a política da própria reunião.
+- A FK anulável para `groups.id` preserva a associação e permite reuniões avulsas. A HU03 também deve consultar o estado do grupo, pois a exclusão é lógica.
+- O papel `ADMIN` permite criar reuniões no grupo. A HU03 deve guardar o ID do criador como administrador único da reunião e exigir esse ID para alterar suas especificações. Publicação explícita de uma reunião de grupo e o destino de uma reunião cujo criador sai do grupo ficam para a HU03.
+
+## Validação da entrega
+
+| Cenário | Cobertura automatizada |
+|---|---|
+| Convite e entrada | HTTP com sessão real cobre convite pendente, aceite do destinatário, recusa e cancelamento. Testes do serviço verificam que repetir o aceite após remover o vínculo não o recria. |
+| Escritas concorrentes | PostgreSQL real verifica aceite e exclusão nas duas ordens de aquisição do lock, aceite e cancelamento, saída e rebaixamento concorrentes e publicação de versão durante mudança de papel. |
+| Persistência e recuperação | As suítes verificam restrições, rollback, leitura por nova conexão, recuperação no limite de um ano e exclusão por saída do integrante único. |
+| Regressão de autorização | As rotas de processos decisórios testam acesso entre grupos, revogação, validação de participantes e histórico após recuperação. As suítes da HU01 exercitam a verificação por e-mail e as sessões. |
+| Dashboard | Os testes de componentes exercitam os fluxos de administrador e convidado, paginação, mensagens de erro, preservação de entrada e confirmação somente após a resposta da API. |
+
+Para reproduzir a regressão com cobertura em backend e frontend, execute `npm run build`, `npm run lint` e `npm run test:coverage` em cada diretório. Configure as duas URLs de teste de banco no backend conforme o [runbook](identity-2-database-runbook.md#testar-em-postgresql-real).
+
+Quando o aceite manual for retomado, use duas contas verificadas no dashboard. Com a primeira, crie um grupo e convide a segunda. Com a segunda, aceite o convite e confira as ações de integrante. Com a primeira, confirme que sair exige promover a outra conta, faça a promoção e saia. Com a segunda, exclua e recupere o grupo e confira a lista de integrantes.
