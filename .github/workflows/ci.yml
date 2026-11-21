@@ -12,6 +12,20 @@ jobs:
   backend-checks:
     name: Backend - Build, Lint e Testes
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mc656
+          POSTGRES_PASSWORD: mc656-ci-only
+          POSTGRES_DB: mc656_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U mc656 -d mc656_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: ./back # Faz os comandos rodarem na pasta Back
@@ -36,7 +50,10 @@ jobs:
       - name: Rodar análise estática (ESLint)
         run: npm run lint
 
-      - name: Rodar testes automatizados e cobertura (Vitest)
+      - name: Rodar testes e cobertura com PostgreSQL (Vitest)
+        env:
+          HU01_TEST_DATABASE_URL: "postgresql://mc656:mc656-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/mc656_test"
+          HU02_TEST_DATABASE_URL: "postgresql://mc656:mc656-ci-only@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/mc656_test"
         run: npm run test:coverage
 
   frontend-checks:
