@@ -24,13 +24,21 @@ Para executar o projeto localmente, você precisará de:
 
 * **Node.js** (versão 22 ou superior recomendada);
 * **npm**;
-* **PostgreSQL** (versão 16 recomendada, para persistência do módulo de identidade).
+* **PostgreSQL** (versão 16 recomendada) ou **Docker** para subir o banco local com `create_bd.sh`.
 
 ---
 
 ## Como Executar
 
 ### 1. Configurar e rodar o Backend
+
+Se for usar Docker, execute na raiz do repositório:
+
+```bash
+./create_bd.sh
+```
+
+O script inicia o PostgreSQL 16 em `127.0.0.1:5432` e exibe a `DATABASE_URL` para o backend. O volume `mc656-postgres-data` preserva os dados entre execuções. Se a porta `5432` já estiver ocupada, escolha outra antes da primeira execução, por exemplo `POSTGRES_PORT=5433 ./create_bd.sh`, e use a mesma porta nas próximas execuções.
 
 Abra um terminal e acesse a pasta `back`:
 
@@ -44,7 +52,7 @@ npm ci
 cp .env.example .env
 ```
 
-> **Atenção:** No arquivo `.env`, certifique-se de configurar a `DATABASE_URL` com os dados do seu PostgreSQL local e definir uma string de pelo menos 32 caracteres em `VERIFICATION_HMAC_KEY`.
+> **Atenção:** Se `back/.env` já existir, pule o `cp`. Configure `DATABASE_URL` com a linha exibida pelo script ou com os dados do seu PostgreSQL local. Defina também uma string de pelo menos 32 caracteres em `VERIFICATION_HMAC_KEY`.
 
 Use um banco vazio com a migration consolidada de identidade. Para reconstruir uma base local descartável ou rodar as suítes PostgreSQL, siga o [runbook de banco](back/docs/identity-2-database-runbook.md).
 
