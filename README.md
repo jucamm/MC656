@@ -10,7 +10,7 @@ O objetivo do sistema é facilitar e estruturar processos de tomada de decisão 
 
 O repositório é organizado no formato de monorepo:
 
-* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém as regras de autenticação (HU01), criação de pautas e apuração de votações.
+* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém autenticação (HU01), [grupos e convites (HU02)](back/docs/groups-contracts.md), criação de pautas e apuração de votações.
 * `front/`: Interface web desenvolvida em **React 19**, **Vite** e **Tailwind CSS**.
 * `.github/workflows/`: Pipeline de Integração Contínua (CI) com GitHub Actions.
 

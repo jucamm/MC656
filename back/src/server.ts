@@ -1,5 +1,5 @@
 /**
- * Composição executável da HU01: carrega configuração antes de instanciar serviços.
+ * Carrega a configuração e compõe os serviços persistidos da aplicação.
  * @remarks DATABASE_URL e VERIFICATION_HMAC_KEY são obrigatórias nesta composição;
  * a origem é validada durante createApp. Segredos não são impressos no startup.
  */
@@ -19,6 +19,9 @@ import { createApp } from './app';
 import { PostgresUserRepository } from './modules/identity/user.repository';
 import { PostgresSessionRepository } from './modules/identity/session.repository';
 import { SessionService } from './modules/identity/session.service';
+import { PostgresGroupsRepository } from './modules/groups/groups.repository';
+import { GroupsService } from './modules/groups/groups.service';
+import { GroupInvitationsService } from './modules/groups/group-invitations.service';
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -30,26 +33,27 @@ if (!Number.isInteger(port) || port < 1 || port > 65_535) {
 // A validação acontece antes de abrir a porta do servidor.
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a plataforma autenticada.');
 
-const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : undefined;
-const database = pool ? drizzle({ client: pool }) : undefined;
-const sessions = database
-  ? new SessionService(new PostgresUserRepository(database), new PostgresSessionRepository(database))
-  : undefined;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const database = drizzle({ client: pool });
+const users = new PostgresUserRepository(database);
+const sessions = new SessionService(users, new PostgresSessionRepository(database));
 
 const emailDelivery = (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)
   ? new GmailEmailAdapter()
   : new MockChannelVerificationDelivery('email');
 
-const verification = database
-  ? new VerificationService(new PostgresVerificationRepository(database), emailDelivery)
-  : undefined;
+const verification = new VerificationService(new PostgresVerificationRepository(database), emailDelivery);
 
 // O mesmo emissor é usado no cadastro e no reenvio; assim, cotas, validade e
 // armazenamento protegido não podem divergir entre os dois caminhos.
-const onboarding = database && verification
-  ? { verification, registration: new RegistrationService(new PostgresUserRepository(database), verification) }
-  : undefined;
-const app = createApp(undefined, sessions, onboarding);
+const onboarding = { verification, registration: new RegistrationService(users, verification) };
+const groupsRepository = new PostgresGroupsRepository(database);
+const app = createApp(undefined, sessions, onboarding, {
+  groups: {
+    groups: new GroupsService(groupsRepository),
+    invitations: new GroupInvitationsService(groupsRepository),
+  },
+});
 
 const certPath = process.env.SSL_CERT ?? 'certs/cert.pem';
 const keyPath = process.env.SSL_KEY ?? 'certs/key.pem';
@@ -68,4 +72,4 @@ export const server = https.createServer(tlsOptions, app).listen(port, () => {
 });
 
 // O fechamento do pool é assíncrono; o evento não publica nem serializa credenciais.
-server.on('close', () => { void pool?.end(); });
+server.on('close', () => { void pool.end(); });

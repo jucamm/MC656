@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 
-const methods = ['GET', 'HEAD', 'POST', 'PUT', 'OPTIONS'];
+const methods = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
 const headers = ['authorization', 'content-type'];
 
 /**
