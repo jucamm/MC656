@@ -4,15 +4,20 @@ import type { User, ApiError } from '../../types/auth';
 
 interface Props {
     user: User;
+    initialDeliveryFailed: boolean;
     onUserUpdated: (user: User) => void;
     onContinue: () => void;
 }
 
-export const VerificationView: React.FC<Props> = ({ user, onUserUpdated, onContinue }) => {
+export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed, onUserUpdated, onContinue }) => {
     const [emailChallengeId, setEmailChallengeId] = useState<string>('');
     const [emailCode, setEmailCode] = useState('');
     const [emailLoading, setEmailLoading] = useState(false);
-    const [emailMsg, setEmailMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [emailMsg, setEmailMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
+        initialDeliveryFailed
+            ? { type: 'error', text: 'Sua conta foi criada. O envio do código falhou. Use “Solicitar novo código” para tentar novamente.' }
+            : null,
+    );
 
     const isEmailVerified = !!user.email_verified_at || user.status === 'verified';
 
@@ -102,7 +107,7 @@ export const VerificationView: React.FC<Props> = ({ user, onUserUpdated, onConti
             <div className="text-center mb-8">
                 <h2 className="text-3xl font-extrabold text-gray-800">Confirmação de E-mail</h2>
                 <p className="text-gray-600 mt-2">
-                    Para acessar a plataforma, confirme o código enviado para o seu e-mail.
+                    Para acessar a plataforma, confirme seu e-mail com o código de verificação.
                 </p>
             </div>
 
@@ -133,7 +138,7 @@ export const VerificationView: React.FC<Props> = ({ user, onUserUpdated, onConti
                         </div>
 
                         {emailMsg && (
-                            <div className={`p-3 rounded text-sm mb-4 ${emailMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                            <div role={emailMsg.type === 'error' ? 'alert' : 'status'} className={`p-3 rounded text-sm mb-4 ${emailMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                 {emailMsg.text}
                             </div>
                         )}

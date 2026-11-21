@@ -12,6 +12,7 @@ import { VerificationService } from './modules/identity/verification.service';
 import { MockChannelVerificationDelivery } from './modules/identity/notifications/verification-delivery';
 import { RegistrationService } from './modules/identity/registration.service';
 import { GmailEmailAdapter } from './modules/identity/notifications/gmail-email.adapter';
+import { ResendEmailAdapter } from './modules/identity/notifications/resend-email.adapter';
 
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -39,9 +40,12 @@ const database = drizzle({ client: pool });
 const users = new PostgresUserRepository(database);
 const sessions = new SessionService(users, new PostgresSessionRepository(database));
 
-const emailDelivery = (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)
-  ? new GmailEmailAdapter()
-  : new MockChannelVerificationDelivery('email');
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+const emailDelivery = resendApiKey
+  ? new ResendEmailAdapter({ apiKey: resendApiKey })
+  : process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
+    ? new GmailEmailAdapter()
+    : new MockChannelVerificationDelivery('email');
 
 const verification = new VerificationService(new PostgresVerificationRepository(database), emailDelivery);
 

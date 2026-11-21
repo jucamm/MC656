@@ -15,6 +15,7 @@
       const [currentUser, setCurrentUser] = useState<User | null>(null);
       const [currentScreen, setCurrentScreen] = useState<Screen>('login');
       const [loadingInitial, setLoadingInitial] = useState(true);
+      const [initialDeliveryFailed, setInitialDeliveryFailed] = useState(false);
     
       // Recupera sessão existente ao recarregar a página
       useEffect(() => {
@@ -41,6 +42,7 @@
           // O cliente de autenticação já encerrou a sessão local.
         } finally {
           setCurrentUser(null);
+          setInitialDeliveryFailed(false);
           setCurrentScreen('login');
         }
       };
@@ -96,9 +98,10 @@
     
             {currentScreen === 'register' && (
               <RegisterForm
-                onSuccess={async () => {
+                onSuccess={async (deliveryFailed) => {
                   const res = await authApi.getMe();
                   setCurrentUser(res.user);
+                  setInitialDeliveryFailed(deliveryFailed);
                   setCurrentScreen('verification');
                 }}
                 onSwitchToLogin={() => setCurrentScreen('login')}
@@ -108,6 +111,7 @@
             {currentScreen === 'verification' && currentUser && (
               <VerificationView
                 user={currentUser}
+                initialDeliveryFailed={initialDeliveryFailed}
                 onUserUpdated={(updated) => setCurrentUser(updated)}
                 onContinue={() => setCurrentScreen('dashboard')}
               />
