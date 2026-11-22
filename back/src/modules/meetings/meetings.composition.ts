@@ -1,0 +1,20 @@
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { AppOptions } from '../../app';
+import { createMeetingAgendaRouter } from '../meeting-agenda/meeting-agenda.routes';
+import { MeetingAgendaService } from '../meeting-agenda/meeting-agenda.service';
+import { createMeetingModerationRouter } from '../meeting-moderation/meeting-moderation.routes';
+import { MeetingModerationService } from '../meeting-moderation/meeting-moderation.service';
+import { PostgresMeetingsRepository } from './meetings.repository';
+import { MeetingsService } from './meetings.service';
+
+export function composeMeetingServices(db: NodePgDatabase, clock = () => new Date()):
+  Pick<AppOptions, 'meetings' | 'meetingExtensionRouters'> {
+  const repository = new PostgresMeetingsRepository(db);
+  return {
+    meetings: new MeetingsService(repository, clock),
+    meetingExtensionRouters: [
+      createMeetingAgendaRouter(new MeetingAgendaService(repository, clock)),
+      createMeetingModerationRouter(new MeetingModerationService(repository, clock)),
+    ],
+  };
+}
