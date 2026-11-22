@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  bigint, bigserial, check, index, integer, pgEnum, pgTable,
+  bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable,
   primaryKey, text, timestamp, unique, uniqueIndex, uuid, varchar,
 } from 'drizzle-orm/pg-core';
 
@@ -141,4 +141,44 @@ export const groupInvitations = pgTable('group_invitations', {
   uniqueIndex('group_invitations_pending_group_user_uidx')
     .on(table.group_id, table.invited_user_id).where(sql`${table.status} = 'PENDING'`),
   index('group_invitations_recipient_idx').on(table.invited_user_id, table.id),
+]);
+
+export const meetingAccessMode = pgEnum('meeting_access_mode', ['public', 'group', 'selected']);
+export const meetingParticipantOrigin = pgEnum('meeting_participant_origin', ['creator', 'group', 'invitation']);
+export const meetingParticipantStatus = pgEnum('meeting_participant_status', ['confirmed', 'pending', 'declined']);
+
+export const meetings = pgTable('meetings', {
+  id: uuid('id').primaryKey(),
+  subject: varchar('subject', { length: 150 }).notNull(),
+  starts_at: timestamp('starts_at', { withTimezone: true }).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  created_by_user_id: bigint('created_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  organizer_user_id: bigint('organizer_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  group_id: uuid('group_id').references(() => groups.id),
+  access_mode: meetingAccessMode('access_mode').notNull(),
+}, (table) => [
+  check('meetings_subject_not_blank_check', sql`${table.subject} ~ '[^[:space:]]'`),
+  check('meetings_starts_after_creation_check', sql`${table.starts_at} > ${table.created_at}`),
+  check('meetings_group_access_check', sql`${table.access_mode} <> 'group' OR ${table.group_id} IS NOT NULL`),
+  index('meetings_starts_at_id_idx').on(table.starts_at, table.id),
+  index('meetings_group_id_idx').on(table.group_id),
+]);
+
+export const meetingParticipants = pgTable('meeting_participants', {
+  meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
+  user_id: bigint('user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  origin: meetingParticipantOrigin('origin').notNull(),
+  status: meetingParticipantStatus('status').notNull(),
+  is_moderator: boolean('is_moderator').notNull().default(false),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolved_at: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => [
+  primaryKey({ columns: [table.meeting_id, table.user_id] }),
+  check('meeting_participants_origin_status_check', sql`${table.origin} = 'invitation' OR ${table.status} = 'confirmed'`),
+  check('meeting_participants_moderator_confirmed_check', sql`NOT ${table.is_moderator} OR ${table.status} = 'confirmed'`),
+  check('meeting_participants_resolution_check', sql`
+    (${table.resolved_at} IS NOT NULL) = (${table.origin} = 'invitation' AND ${table.status} <> 'pending')
+    AND (${table.resolved_at} IS NULL OR ${table.resolved_at} >= ${table.created_at})
+  `),
+  index('meeting_participants_user_meeting_idx').on(table.user_id, table.meeting_id),
 ]);
