@@ -44,7 +44,8 @@ describe('Painel de pautas', () => {
     const fetch = fetchMock().mockResolvedValueOnce(page()).mockRejectedValueOnce(new TypeError('offline'))
       .mockResolvedValueOnce(page()).mockResolvedValueOnce(Response.json({ data: item }, { status: 201 }))
       .mockResolvedValueOnce(page([item]));
-    render(<MeetingAgendaPanel meetingId="reuniao" />);
+    const onChanged = vi.fn();
+    render(<MeetingAgendaPanel meetingId="reuniao" onChanged={onChanged} />);
     expect(await screen.findByText('Nenhuma pauta nesta reunião.')).toBeInTheDocument();
     const subject = screen.getByLabelText('Assunto da pauta');
     const context = screen.getByLabelText('Contexto da pauta');
@@ -53,6 +54,7 @@ describe('Painel de pautas', () => {
     await user.click(screen.getByRole('button', { name: 'Registrar pauta' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Atualize a lista antes de tentar novamente');
+    expect(onChanged).not.toHaveBeenCalled();
     expect(subject).toHaveValue('  Orçamento  ');
     expect(context).toHaveValue('Discussão');
     expect(screen.getByRole('button', { name: 'Registrar pauta' })).toBeDisabled();
@@ -61,6 +63,7 @@ describe('Painel de pautas', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar pauta' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Registrar pauta' }));
     expect(await screen.findByText('Pauta registrada.')).toBeInTheDocument();
+    expect(onChanged).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(item.subject)).toBeInTheDocument();
     expect(subject).toHaveValue('');
     expect(context).toHaveValue('');
