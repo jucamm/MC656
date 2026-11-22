@@ -5,12 +5,16 @@ import { Pool } from 'pg';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../../app';
-import { authenticationSessions, meetingParticipants, meetingParticipationBlocks, meetingPolls, meetings, users } from '../../../db/schema';
+import { authenticationSessions, meetingAgendaItems, meetingParticipants, meetingParticipationBlocks, meetingPolls, meetings, users } from '../../../db/schema';
 import { PasswordService } from '../../identity/password.service';
 import { PostgresSessionRepository } from '../../identity/session.repository';
 import { SessionService } from '../../identity/session.service';
 import { migrateIdentityTestDatabase } from '../../identity/tests/postgres-test-utils';
 import { PostgresUserRepository } from '../../identity/user.repository';
+import { createMeetingAgendaRouter } from '../../meeting-agenda/meeting-agenda.routes';
+import { MeetingAgendaService } from '../../meeting-agenda/meeting-agenda.service';
+import { createAgendaReviewRouter } from '../agenda-review.routes';
+import { AgendaReviewService } from '../agenda-review.service';
 import { PostgresMeetingsRepository } from '../../meetings/meetings.repository';
 import { MeetingsService } from '../../meetings/meetings.service';
 import { createMeetingModerationRouter } from '../meeting-moderation.routes';
@@ -29,14 +33,18 @@ describe.skipIf(!connectionString)('moderação local com PostgreSQL', () => {
   let clock: Date;
   const application = createApp(undefined, sessions, undefined, { meetings: new MeetingsService(repository, () => clock) });
   application.use(createMeetingModerationRouter(new MeetingModerationService(repository, () => clock)));
+  application.use(createMeetingAgendaRouter(new MeetingAgendaService(repository, () => clock)));
+  application.use(createAgendaReviewRouter(new AgendaReviewService(repository, () => clock)));
   const app = request(application);
   let accounts: { id: bigint; email: string; token: string }[];
   let id: string;
+  let otherMeetingId: string;
 
   beforeAll(async () => { await migrateIdentityTestDatabase(pool); });
   beforeEach(async () => {
     clock = scheduled;
     id = randomUUID();
+    otherMeetingId = randomUUID();
     const names = ['Organizadora', 'Moderador', 'Participante', 'Leitora', 'Conta pendente', 'Convidada'];
     const hash = await passwords.hash('Senha de teste');
     const inserted = await db.insert(users).values(names.map((name, index) => ({
@@ -64,10 +72,11 @@ describe.skipIf(!connectionString)('moderação local com PostgreSQL', () => {
   });
   afterEach(async () => {
     if (!accounts?.length) return;
+    await db.delete(meetingAgendaItems).where(inArray(meetingAgendaItems.meeting_id, [id, otherMeetingId]));
     await db.delete(meetingPolls).where(eq(meetingPolls.meeting_id, id));
     await db.delete(meetingParticipationBlocks).where(eq(meetingParticipationBlocks.meeting_id, id));
     await db.delete(meetingParticipants).where(eq(meetingParticipants.meeting_id, id));
-    await db.delete(meetings).where(eq(meetings.id, id));
+    await db.delete(meetings).where(inArray(meetings.id, [id, otherMeetingId]));
     const ids = accounts.map(account => account.id);
     await db.delete(authenticationSessions).where(inArray(authenticationSessions.user_id, ids));
     await db.delete(users).where(inArray(users.id, ids));
@@ -186,5 +195,49 @@ describe.skipIf(!connectionString)('moderação local com PostgreSQL', () => {
     await app.post(`${path}/${body.data.id}/close`).set('Authorization', bearer(1)).expect(204);
     const [poll] = await db.select().from(meetingPolls).where(eq(meetingPolls.id, body.data.id));
     expect(poll).toMatchObject({ closed_by_user_id: accounts[0].id, closed_at: start });
+  });
+
+  async function createAgendaItem() {
+    const { body } = await app.post(`/meetings/${id}/agenda-items`).set('Authorization', bearer(2))
+      .send({ subject: 'Pauta para revisão', context: 'Contexto deliberativo' }).expect(201);
+    return body.data;
+  }
+
+  function review(itemId: string, actor: number, decision: string, meetingId = id) {
+    return app.post(`/meetings/${meetingId}/agenda-items/${itemId}/review`).set('Authorization', bearer(actor))
+      .send({ review_status: decision });
+  }
+
+  it('passa da pauta HU04 ao histórico revisado, com uma decisão concorrente vencedora', async () => {
+    const agenda = await createAgendaItem();
+    await review(agenda.id, 2, 'approved').expect(403);
+    await review(agenda.id, 1, 'pending').expect(400);
+    await db.insert(meetings).values({
+      id: otherMeetingId, subject: 'Outra assembleia', starts_at: start, created_at: scheduled, access_mode: 'public',
+      created_by_user_id: accounts[0].id, organizer_user_id: accounts[0].id,
+    });
+    await review(agenda.id, 0, 'approved', otherMeetingId).expect(404);
+    clock = start;
+    const responses = await Promise.all([review(agenda.id, 0, 'approved'), review(agenda.id, 1, 'rejected')]);
+    expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+    const result = responses.find(response => response.status === 200)?.body.data;
+    expect(result).toMatchObject({
+      id: agenda.id, proposer_name: 'Participante', reviewed_at: start.toISOString(), review_status: expect.stringMatching(/^(approved|rejected)$/),
+      reviewed_by_user_id: result.review_status === 'approved' ? accounts[0].id.toString() : accounts[1].id.toString(),
+    });
+    const { body } = await app.get(`/meetings/${id}/agenda-items`).set('Authorization', bearer(0)).expect(200);
+    expect(body.data.items).toEqual([result]);
+  });
+
+  it('nega revisão a moderador bloqueado e serializa o fechamento com a revisão', async () => {
+    const agenda = await createAgendaItem();
+    await block(0, 1).expect(204);
+    await review(agenda.id, 1, 'approved').expect(403);
+    clock = start;
+    const [reviewed] = await Promise.all([review(agenda.id, 0, 'approved'), end(0).expect(204)]);
+    expect([200, 409]).toContain(reviewed.status);
+    const [persisted] = await db.select().from(meetingAgendaItems).where(eq(meetingAgendaItems.id, agenda.id));
+    expect(persisted.review_status).toBe(reviewed.status === 200 ? 'approved' : 'pending');
+    expect((await review(agenda.id, 0, 'rejected').expect(409)).body.error.code).toBe('MEETING_ENDED');
   });
 });
