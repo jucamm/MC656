@@ -38,3 +38,18 @@ it('mantém a conta criada e permite reenviar o código quando a entrega inicial
     expect(sendVerification).toHaveBeenCalledWith('email');
     expect(await screen.findByRole('status')).toHaveTextContent('Código enviado');
 });
+
+it('mostra a seção de reuniões no dashboard de uma conta verificada', async () => {
+    const user = {
+        id: '1', name: 'Ana Silva', email: 'ana@example.com', status: 'verified' as const,
+        email_verified_at: '2026-11-21T12:00:00Z', created_at: '2026-11-21T12:00:00Z',
+    };
+    vi.spyOn(authApi, 'getToken').mockReturnValue('session');
+    vi.spyOn(authApi, 'getMe').mockResolvedValue({ user, verification_challenges: [] });
+    const request = vi.spyOn(authApi, 'request').mockResolvedValue({ items: [], next_cursor: null });
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Reuniões' })).toBeInTheDocument();
+    expect(await screen.findByText('Nenhuma reunião disponível.')).toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith('/meetings?limit=20', { signal: expect.any(AbortSignal) });
+});
