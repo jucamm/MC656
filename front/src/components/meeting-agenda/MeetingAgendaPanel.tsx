@@ -19,11 +19,17 @@ interface PageResult {
   revision: number;
 }
 
-export function MeetingAgendaPanel({ meetingId, revision = 0 }: { meetingId: string; revision?: number }) {
-  return <AgendaPanel key={meetingId} meetingId={meetingId} revision={revision} />;
+interface AgendaPanelProps {
+  meetingId: string;
+  revision?: number;
+  onChanged?: () => void;
 }
 
-function AgendaPanel({ meetingId, revision }: { meetingId: string; revision: number }) {
+export function MeetingAgendaPanel({ meetingId, revision = 0, onChanged }: AgendaPanelProps) {
+  return <AgendaPanel key={meetingId} meetingId={meetingId} revision={revision} onChanged={onChanged} />;
+}
+
+function AgendaPanel({ meetingId, revision, onChanged }: AgendaPanelProps & { revision: number }) {
   const heading = useId();
   const [request, setRequest] = useState<PageRequest>({ revision });
   const [result, setResult] = useState<PageResult | null>(null);
@@ -64,12 +70,13 @@ function AgendaPanel({ meetingId, revision }: { meetingId: string; revision: num
     event.preventDefault();
     if (loading || !page?.actions.can_submit || refreshRequired || !subject.trim() || !context.trim()) return;
 
-    await action.run(async () => {
+    const created = await action.run(async () => {
       await meetingAgendaApi.create(meetingId, { subject: subject.trim(), context: context.trim() });
       setSubject('');
       setContext('');
       refresh();
     }, 'Pauta registrada.');
+    if (created) onChanged?.();
   }
 
   return (
