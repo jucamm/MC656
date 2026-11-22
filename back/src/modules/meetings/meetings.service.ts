@@ -108,6 +108,7 @@ export class MeetingsService {
       if (!availability) throw meetingError('MEETING_INVITATION_NOT_FOUND');
       const meeting = await tx.lockActiveMeeting(meetingId, availability.groupId);
       if (!meeting) throw meetingError('MEETING_INVITATION_NOT_FOUND');
+      if (meeting.ended_at && decision === 'confirmed') throw meetingError('MEETING_ENDED');
 
       const now = this.clock();
       const resolvedAt = now < meeting.created_at ? meeting.created_at : now;

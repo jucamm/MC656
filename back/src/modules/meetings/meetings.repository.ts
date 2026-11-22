@@ -1,4 +1,4 @@
-import { and, eq, exists, gt, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, exists, gt, inArray, isNull, not, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { alias } from 'drizzle-orm/pg-core';
 import { groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../db/schema';
@@ -40,6 +40,10 @@ function blockedParticipant(db: DatabaseQueries, actorId: bigint | typeof meetin
     eq(meetingParticipationBlocks.meeting_id, meetings.id),
     eq(meetingParticipationBlocks.user_id, actorId),
   )));
+}
+
+function participantCanBeSelected(db: DatabaseQueries) {
+  return and(eligibleParticipant(db), not(blockedParticipant(db, meetingParticipants.user_id)));
 }
 
 function visibleTo(db: DatabaseQueries, actorId: bigint) {
@@ -132,6 +136,28 @@ export class MeetingTransaction {
     return meeting ?? null;
   }
 
+  listModerationTargets(meetingId: string) {
+    return this.moderationTargets(meetingId).orderBy(meetingParticipants.user_id);
+  }
+
+  async findModerationTarget(meetingId: string, targetId: bigint) {
+    const [target] = await this.moderationTargets(meetingId, targetId);
+    return target ?? null;
+  }
+
+  private moderationTargets(meetingId: string, targetId?: bigint) {
+    return this.db.select({
+      id: meetingParticipants.user_id,
+      name: users.name,
+      isModerator: meetingParticipants.is_moderator,
+      isEligible: sql<boolean>`${eligibleParticipant(this.db)}`,
+      isBlocked: sql<boolean>`${blockedParticipant(this.db, meetingParticipants.user_id)}`,
+    }).from(meetingParticipants)
+      .innerJoin(meetings, eq(meetings.id, meetingParticipants.meeting_id))
+      .innerJoin(users, eq(users.id, meetingParticipants.user_id))
+      .where(and(eq(meetings.id, meetingId), targetId === undefined ? undefined : eq(meetingParticipants.user_id, targetId)));
+  }
+
   async isEligibleParticipant(meetingId: string, userId: bigint) {
     return (await this.findEligibleParticipantIds(meetingId, [userId])).length === 1;
   }
@@ -142,7 +168,7 @@ export class MeetingTransaction {
     const rows = await this.db.select({ id: meetingParticipants.user_id }).from(meetingParticipants)
       .innerJoin(meetings, eq(meetings.id, meetingParticipants.meeting_id))
       .innerJoin(users, eq(users.id, meetingParticipants.user_id))
-      .where(and(eq(meetings.id, meetingId), inArray(meetingParticipants.user_id, userIds), eligibleParticipant(this.db)))
+      .where(and(eq(meetings.id, meetingId), inArray(meetingParticipants.user_id, userIds), participantCanBeSelected(this.db)))
       .orderBy(meetingParticipants.user_id);
     return rows.map(row => row.id);
   }
@@ -232,7 +258,7 @@ export class PostgresMeetingsRepository {
   }
 
   listParticipants(meetingId: string, actorId: bigint, page: PageInput<bigint>) {
-    const eligible = eligibleParticipant(this.db);
+    const eligible = participantCanBeSelected(this.db);
     // O lateral conserva a reunião no resultado quando a página está vazia e só
     // carrega participantes se o ator for organizador na mesma consulta.
     const participantPage = this.db.select({
@@ -289,7 +315,7 @@ export class PostgresMeetingsRepository {
       .leftJoin(groups, eq(groups.id, meetings.group_id))
       .where(and(eq(meetingOrganizerTransfers.recipient_user_id, actorId), eq(meetingOrganizerTransfers.status, 'pending'),
         eq(meetingOrganizerTransfers.requested_by_user_id, meetings.organizer_user_id), gt(meetings.starts_at, now),
-        isNull(groups.deleted_at), eligibleParticipant(this.db),
+        isNull(groups.deleted_at), participantCanBeSelected(this.db),
         page.after === undefined ? undefined : gt(meetingOrganizerTransfers.id, page.after)))
       .orderBy(meetingOrganizerTransfers.id).limit(page.limit + 1);
   }
@@ -304,7 +330,7 @@ export class PostgresMeetingsRepository {
       .innerJoin(meetings, eq(meetings.id, meetingParticipants.meeting_id))
       .innerJoin(users, eq(users.id, meetings.created_by_user_id))
       .leftJoin(groups, eq(groups.id, meetings.group_id))
-      .where(and(invitationsFor(userId), eq(meetingParticipants.status, 'pending'), isNull(groups.deleted_at),
+      .where(and(invitationsFor(userId), eq(meetingParticipants.status, 'pending'), isNull(groups.deleted_at), isNull(meetings.ended_at),
         page.after === undefined ? undefined : gt(meetingParticipants.meeting_id, page.after)))
       .orderBy(meetingParticipants.meeting_id).limit(page.limit + 1);
   }
