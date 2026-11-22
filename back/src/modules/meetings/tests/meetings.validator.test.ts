@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateCreateMeeting } from '../meetings.validator';
+import { validateCreateMeeting, validateModerators } from '../meetings.validator';
 
 const groupId = '03f1f40b-6293-4bc9-8135-ea004cf38d4d';
 const body = { subject: '  Assembleia  ', starts_at: '2028-02-29T10:30:20-03:00', access: { visibility: 'private' } };
@@ -38,5 +38,19 @@ describe('validação da criação de reuniões', () => {
     expect(() => validateCreateMeeting({ ...body, ...override })).toThrow(expect.objectContaining({
       code: 'VALIDATION_ERROR', details: { fields: { [field]: expect.any(String) } },
     }));
+  });
+});
+
+describe('validação do conjunto de moderadores', () => {
+  it('aceita conjunto vazio e consolida IDs repetidos', () => {
+    expect(validateModerators({ participant_ids: [] })).toEqual([]);
+    expect(validateModerators({ participant_ids: ['2', '1', '2'] })).toEqual([2n, 1n]);
+    expect(validateModerators({ participant_ids: Array.from({ length: 101 }, (_, index) => String(index + 1)) })).toHaveLength(101);
+  });
+
+  it.each([{}, { participant_ids: '1' }, { participant_ids: [1] }, { participant_ids: ['0'] },
+    { participant_ids: ['9223372036854775808'] }, { participant_ids: Array(102).fill('1') },
+    { participant_ids: ['1'], organizer_user_id: '1' }])('rejeita corpo de moderadores inválido %j', input => {
+    expect(() => validateModerators(input)).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
   });
 });

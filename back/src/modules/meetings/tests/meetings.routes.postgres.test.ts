@@ -540,4 +540,121 @@ describe.skipIf(!connectionString)('rotas de reuniões com PostgreSQL', () => {
       await resolve(id, proposed.data.id, 1, 'accept').expect(204);
     });
   });
+
+  describe('designação de moderadores', () => {
+    function setModerators(id: string, actor: number, users: number[]) {
+      return app.put(`/meetings/${id}/moderators`).set('Authorization', bearer(actor))
+        .send({ participant_ids: users.map(user => fixture[user].id.toString()) });
+    }
+
+    async function setupMeeting() {
+      const { body: response } = await create().send({
+        ...grouped(), participant_ids: [fixture[1].id.toString()], participant_emails: [fixture[2].email],
+      }).expect(201);
+      return response.data.id as string;
+    }
+
+    async function moderatorIds(meetingId: string) {
+      const rows = await db.select({ id: meetingParticipants.user_id }).from(meetingParticipants)
+        .where(and(eq(meetingParticipants.meeting_id, meetingId), eq(meetingParticipants.is_moderator, true)))
+        .orderBy(meetingParticipants.user_id);
+      return rows.map(row => row.id);
+    }
+
+    it('substitui o conjunto, é idempotente e permite retirar todas as designações', async () => {
+      const id = await setupMeeting();
+      await respond(id, 2).expect(204);
+      const expected = [fixture[1].id.toString(), fixture[2].id.toString()];
+      for (const selected of [[2, 1, 1], [1, 2]]) {
+        const { body: response } = await setModerators(id, 0, selected).expect(200).expect('Cache-Control', 'no-store');
+        expect(response).toEqual({ data: { participant_ids: expected } });
+      }
+
+      const { body: replacement } = await setModerators(id, 0, [0, 2]).expect(200);
+      expect(replacement.data.participant_ids).toEqual([fixture[0].id.toString(), fixture[2].id.toString()]);
+      const { body: participants } = await participantList(id, 0).expect(200);
+      expect(participants.data.items.map((item: { is_moderator: boolean }) => item.is_moderator)).toEqual([true, false, true]);
+      const { body: cleared } = await setModerators(id, 0, []).expect(200);
+      expect(cleared).toEqual({ data: { participant_ids: [] } });
+      expect(await moderatorIds(id)).toEqual([]);
+    });
+
+    it('mantém o conjunto anterior se qualquer participante for inelegível', async () => {
+      const id = await setupMeeting();
+      await create(4).send(body).expect(201);
+      await setModerators(id, 0, [1]).expect(200);
+      for (const selection of [[1, 2], [1, 4]]) {
+        const result = await setModerators(id, 0, selection).expect(422);
+        expect(result.body.error.code).toBe('MEETING_PARTICIPANT_NOT_ELIGIBLE');
+        expect(await moderatorIds(id)).toEqual([fixture[1].id]);
+      }
+      await respond(id, 2).expect(204);
+      await setModerators(id, 0, [2]).expect(200);
+      await groupService.removeMember(groupId, fixture[0].id, fixture[1].id);
+      await setModerators(id, 0, [1, 2]).expect(422);
+      expect(await moderatorIds(id)).toEqual([fixture[2].id]);
+    });
+
+    it('exige o organizador, grupo ativo e alteração estritamente anterior ao início', async () => {
+      const id = await setupMeeting();
+      await app.put(`/meetings/${id}/moderators`).send({ participant_ids: [] }).expect(401);
+      await setModerators(id, 3, []).expect(403);
+      const unauthorized = await setModerators(id, 1, []).expect(403);
+      expect(unauthorized.body.error.code).toBe('MEETING_ORGANIZER_REQUIRED');
+      await setModerators(id, 2, []).expect(404);
+
+      await groupService.deleteGroup(groupId, fixture[0].id);
+      await setModerators(id, 0, [1]).expect(404);
+      await groupService.restoreGroup(groupId, fixture[0].id);
+
+      meetingClock = new Date('2028-02-29T10:59:59.999Z');
+      await setModerators(id, 0, [1]).expect(200);
+      for (const now of ['2028-02-29T11:00:00.000Z', '2028-02-29T11:00:00.001Z']) {
+        meetingClock = new Date(now);
+        const expired = await setModerators(id, 0, []).expect(409);
+        expect(expired.body.error.code).toBe('MEETING_STARTED');
+        expect(await moderatorIds(id)).toEqual([fixture[1].id]);
+      }
+    });
+
+    it('reavalia o organizador quando a transferência obtém o bloqueio primeiro', async () => {
+      const id = await setupMeeting();
+      const path = `/meetings/${id}/organizer-transfers`;
+      const { body: proposed } = await app.post(path).set('Authorization', bearer(0))
+        .send({ recipient_user_id: fixture[1].id.toString() }).expect(201);
+      const locked = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const changeOrganizer = MeetingTransaction.prototype.changeOrganizer;
+      const update = vi.spyOn(MeetingTransaction.prototype, 'changeOrganizer')
+        .mockImplementationOnce(async function (this: MeetingTransaction, ...args) {
+          locked.resolve();
+          await release.promise;
+          return changeOrganizer.apply(this, args);
+        });
+
+      const accept = app.post(`${path}/${proposed.data.id}/accept`).set('Authorization', bearer(1)).expect(204)
+        .then(response => response);
+      const staleEdit = Promise.race([locked.promise, accept]).then(() => setModerators(id, 0, [1]).expect(403));
+      const outcomes = Promise.allSettled([accept, staleEdit]);
+      try {
+        await vi.waitFor(async () => {
+          const waiting = await pool.query(
+            "SELECT 1 FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock'", [applicationName],
+          );
+          expect(waiting.rowCount).toBe(1);
+        });
+        release.resolve();
+        const [transferred, edited] = await outcomes;
+        expect(transferred.status).toBe('fulfilled');
+        expect(edited).toMatchObject({ status: 'fulfilled', value: { body: { error: { code: 'MEETING_ORGANIZER_REQUIRED' } } } });
+        expect(await moderatorIds(id)).toEqual([]);
+        await setModerators(id, 1, [0]).expect(200);
+        expect(await moderatorIds(id)).toEqual([fixture[0].id]);
+      } finally {
+        release.resolve();
+        await outcomes;
+        update.mockRestore();
+      }
+    });
+  });
 });

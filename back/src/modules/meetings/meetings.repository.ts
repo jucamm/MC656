@@ -100,11 +100,26 @@ export class MeetingTransaction {
   }
 
   async isEligibleParticipant(meetingId: string, userId: bigint) {
-    const [row] = await this.db.select({ id: meetingParticipants.user_id }).from(meetingParticipants)
+    return (await this.findEligibleParticipantIds(meetingId, [userId])).length === 1;
+  }
+
+  async findEligibleParticipantIds(meetingId: string, userIds: bigint[]) {
+    if (!userIds.length) return [];
+
+    const rows = await this.db.select({ id: meetingParticipants.user_id }).from(meetingParticipants)
       .innerJoin(meetings, eq(meetings.id, meetingParticipants.meeting_id))
       .innerJoin(users, eq(users.id, meetingParticipants.user_id))
-      .where(and(eq(meetings.id, meetingId), eq(meetingParticipants.user_id, userId), eligibleParticipant(this.db)));
-    return row !== undefined;
+      .where(and(eq(meetings.id, meetingId), inArray(meetingParticipants.user_id, userIds), eligibleParticipant(this.db)))
+      .orderBy(meetingParticipants.user_id);
+    return rows.map(row => row.id);
+  }
+
+  async replaceModerators(meetingId: string, userIds: bigint[]) {
+    const selected = userIds.length ? inArray(meetingParticipants.user_id, userIds) : sql<boolean>`false`;
+    await this.db.update(meetingParticipants).set({ is_moderator: selected }).where(and(
+      eq(meetingParticipants.meeting_id, meetingId),
+      sql`${meetingParticipants.is_moderator} IS DISTINCT FROM (${selected})`,
+    ));
   }
 
   async findPendingTransfer(meetingId: string) {

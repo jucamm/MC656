@@ -87,3 +87,12 @@ export function validateOrganizerTransfer(input: unknown): bigint {
   const body = readObject(input, 'body', ['recipient_user_id']);
   return validateUserId(body.recipient_user_id, 'recipient_user_id');
 }
+
+export function validateModerators(input: unknown): bigint[] {
+  const { participant_ids: ids } = readObject(input, 'body', ['participant_ids']);
+  // A reunião pode ter os 100 participantes indicados na criação e seu criador.
+  if (!Array.isArray(ids) || ids.length > maxParticipants + 1) {
+    invalidField('participant_ids', 'Informe uma lista com até 101 identificadores de participantes.');
+  }
+  return [...new Set(ids.map(id => validateUserId(id, 'participant_ids')))];
+}

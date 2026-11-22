@@ -6,7 +6,7 @@ import { meetingError } from './meetings.errors';
 import type { MeetingTransaction, PostgresMeetingsRepository } from './meetings.repository';
 import type {
   CreateMeetingInput, InvitationDecision, Meeting, MeetingCursor, MeetingDto, MeetingInvitationDto,
-  MeetingParticipantDto, OrganizerTransfer, OrganizerTransferDto, Participant, ReceivedOrganizerTransferDto, TransferResolution,
+  MeetingModeratorsDto, MeetingParticipantDto, OrganizerTransfer, OrganizerTransferDto, Participant, ReceivedOrganizerTransferDto, TransferResolution,
 } from './meetings.types';
 
 function toMeetingDto(row: Pick<Meeting, 'id' | 'subject' | 'starts_at' | 'access_mode'> & {
@@ -169,6 +169,18 @@ export class MeetingsService {
       if (decision === 'accepted' && !await tx.changeOrganizer(meetingId, meeting.organizer_user_id, actorId)) {
         throw meetingError('ORGANIZER_TRANSFER_RESOLVED');
       }
+    });
+  }
+
+  async setModerators(meetingId: string, actorId: bigint, participantIds: bigint[]): Promise<MeetingModeratorsDto> {
+    return this.repository.transaction(async tx => {
+      const meeting = await this.lockMeetingForOrganizer(tx, meetingId, actorId);
+      const eligibleIds = await tx.findEligibleParticipantIds(meetingId, participantIds);
+      this.requireBeforeStart(meeting);
+      if (eligibleIds.length !== participantIds.length) throw meetingError('MEETING_PARTICIPANT_NOT_ELIGIBLE');
+
+      await tx.replaceModerators(meetingId, eligibleIds);
+      return { participant_ids: eligibleIds.map(id => id.toString()) };
     });
   }
 

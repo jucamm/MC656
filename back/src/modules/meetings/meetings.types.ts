@@ -61,3 +61,7 @@ export interface ReceivedOrganizerTransferDto extends OrganizerTransferDto {
   starts_at: string;
   requested_by_user_name: string;
 }
+
+export interface MeetingModeratorsDto {
+  participant_ids: string[];
+}

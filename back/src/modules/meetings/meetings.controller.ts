@@ -3,7 +3,7 @@ import { DomainError } from '../../errors/domain.error';
 import { validatePage, validateUserId, validateUuid } from '../groups/groups.validator';
 import type { MeetingsService } from './meetings.service';
 import type { InvitationDecision, TransferResolution } from './meetings.types';
-import { validateCreateMeeting, validateMeetingCursor, validateOrganizerTransfer } from './meetings.validator';
+import { validateCreateMeeting, validateMeetingCursor, validateModerators, validateOrganizerTransfer } from './meetings.validator';
 
 function actorId(request: Request): bigint {
   if (!request.auth) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
@@ -73,4 +73,9 @@ export class MeetingsController {
       response.status(204).end();
     };
   }
+
+  setModerators: RequestHandler = async (request, response) => {
+    const moderatorIds = validateModerators(request.body);
+    response.json({ data: await this.service.setModerators(meetingId(request), actorId(request), moderatorIds) });
+  };
 }

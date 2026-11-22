@@ -53,6 +53,7 @@ export function createMeetingsRouter(service: MeetingsService) {
   router.post('/meetings/:meetingId/organizer-transfers/:transferId/accept', noBody, controller.resolveOrganizerTransfer('accepted'));
   router.post('/meetings/:meetingId/organizer-transfers/:transferId/decline', noBody, controller.resolveOrganizerTransfer('declined'));
   router.delete('/meetings/:meetingId/organizer-transfers/:transferId', noBody, controller.resolveOrganizerTransfer('cancelled'));
+  router.put('/meetings/:meetingId/moderators', express.json(), controller.setModerators);
   router.use(meetingErrorHandler);
   return router;
 }
