@@ -1,8 +1,9 @@
 import { validateUserId, validateUuid } from '../groups/groups.validator';
 import { invalidField, normalizeEmail } from '../identity/validators/registration.validator';
-import type { CreateMeetingInput, MeetingAccessMode } from './meetings.types';
+import type { CreateMeetingInput, MeetingAccessMode, MeetingCursor } from './meetings.types';
 
 const instantPattern = /^([0-9]{4}-[0-9]{2}-[0-9]{2})T(?:[01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9](?:\.[0-9]{1,3})?)?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$/;
+const cursorInstantPattern = /^(?:[0-9]{4}|10000)-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/;
 const maxParticipants = 100;
 
 function readObject(input: unknown, field: string, keys: string[]): Record<string, unknown> {
@@ -66,4 +67,18 @@ export function validateCreateMeeting(input: unknown): CreateMeetingInput {
     participantIds: [...new Set(ids.map(value => validateUserId(value, 'participant_ids')))],
     participantEmails: [...new Set(emails.map(value => normalizeEmail(value, 'participant_emails')))],
   };
+}
+
+export function validateMeetingCursor(input: unknown, field: string): MeetingCursor {
+  if (typeof input !== 'string' || input.length > 65) invalidField(field, 'Informe um cursor válido.');
+  const [instant, id, extra] = input.split('|');
+  if (extra !== undefined || !cursorInstantPattern.test(instant) || instant.startsWith('0000-')) {
+    invalidField(field, 'Informe um cursor válido.');
+  }
+  // Valida o calendário na precisão do Date e preserva os microssegundos para o PostgreSQL.
+  const milliseconds = instant.slice(0, -4) + 'Z';
+  const iso = instant.startsWith('10000-') ? '+0' + milliseconds : milliseconds;
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime()) || date.toISOString() !== iso) invalidField(field, 'Informe um cursor válido.');
+  return { startsAt: instant, id: validateUuid(id, field) };
 }

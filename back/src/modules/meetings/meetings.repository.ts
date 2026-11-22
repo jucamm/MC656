@@ -1,14 +1,43 @@
-import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
+import { and, eq, exists, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { groups, meetingParticipants, meetings, users } from '../../db/schema';
+import { groupMemberships, groups, meetingParticipants, meetings, users } from '../../db/schema';
 import { lockGroup } from '../groups/groups.repository';
 import type { PageInput } from '../groups/groups.types';
-import type { InvitationDecision, Participant } from './meetings.types';
+import type { InvitationDecision, MeetingCursor, Participant } from './meetings.types';
 
 type DatabaseQueries = Pick<NodePgDatabase, 'select' | 'insert' | 'update' | 'delete'>;
 
 function invitationsFor(userId: bigint) {
   return and(eq(meetingParticipants.user_id, userId), eq(meetingParticipants.origin, 'invitation'));
+}
+
+function hasGroupMembership(db: DatabaseQueries, userId: bigint | typeof meetingParticipants.user_id) {
+  return exists(db.select({ one: sql`1` }).from(groupMemberships).where(and(
+    eq(groupMemberships.group_id, meetings.group_id),
+    eq(groupMemberships.user_id, userId),
+  )));
+}
+
+function confirmedParticipantWithAccess(member: ReturnType<typeof hasGroupMembership>) {
+  return and(
+    eq(meetingParticipants.status, 'confirmed'),
+    or(eq(meetingParticipants.origin, 'invitation'), isNull(meetings.group_id), member),
+  );
+}
+
+function visibleTo(db: DatabaseQueries, actorId: bigint) {
+  const member = hasGroupMembership(db, actorId);
+  const participant = exists(db.select({ one: sql`1` }).from(meetingParticipants).where(and(
+    eq(meetingParticipants.meeting_id, meetings.id),
+    eq(meetingParticipants.user_id, actorId),
+    confirmedParticipantWithAccess(member),
+  )));
+  return and(isNull(groups.deleted_at), or(
+    eq(meetings.organizer_user_id, actorId),
+    eq(meetings.access_mode, 'public'),
+    and(eq(meetings.access_mode, 'group'), member),
+    participant,
+  ));
 }
 
 class MeetingTransaction {
@@ -56,6 +85,62 @@ export class PostgresMeetingsRepository {
 
   transaction<Result>(operation: (tx: MeetingTransaction) => Promise<Result>): Promise<Result> {
     return this.db.transaction(tx => operation(new MeetingTransaction(tx)));
+  }
+
+  listVisible(actorId: bigint, page: PageInput<MeetingCursor>) {
+    const after = page.after;
+    return this.meetingsForActor(actorId).where(and(
+      visibleTo(this.db, actorId),
+      after ? sql`(${meetings.starts_at}, ${meetings.id}) >
+        (${after.startsAt}::timestamptz, ${after.id}::uuid)` : undefined,
+    )).orderBy(meetings.starts_at, meetings.id).limit(page.limit + 1);
+  }
+
+  async findVisible(meetingId: string, actorId: bigint) {
+    const [row] = await this.meetingsForActor(actorId).where(and(
+      eq(meetings.id, meetingId), visibleTo(this.db, actorId),
+    ));
+    return row ?? null;
+  }
+
+  private meetingsForActor(actorId: bigint) {
+    return this.db.select({
+      id: meetings.id, subject: meetings.subject, starts_at: meetings.starts_at, access_mode: meetings.access_mode,
+      organizer_name: users.name, canManage: sql<boolean>`${meetings.organizer_user_id} = ${actorId}`,
+      cursorStartsAt: sql<string>`to_char(${meetings.starts_at} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+    }).from(meetings)
+      .innerJoin(users, eq(users.id, meetings.organizer_user_id))
+      .leftJoin(groups, eq(groups.id, meetings.group_id));
+  }
+
+  listParticipants(meetingId: string, actorId: bigint, page: PageInput<bigint>) {
+    const eligible = and(eq(users.status, 'verified'),
+      confirmedParticipantWithAccess(hasGroupMembership(this.db, meetingParticipants.user_id)));
+    // O lateral conserva a reunião no resultado quando a página está vazia e só
+    // carrega participantes se o ator for organizador na mesma consulta.
+    const participantPage = this.db.select({
+      user_id: meetingParticipants.user_id, name: users.name,
+      origin: meetingParticipants.origin, status: meetingParticipants.status,
+      is_eligible: sql<boolean>`${eligible}`.as('is_eligible'),
+      is_moderator: sql<boolean>`${meetingParticipants.is_moderator} AND (${eligible})`.as('is_moderator'),
+    }).from(meetingParticipants).innerJoin(users, eq(users.id, meetingParticipants.user_id))
+      .where(and(
+        eq(meetings.organizer_user_id, actorId),
+        eq(meetingParticipants.meeting_id, meetings.id),
+        page.after === undefined ? undefined : gt(meetingParticipants.user_id, page.after),
+      )).orderBy(meetingParticipants.user_id).limit(page.limit + 1).as('participant_page');
+
+    return this.db.select({
+      canManage: sql<boolean>`${meetings.organizer_user_id} = ${actorId}`,
+      participant: {
+        user_id: participantPage.user_id, name: participantPage.name,
+        origin: participantPage.origin, status: participantPage.status,
+        is_eligible: participantPage.is_eligible, is_moderator: participantPage.is_moderator,
+      },
+    }).from(meetings).leftJoin(groups, eq(groups.id, meetings.group_id))
+      .leftJoinLateral(participantPage, sql`true`)
+      .where(and(eq(meetings.id, meetingId), visibleTo(this.db, actorId)))
+      .orderBy(participantPage.user_id);
   }
 
   listPendingInvitations(userId: bigint, page: PageInput<string>) {

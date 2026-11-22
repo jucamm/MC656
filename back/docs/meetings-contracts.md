@@ -20,9 +20,9 @@ As rotas passam por autenticação Bearer e verificação por e-mail. Extrair o 
 | Método e rota | Contrato |
 |---|---|
 | `POST /meetings` | Recebe `subject`, `starts_at`, `access` e, opcionalmente, `group_id`, `participant_ids` para integrantes selecionados e `participant_emails` para contas identificadas por e-mail exato. Retorna `201` com a reunião e `Location: /meetings/<id>` após o commit. |
-| `GET /meetings` | Retorna `200` com `{ items, next_cursor }` em `data`. Aplicar visibilidade antes de paginar, com ordenação por `(starts_at, id)`. |
+| `GET /meetings` | Retorna `200` com `{ items, next_cursor }` em `data`. Aplica visibilidade antes de paginar, com ordenação por `(starts_at, id)`. Envie `next_cursor` como `cursor` na próxima requisição. |
 | `GET /meetings/:meetingId` | Retorna `200` com a reunião aplicando a mesma política da listagem. |
-| `GET /meetings/:meetingId/participants` | Retorna `200` com a lista paginada de participantes, estados de convite e designações, visível ao organizador vigente. |
+| `GET /meetings/:meetingId/participants` | Retorna `200` com `{ items, next_cursor }` ao organizador vigente. A ordem e o cursor usam o ID do usuário. |
 | `GET /meeting-invitations` | Retorna `200` com os convites pendentes da própria conta para reuniões disponíveis. |
 | `POST /meetings/:meetingId/invitation/accept` e `POST /meetings/:meetingId/invitation/decline` | A conta destinatária responde ao próprio convite. Retorna `204`. |
 | `POST /meetings/:meetingId/organizer-transfers` | O organizador envia `recipient_user_id` de outro participante elegível. Retorna `201` com o pedido pendente. |
@@ -40,6 +40,8 @@ O campo `access` contém `visibility` com valor `public` ou `private`. No modo p
 | `404` | Grupo, reunião, convite ou pedido indisponível no escopo do ator. |
 | `409` | `MEETING_STARTED` para transferência ou alteração de moderadores no início ou depois dele. Também cobre convite ou pedido resolvido e pedido concorrente de transferência. |
 | `422` | Participante ou destinatário inelegível para a operação. |
+
+Nas listas de reuniões e participantes, `limit` vai de 1 a 100 e tem padrão 20. A lista de participantes retorna `user_id`, `name`, `origin`, `status`, `is_eligible` e `is_moderator`. O status preserva o registro de confirmação ou convite. A elegibilidade exige conta verificada e participação confirmada com vínculo vigente quando o acesso deriva do grupo. A moderação exibida reflete a designação vigente após essa checagem. Em reunião visível para a conta, apenas o organizador consulta a lista de participantes. Outra conta que pode consultar a reunião recebe `403 MEETING_MANAGEMENT_FORBIDDEN`. Fora da audiência, a API retorna `404 MEETING_NOT_FOUND`.
 
 ## Integridade e concorrência
 

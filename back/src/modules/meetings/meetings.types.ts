@@ -14,6 +14,11 @@ export interface CreateMeetingInput {
   participantEmails: string[];
 }
 
+export interface MeetingCursor {
+  startsAt: string;
+  id: string;
+}
+
 export interface MeetingDto {
   id: string;
   subject: string;
@@ -28,4 +33,13 @@ export interface MeetingInvitationDto {
   subject: string;
   starts_at: string;
   invited_by_user_name: string;
+}
+
+export interface MeetingParticipantDto {
+  user_id: string;
+  name: string;
+  origin: Participant['origin'];
+  status: Participant['status'];
+  is_eligible: boolean;
+  is_moderator: boolean;
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import request from 'supertest';
@@ -21,7 +21,7 @@ const connectionString = process.env.HU03_TEST_DATABASE_URL;
 const clock = new Date('2028-02-29T10:00:00Z');
 const body = { subject: ' Assembleia ', starts_at: '2028-02-29T08:00:00-03:00', access: { visibility: 'private' } };
 
-describe.skipIf(!connectionString)('criação e convites de reuniões com PostgreSQL', () => {
+describe.skipIf(!connectionString)('rotas de reuniões com PostgreSQL', () => {
   const applicationName = `hu03-meetings-${randomUUID()}`;
   const pool = new Pool({ connectionString, application_name: applicationName });
   const db = drizzle({ client: pool });
@@ -37,7 +37,7 @@ describe.skipIf(!connectionString)('criação e convites de reuniões com Postgr
   beforeAll(async () => { await migrateIdentityTestDatabase(pool); });
   beforeEach(async () => {
     const hash = await passwords.hash('Senha de teste');
-    const accounts = await db.insert(users).values(['Organizador', 'Integrante', 'Convidado', 'Pendente'].map((name, index) => ({
+    const accounts = await db.insert(users).values(['Organizador', 'Integrante', 'Convidado', 'Pendente', 'Outro integrante'].map((name, index) => ({
       name, email: `${randomUUID()}@example.com`, password_hash: hash,
       status: index === 3 ? 'pending' as const : 'verified' as const,
       email_verified_at: index === 3 ? null : clock,
@@ -89,6 +89,18 @@ describe.skipIf(!connectionString)('criação e convites de reuniões com Postgr
 
   function respond(id: string, index: number, action: 'accept' | 'decline' = 'accept') {
     return app.post(`/meetings/${id}/invitation/${action}`).set('Authorization', bearer(index));
+  }
+
+  function meetingList(index: number) {
+    return app.get('/meetings').set('Authorization', bearer(index));
+  }
+
+  function detail(id: string, index: number) {
+    return app.get(`/meetings/${id}`).set('Authorization', bearer(index));
+  }
+
+  function participantList(id: string, index: number) {
+    return app.get(`/meetings/${id}/participants`).set('Authorization', bearer(index));
   }
 
   function grouped() {
@@ -222,6 +234,144 @@ describe.skipIf(!connectionString)('criação e convites de reuniões com Postgr
       release.resolve();
       await outcomes;
     }
+  });
+
+  it('aplica as quatro audiências tanto na listagem quanto na URL direta', async () => {
+    await db.insert(groupMemberships).values({ group_id: groupId, user_id: fixture[4].id, role: 'ADMIN' });
+    const cases = [
+      [{ ...grouped(), access: { visibility: 'public' } }, [0, 1, 2, 4]],
+      [{ ...grouped(), access: { visibility: 'private', audience: 'group' } }, [0, 1, 4]],
+      [{ ...grouped(), participant_ids: [fixture[1].id.toString()] }, [0, 1]],
+      [body, [0]],
+    ] as const;
+    const records = [];
+    for (const [input, audience] of cases) {
+      const { body: response } = await create().send(input).expect(201);
+      records.push({ id: response.data.id as string, audience: new Set<number>(audience) });
+    }
+
+    for (const actor of [0, 1, 2, 4]) {
+      const { body: response } = await meetingList(actor).expect(200).expect('Cache-Control', 'no-store');
+      const listed = new Set(response.data.items.map((item: { id: string }) => item.id));
+      for (const { id, audience } of records) {
+        expect(listed.has(id)).toBe(audience.has(actor));
+        const meeting = await detail(id, actor).expect(audience.has(actor) ? 200 : 404);
+        if (audience.has(actor)) {
+          expect(meeting.body.data.actions).toEqual({ can_manage: actor === 0 });
+          expect(meeting.body.data).not.toHaveProperty('participants');
+        } else {
+          expect(meeting.body.error.code).toBe('MEETING_NOT_FOUND');
+        }
+      }
+    }
+
+    const [{ id }] = records;
+    await app.get('/meetings').expect(401);
+    await app.get(`/meetings/${id}`).expect(401);
+    await meetingList(3).expect(403);
+    await detail(id, 3).expect(403);
+    await detail(randomUUID(), 2).expect(404);
+    await detail('invalido', 2).expect(400);
+  });
+
+  it('usa o aceite externo e o vínculo atual para recalcular o acesso a cada consulta', async () => {
+    const result = await create().send({
+      ...grouped(), participant_ids: [fixture[1].id.toString()], participant_emails: [fixture[2].email, fixture[4].email],
+    }).expect(201);
+    const id = result.body.data.id;
+    await detail(id, 2).expect(404);
+    await respond(id, 4, 'decline').expect(204);
+    await detail(id, 4).expect(404);
+    await respond(id, 2).expect(204);
+    await detail(id, 2).expect(200);
+    await detail(id, 1).expect(200);
+    await groupService.removeMember(groupId, fixture[0].id, fixture[1].id);
+    await detail(id, 1).expect(404);
+    await detail(id, 2).expect(200);
+    const removed = await meetingList(1).expect(200);
+    expect(removed.body.data.items).not.toContainEqual(expect.objectContaining({ id }));
+    const accepted = await meetingList(2).expect(200);
+    expect(accepted.body.data.items).toContainEqual(expect.objectContaining({ id }));
+  });
+
+  it('oculta reuniões de grupos excluídos mesmo do organizador e reaplica o acesso na recuperação', async () => {
+    const { body: response } = await create().send({ ...grouped(), access: { visibility: 'public' } }).expect(201);
+    const id = response.data.id;
+    await groupService.deleteGroup(groupId, fixture[0].id);
+    await detail(id, 2).expect(404);
+    await detail(id, 0).expect(404);
+    await participantList(id, 0).expect(404);
+    const hidden = await meetingList(2).expect(200);
+    expect(hidden.body.data.items).not.toContainEqual(expect.objectContaining({ id }));
+    await groupService.restoreGroup(groupId, fixture[0].id);
+    await detail(id, 2).expect(200);
+    await participantList(id, 0).expect(200);
+    const restored = await meetingList(2).expect(200);
+    expect(restored.body.data.items).toContainEqual(expect.objectContaining({ id }));
+  });
+
+  it('pagina reuniões visíveis por início e UUID e valida o cursor', async () => {
+    const startsAt = '2090-02-10T11:00:00.000Z';
+    const { body: hidden } = await create(1).send({ ...body, starts_at: startsAt }).expect(201);
+    const meetingIds: string[] = [];
+    const startsAtPrecise = '2090-02-10T11:00:00.000123Z';
+    for (const start of ['2090-02-11T11:00:00.000Z', startsAt, startsAt, startsAt]) {
+      const { body: response } = await create().send({ ...body, starts_at: start }).expect(201);
+      meetingIds.push(response.data.id);
+    }
+
+    await db.update(meetings).set({ starts_at: sql`${startsAtPrecise}::timestamptz` }).where(eq(meetings.id, meetingIds[3]));
+    const tied = meetingIds.slice(1, 3).sort();
+    let cursor = '2090-02-10T00:00:00.000000Z|00000000-0000-0000-0000-000000000000';
+    for (const [offset, id] of [...tied, meetingIds[3], meetingIds[0]].entries()) {
+      const { body: response } = await meetingList(0).query({ limit: 1, cursor }).expect(200);
+      expect(response.data.items.map((item: { id: string }) => item.id)).toEqual([id]);
+      expect(response.data.items).not.toContainEqual(expect.objectContaining({ id: hidden.data.id }));
+      cursor = response.data.next_cursor;
+      if (offset < 2) expect(cursor).toBe(`2090-02-10T11:00:00.000000Z|${id}`);
+      else if (offset === 2) expect(cursor).toBe(`${startsAtPrecise}|${id}`);
+      else expect(cursor).toBeNull();
+    }
+    await meetingList(0).query({ cursor: 'invalido' }).expect(400);
+    await meetingList(0).query({ cursor: `2090-02-30T11:00:00.000000Z|${meetingIds[0]}` }).expect(400);
+    await meetingList(0).query({ limit: 101 }).expect(400);
+  });
+
+  it('reserva a lista paginada de participantes ao organizador vigente', async () => {
+    const { body: response } = await create().send({
+      ...grouped(), participant_ids: [fixture[1].id.toString()], participant_emails: [fixture[2].email],
+    }).expect(201);
+    const id = response.data.id;
+    await participantList(id, 1).expect(403);
+    await participantList(id, 2).expect(404);
+    await participantList(id, 3).expect(403);
+    await participantList(id, 0).query({ cursor: '1e3' }).expect(400);
+    await db.update(meetingParticipants).set({ is_moderator: true }).where(and(
+      eq(meetingParticipants.meeting_id, id), eq(meetingParticipants.user_id, fixture[1].id),
+    ));
+
+    const { body: first } = await participantList(id, 0).query({ limit: 2 }).expect(200);
+    expect(first.data).toEqual({ items: [
+      { user_id: fixture[0].id.toString(), name: 'Organizador', origin: 'creator', status: 'confirmed', is_eligible: true, is_moderator: false },
+      { user_id: fixture[1].id.toString(), name: 'Integrante', origin: 'group', status: 'confirmed', is_eligible: true, is_moderator: true },
+    ], next_cursor: fixture[1].id.toString() });
+    const { body: second } = await participantList(id, 0).query({ cursor: first.data.next_cursor }).expect(200);
+    expect(second.data).toEqual({ items: [
+      { user_id: fixture[2].id.toString(), name: 'Convidado', origin: 'invitation', status: 'pending', is_eligible: false, is_moderator: false },
+    ], next_cursor: null });
+    const { body: empty } = await participantList(id, 0).query({ cursor: fixture[2].id.toString() }).expect(200);
+    expect(empty.data).toEqual({ items: [], next_cursor: null });
+
+    await groupService.removeMember(groupId, fixture[0].id, fixture[1].id);
+    const { body: revoked } = await participantList(id, 0).expect(200);
+    expect(revoked.data.items[1]).toMatchObject({ status: 'confirmed', is_eligible: false, is_moderator: false });
+
+    await respond(id, 2).expect(204);
+    await db.update(meetings).set({ organizer_user_id: fixture[2].id }).where(eq(meetings.id, id));
+    await participantList(id, 0).expect(403);
+    await participantList(id, 2).expect(200);
+    const { body: updated } = await detail(id, 2).expect(200);
+    expect(updated.data).toMatchObject({ organizer_name: 'Convidado', actions: { can_manage: true } });
   });
 
   it('reverte a inserção da reunião se a persistência de participantes falhar', async () => {
