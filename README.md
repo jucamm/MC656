@@ -10,7 +10,7 @@ O objetivo do sistema é facilitar e estruturar processos de tomada de decisão 
 
 O repositório é organizado no formato de monorepo:
 
-* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém autenticação (HU01), [grupos e convites (HU02)](back/docs/groups-contracts.md), criação de pautas e apuração de votações.
+* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém autenticação (HU01), [grupos e convites (HU02)](back/docs/groups-contracts.md), [reuniões (HU03)](back/docs/meetings-contracts.md), criação de pautas e apuração de votações.
 * `front/`: Interface web desenvolvida em **React 19**, **Vite** e **Tailwind CSS**.
 * `.github/workflows/`: Pipeline de Integração Contínua (CI) com GitHub Actions.
 
@@ -54,7 +54,7 @@ cp .env.example .env
 
 > **Atenção:** Se `back/.env` já existir, pule o `cp`. Configure `DATABASE_URL` com a linha exibida pelo script ou com os dados do seu PostgreSQL local. Defina também uma string de pelo menos 32 caracteres em `VERIFICATION_HMAC_KEY`.
 
-Use um banco vazio com a migration consolidada de identidade. Para reconstruir uma base local descartável ou rodar as suítes PostgreSQL, siga o [runbook de banco](back/docs/identity-2-database-runbook.md).
+Use um banco vazio para a primeira instalação. As migrations preparam identidade, grupos e reuniões. Para reconstruir uma base local descartável ou rodar as suítes PostgreSQL, siga o [runbook de banco](back/docs/identity-2-database-runbook.md).
 
 Com o banco configurado, aplique as migrações e inicie o servidor:
 
@@ -89,7 +89,7 @@ npm run dev
 
 A interface estará acessível no navegador pelo endereço indicado pelo Vite (normalmente `http://localhost:5173`).
 
-O frontend usa `https://localhost:3000` para autenticação, grupos e pautas. Se usar outro endereço de API, configure `VITE_API_URL` em `front/.env.local`. Quando o backend local usar um certificado autoassinado, abra a URL da API no navegador para aceitar o certificado de desenvolvimento antes de entrar pelo frontend. Configure `TRUSTED_ORIGIN` no backend com a origem efetiva do Vite.
+O frontend usa `https://localhost:3000` para autenticação, grupos, reuniões e pautas. Se usar outro endereço de API, configure `VITE_API_URL` em `front/.env.local`. Quando o backend local usar um certificado autoassinado, abra a URL da API no navegador para aceitar o certificado de desenvolvimento antes de entrar pelo frontend. Configure `TRUSTED_ORIGIN` no backend com a origem efetiva do Vite.
 
 ---
 
@@ -122,7 +122,7 @@ O repositório utiliza o **GitHub Actions** (`.github/workflows/ci.yml`). A cada
 2. Análise estática com ESLint (`npm run lint`);
 3. Execução completa dos testes automatizados e medição de cobertura com Vitest.
 
-O job de backend inicia um PostgreSQL descartável e configura as URLs de teste da HU01 e da HU02 para executar também as suítes de integração. O [runbook de banco](back/docs/identity-2-database-runbook.md#testar-em-postgresql-real) descreve como reproduzir a execução local.
+O job de backend inicia um PostgreSQL descartável e configura as URLs de teste da HU01, da HU02 e da HU03 para executar também as suítes de integração. O [runbook de banco](back/docs/identity-2-database-runbook.md#testar-em-postgresql-real) descreve como reproduzir a execução local.
 
 ---
 

@@ -56,7 +56,10 @@ jobs:
             if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$postgres_id")" == healthy ]]; then
               port_mapping=$(docker port "$postgres_id" 5432/tcp)
               db_url="postgresql://mc656:$postgres_password@127.0.0.1:${port_mapping##*:}/mc656_test"
-              HU01_TEST_DATABASE_URL="$db_url" HU02_TEST_DATABASE_URL="$db_url" npm run test:coverage
+              HU01_TEST_DATABASE_URL="$db_url" \
+                HU02_TEST_DATABASE_URL="$db_url" \
+                HU03_TEST_DATABASE_URL="$db_url" \
+                npm run test:coverage
               exit 0
             fi
             sleep 1

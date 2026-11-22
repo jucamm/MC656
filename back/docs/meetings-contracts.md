@@ -64,3 +64,25 @@ Verificação local da base `7b795c6` com Node.js 24 e PostgreSQL 17. As suítes
 | Frontend | Passou | Passou com três avisos em arquivos gerados em `coverage/` | 17 testes em 5 arquivos |
 
 Para reproduzir, execute `npm run build`, `npm run lint` e `npm run test:coverage` em `back/` e `front/`. No backend, configure `HU01_TEST_DATABASE_URL` e `HU02_TEST_DATABASE_URL` conforme o [runbook](identity-2-database-runbook.md#testar-em-postgresql-real).
+
+## Validação final da HU03
+
+A regressão local da etapa 7 usou Node.js 24 e PostgreSQL 17. As suítes da HU01, HU02 e HU03 aplicaram as migrations em uma mesma base vazia e descartável. O workflow de CI usa as mesmas três variáveis de conexão com uma única instância temporária.
+
+| Módulo | Build | Lint | Testes com cobertura | Cobertura de linhas |
+|---|---|---|---|---|
+| Backend | Passou | Passou | 582 testes em 29 arquivos, sem testes pulados | 96,80% |
+| Frontend | Passou | Passou | 22 testes em 6 arquivos, sem testes pulados | 83,02% |
+
+A HU03 executou 23 testes HTTP e 6 de schema com PostgreSQL, além de 24 testes de validação. Os testes do dashboard cobriram criação com preservação dos campos após erro, convites, transferências, moderação e perda de permissões após troca de organizador. Na etapa 6, um teste local em Firefox com duas contas, API real e banco descartável confirmou o fluxo de criação, aceite do convite, transferência e moderação.
+
+| Cenário de acesso | Resultado verificado |
+|---|---|
+| Reunião pública disponível | Contas verificadas, inclusive externas ao grupo, conseguem consultar na lista e por URL direta. |
+| Privada de grupo com audiência de integrantes | Integrantes vigentes conseguem consultar, inclusive quem não foi selecionado para participar. |
+| Privada de grupo com seleção restrita | Organizador e participantes selecionados com vínculo vigente conseguem consultar. Convidados externos ganham acesso após o aceite. |
+| Privada avulsa | Organizador e convidados com aceite conseguem consultar. |
+| Vínculo revogado ou grupo excluído | O acesso derivado do vínculo é revogado. A exclusão do grupo oculta suas reuniões, inclusive as públicas. A recuperação reaplica as permissões vigentes. |
+| Gestão | A consulta de participantes, a proposta de transferência e a designação de moderadores são restritas ao organizador vigente. O aceite é exclusivo do destinatário. Transferência e moderação respeitam o horário de início e a elegibilidade atual. |
+
+Para reproduzir, execute `npm run build`, `npm run lint` e `npm run test:coverage` em `back/` e `front/`. Configure as três variáveis de banco no backend conforme o [runbook](identity-2-database-runbook.md#testar-em-postgresql-real).
