@@ -14,3 +14,5 @@ export interface MeetingPoll {
   closed_at: string | null;
   closed_by_user_id: string | null;
 }
+
+export type AgendaReviewDecision = 'approved' | 'rejected';

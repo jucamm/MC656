@@ -1,5 +1,6 @@
 import type { Page } from '../types/groups';
-import type { MeetingModerationState, MeetingPoll } from '../types/meetingModeration';
+import type { AgendaItem } from '../types/meetingAgenda';
+import type { AgendaReviewDecision, MeetingModerationState, MeetingPoll } from '../types/meetingModeration';
 import { authApi } from './authApi';
 
 export const meetingModerationApi = {
@@ -17,6 +18,10 @@ export const meetingModerationApi = {
   openPoll: (meetingId: string, question: string) =>
     authApi.request<MeetingPoll>(`/meetings/${meetingId}/polls`, {
       method: 'POST', body: JSON.stringify({ question }),
+    }),
+  reviewAgendaItem: (meetingId: string, itemId: string, decision: AgendaReviewDecision) =>
+    authApi.request<AgendaItem>(`/meetings/${meetingId}/agenda-items/${itemId}/review`, {
+      method: 'POST', body: JSON.stringify({ review_status: decision }),
     }),
   closePoll: (meetingId: string, pollId: string) =>
     authApi.request<void>(`/meetings/${meetingId}/polls/${pollId}/close`, { method: 'POST' }),

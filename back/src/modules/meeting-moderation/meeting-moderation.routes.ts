@@ -22,7 +22,7 @@ export const moderationNoBody: RequestHandler = (request, _response, next) => {
   next();
 };
 
-const handleError: ErrorRequestHandler = (error: unknown, request, response, next) => {
+export const moderationErrorHandler: ErrorRequestHandler = (error: unknown, request, response, next) => {
   if (error instanceof DomainError && Object.hasOwn(moderationErrors, error.code)) {
     const code = error.code as keyof typeof moderationErrors;
     response.status(moderationErrors[code].status).json({ error: { code, message: error.message, details: error.details ?? {} } });
@@ -68,6 +68,6 @@ export function createMeetingModerationRouter(service: MeetingModerationService)
     await service.closePoll(moderationMeetingId(req), moderationActor(req), validateUuid(req.params.pollId, 'pollId'));
     res.status(204).end();
   });
-  router.use(handleError);
+  router.use(moderationErrorHandler);
   return router;
 }
