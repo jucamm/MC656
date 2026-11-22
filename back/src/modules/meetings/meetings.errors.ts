@@ -7,6 +7,7 @@ export const meetingErrors = {
   MEETING_NOT_FOUND: { status: 404, message: 'Reunião indisponível.' },
   MEETING_MANAGEMENT_FORBIDDEN: { status: 403, message: 'Apenas o organizador pode consultar os participantes da reunião.' },
   MEETING_ORGANIZER_REQUIRED: { status: 403, message: 'Apenas o organizador vigente pode realizar esta ação.' },
+  MEETING_ENDED: { status: 409, message: 'A reunião já foi encerrada.' },
   MEETING_STARTED: { status: 409, message: 'A reunião já começou.' },
   ORGANIZER_TRANSFER_NOT_FOUND: { status: 404, message: 'Pedido de transferência indisponível.' },
   ORGANIZER_TRANSFER_ALREADY_PENDING: { status: 409, message: 'Já existe um pedido de transferência pendente.' },
