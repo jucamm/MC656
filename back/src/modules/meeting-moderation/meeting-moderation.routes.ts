@@ -1,10 +1,11 @@
-import { Router, type ErrorRequestHandler, type Request, type RequestHandler } from 'express';
+import express, { Router, type ErrorRequestHandler, type Request, type RequestHandler } from 'express';
 import { DomainError } from '../../errors/domain.error';
-import { validateUserId, validateUuid } from '../groups/groups.validator';
+import { validatePage, validateUserId, validateUuid } from '../groups/groups.validator';
 import { identityErrorHandler } from '../identity/session.middleware';
 import { invalidField } from '../identity/validators/registration.validator';
 import { moderationErrors } from './meeting-moderation.errors';
 import type { MeetingModerationService } from './meeting-moderation.service';
+import { validatePollQuestion } from './meeting-polls.validator';
 
 export function moderationActor(req: Request) {
   if (!req.auth) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
@@ -54,6 +55,17 @@ export function createMeetingModerationRouter(service: MeetingModerationService)
   });
   router.post('/meetings/:meetingId/end', moderationNoBody, async (req, res) => {
     await service.end(moderationMeetingId(req), moderationActor(req));
+    res.status(204).end();
+  });
+  router.get('/meetings/:meetingId/polls', async (req, res) => {
+    const page = validatePage(req.query, validateUuid);
+    res.json({ data: await service.listPolls(moderationMeetingId(req), moderationActor(req), page) });
+  });
+  router.post('/meetings/:meetingId/polls', express.json(), async (req, res) => {
+    res.status(201).json({ data: await service.openPoll(moderationMeetingId(req), moderationActor(req), validatePollQuestion(req.body)) });
+  });
+  router.post('/meetings/:meetingId/polls/:pollId/close', moderationNoBody, async (req, res) => {
+    await service.closePoll(moderationMeetingId(req), moderationActor(req), validateUuid(req.params.pollId, 'pollId'));
     res.status(204).end();
   });
   router.use(handleError);
