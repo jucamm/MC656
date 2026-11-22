@@ -65,3 +65,26 @@ export interface ReceivedOrganizerTransferDto extends OrganizerTransferDto {
 export interface MeetingModeratorsDto {
   participant_ids: string[];
 }
+
+export interface MeetingScope {
+  meeting: Meeting;
+  isOrganizer: boolean;
+  isEligibleParticipant: boolean;
+  isModerator: boolean;
+  isBlocked: boolean;
+}
+
+export type MeetingPhase = 'scheduled' | 'in_progress' | 'ended';
+
+export function meetingPhase(meeting: Pick<Meeting, 'starts_at' | 'ended_at'>, now: Date): MeetingPhase {
+  if (meeting.ended_at) return 'ended';
+  return now < meeting.starts_at ? 'scheduled' : 'in_progress';
+}
+
+export function canParticipate(scope: MeetingScope): boolean {
+  return !scope.isBlocked && (scope.isOrganizer || scope.isEligibleParticipant);
+}
+
+export function canModerate(scope: MeetingScope): boolean {
+  return scope.isOrganizer || scope.isModerator;
+}
