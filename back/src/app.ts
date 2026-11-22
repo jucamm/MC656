@@ -16,17 +16,21 @@ import { InMemoryDecisionProcessRepository } from './modules/decision-process/re
 import type { DecisionProcessRepository } from './modules/decision-process/repositories/decision-process.repository';
 import type { GroupsHttpServices } from './modules/groups/groups.controller';
 import { createGroupsRouter } from './modules/groups/groups.routes';
+import { createMeetingsRouter, meetingsNoStore } from './modules/meetings/meetings.routes';
+import type { MeetingsService } from './modules/meetings/meetings.service';
 
 /**
  * Configuração e serviços fornecidos pela composição da aplicação.
  * @property {string | undefined} trustedOrigin - Origem HTTP(S) do frontend, sem wildcard.
  * @property {DecisionProcessGroupAccess | undefined} decisionProcessGroupAccess - Autorização dos processos decisórios.
  * @property {GroupsHttpServices | undefined} groups - Serviços de grupos e convites.
+ * @property {MeetingsService | undefined} meetings - Serviço de reuniões e seus convites.
  */
 export interface AppOptions {
   trustedOrigin?: string;
   decisionProcessGroupAccess?: DecisionProcessGroupAccess;
   groups?: GroupsHttpServices;
+  meetings?: MeetingsService;
 }
 
 /**
@@ -50,6 +54,7 @@ export function createApp(
   // WARNING: A ordem faz parte da política de segurança. Preflight deve responder
   // sem Bearer; handlers /auth resolvem suas próprias exigências antes do gate de
   // verified, para permitir que pending confirme canais e encerre sua sessão.
+  if (options.meetings) application.use(['/meetings', '/meeting-invitations'], meetingsNoStore);
   application.use(trustedOriginCors(readTrustedOrigin(options.trustedOrigin)));
   if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions, identityOnboarding));
   // Gate global: nenhum router registrado abaixo fica público ou depende de headers mockados.
@@ -61,6 +66,7 @@ export function createApp(
   // dos módulos mantêm seus contratos legados no handler montado ao final.
   application.use(identityErrorHandler);
   if (options.groups) application.use(createGroupsRouter(options.groups));
+  if (options.meetings) application.use(createMeetingsRouter(options.meetings));
   application.use(express.json());
   // NOTE: Novos routers de negócio devem ser montados aqui, depois do gate;
   // mover uma leitura para cima dele reintroduziria acesso anônimo/parcial.

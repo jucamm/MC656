@@ -15,13 +15,14 @@ export function invalidField(field: string, message: string): never {
 /**
  * Aplica a representação canônica compartilhada por cadastro e login.
  * @param {unknown} input - Endereço recebido de uma entrada não confiável.
+ * @param {string} field - Campo de entrada usado nos erros de validação.
  * @returns {string} Endereço ASCII validado, sem espaços externos e em lowercase.
  * @throws {DomainError} VALIDATION_ERROR para tipo, tamanho ou sintaxe inválidos.
  * @remarks Não consulta DNS, não comprova posse e não remove aliases ou pontos.
  */
-export function normalizeEmail(input: unknown): string {
+export function normalizeEmail(input: unknown, field = 'email'): string {
   if (typeof input !== 'string' || !input.trim()) {
-    invalidField('email', 'Informe um e-mail válido.');
+    invalidField(field, 'Informe um e-mail válido.');
   }
   const email = input.trim().toLowerCase();
   const [local, domain, extra] = email.split('@');
@@ -30,7 +31,7 @@ export function normalizeEmail(input: unknown): string {
       local.startsWith('.') || local.endsWith('.') || local.includes('..') ||
       !domain.includes('.') || domain.split('.').some(label =>
         !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) {
-    invalidField('email', 'Informe um e-mail válido (exemplo: usuario@dominio.com).');
+    invalidField(field, 'Informe um e-mail válido (exemplo: usuario@dominio.com).');
   }
   return email;
 }

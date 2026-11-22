@@ -163,6 +163,13 @@ class LockedGroupTransaction {
 
 export type GroupTransaction = Pick<LockedGroupTransaction, keyof LockedGroupTransaction>;
 
+/** Adquire o lock da HU02 dentro da transação que executa a operação. */
+export async function lockGroup(db: DatabaseQueries, groupId: string): Promise<GroupTransaction | null> {
+  const [locked] = await db.select({ group: groups, recoverableUntil: recoveryDeadline })
+    .from(groups).where(eq(groups.id, groupId)).for('update');
+  return locked ? new LockedGroupTransaction(db, locked.group, locked.recoverableUntil) : null;
+}
+
 export class PostgresGroupsRepository {
   constructor(private readonly db: NodePgDatabase) {}
 
@@ -180,9 +187,8 @@ export class PostgresGroupsRepository {
 
   async withGroupLock<T>(groupId: string, operation: (tx: GroupTransaction) => Promise<T>): Promise<T | null> {
     return this.db.transaction(async tx => {
-      const [locked] = await tx.select({ group: groups, recoverableUntil: recoveryDeadline })
-        .from(groups).where(eq(groups.id, groupId)).for('update');
-      return locked ? operation(new LockedGroupTransaction(tx, locked.group, locked.recoverableUntil)) : null;
+      const group = await lockGroup(tx, groupId);
+      return group ? operation(group) : null;
     });
   }
 

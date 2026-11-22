@@ -24,6 +24,8 @@ import { SessionService } from './modules/identity/session.service';
 import { PostgresGroupsRepository } from './modules/groups/groups.repository';
 import { GroupsService } from './modules/groups/groups.service';
 import { GroupInvitationsService } from './modules/groups/group-invitations.service';
+import { PostgresMeetingsRepository } from './modules/meetings/meetings.repository';
+import { MeetingsService } from './modules/meetings/meetings.service';
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -50,6 +52,7 @@ const verification = new VerificationService(new PostgresVerificationRepository(
 const onboarding = { verification, registration: new RegistrationService(users, verification) };
 const groupsRepository = new PostgresGroupsRepository(database);
 const app = createApp(undefined, sessions, onboarding, {
+  meetings: new MeetingsService(new PostgresMeetingsRepository(database)),
   decisionProcessGroupAccess: new PersistedDecisionProcessGroupAccess(groupsRepository),
   groups: {
     groups: new GroupsService(groupsRepository),
