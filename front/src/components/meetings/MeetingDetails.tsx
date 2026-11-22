@@ -4,6 +4,7 @@ import type { Meeting, MeetingParticipant, OrganizerTransfer } from '../../types
 import { buttonStyle, Feedback, inputStyle, primaryStyle } from '../groups/GroupControls';
 import { groupError, useGroupAction } from '../groups/groups-state';
 import { MeetingAgendaPanel } from '../meeting-agenda/MeetingAgendaPanel';
+import { MeetingConferencingPanel } from '../meeting-conferencing/MeetingConferencingPanel';
 import { formatMeetingTime, localTimeZone } from './meeting-time';
 
 const statusLabels = { confirmed: 'Confirmado', pending: 'Aguardando aceite', declined: 'Recusado' };
@@ -72,6 +73,7 @@ export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: 
             <p className="text-sm text-slate-600">{meeting.visibility === 'public' ? 'Reunião pública' : 'Reunião privada'}</p>
             <p className="break-words text-sm text-slate-700">Organizador <strong>{meeting.organizer_name}</strong></p>
           </div>
+          <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={revision} />
           <MeetingAgendaPanel meetingId={id} revision={revision} />
           {management && (
             <MeetingManagement key={revision} userId={userId} data={management} busy={action.busy}

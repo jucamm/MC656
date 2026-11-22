@@ -52,6 +52,9 @@ function mockApi(route: (call: Call) => Response) {
     if (call.method === 'GET' && call.path.endsWith('/agenda-items')) {
       return ok({ items: [], next_cursor: null, actions: { can_submit: false, can_review: false } });
     }
+    if (call.method === 'GET' && call.path.endsWith('/conferencing')) {
+      return ok({ mode: 'in_person', actions: { can_join: false, can_configure: false } });
+    }
     return route(call);
   }));
   return calls;
