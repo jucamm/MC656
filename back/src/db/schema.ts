@@ -230,3 +230,23 @@ export const meetingParticipationBlocks = pgTable('meeting_participation_blocks'
   }),
   check('meeting_participation_blocks_actor_check', sql`${table.user_id} <> ${table.blocked_by_user_id}`),
 ]);
+
+export const meetingAgendaItems = pgTable('meeting_agenda_items', {
+  id: uuid('id').primaryKey(),
+  meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
+  proposed_by_user_id: bigint('proposed_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  subject: varchar('subject', { length: 150 }).notNull(),
+  context: varchar('context', { length: 4000 }).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  review_status: text('review_status', { enum: ['pending', 'approved', 'rejected'] }).notNull().default('pending'),
+  reviewed_by_user_id: bigint('reviewed_by_user_id', { mode: 'bigint' }).references(() => users.id),
+  reviewed_at: timestamp('reviewed_at', { withTimezone: true }),
+}, (table) => [
+  check('meeting_agenda_items_text_check', sql`${table.subject} ~ '[^[:space:]]' AND ${table.context} ~ '[^[:space:]]'`),
+  check('meeting_agenda_items_review_check', sql`
+    (${table.review_status} = 'pending' AND ${table.reviewed_by_user_id} IS NULL AND ${table.reviewed_at} IS NULL)
+    OR (${table.review_status} IN ('approved', 'rejected') AND ${table.reviewed_by_user_id} IS NOT NULL
+      AND ${table.reviewed_at} IS NOT NULL AND ${table.reviewed_at} >= ${table.created_at})
+  `),
+  index('meeting_agenda_items_meeting_id_idx').on(table.meeting_id, table.id),
+]);
