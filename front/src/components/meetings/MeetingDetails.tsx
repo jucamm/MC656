@@ -77,7 +77,7 @@ export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: 
             <p className="break-words text-sm text-slate-700">Organizador <strong>{meeting.organizer_name}</strong></p>
           </div>
           <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={featureRevision} />
-          <MeetingAgendaPanel meetingId={id} revision={featureRevision} />
+          <MeetingAgendaPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           <MeetingModerationPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           {management && (
             <MeetingManagement key={revision} userId={userId} data={management} busy={action.busy}
