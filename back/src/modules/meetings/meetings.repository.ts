@@ -1,9 +1,10 @@
 import { and, eq, exists, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { groupMemberships, groups, meetingParticipants, meetings, users } from '../../db/schema';
+import { alias } from 'drizzle-orm/pg-core';
+import { groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetings, users } from '../../db/schema';
 import { lockGroup } from '../groups/groups.repository';
 import type { PageInput } from '../groups/groups.types';
-import type { InvitationDecision, MeetingCursor, Participant } from './meetings.types';
+import type { InvitationDecision, MeetingCursor, OrganizerTransfer, Participant, TransferResolution } from './meetings.types';
 
 type DatabaseQueries = Pick<NodePgDatabase, 'select' | 'insert' | 'update' | 'delete'>;
 
@@ -25,6 +26,11 @@ function confirmedParticipantWithAccess(member: ReturnType<typeof hasGroupMember
   );
 }
 
+function eligibleParticipant(db: DatabaseQueries) {
+  return and(eq(users.status, 'verified'),
+    confirmedParticipantWithAccess(hasGroupMembership(db, meetingParticipants.user_id)));
+}
+
 function visibleTo(db: DatabaseQueries, actorId: bigint) {
   const member = hasGroupMembership(db, actorId);
   const participant = exists(db.select({ one: sql`1` }).from(meetingParticipants).where(and(
@@ -40,7 +46,7 @@ function visibleTo(db: DatabaseQueries, actorId: bigint) {
   ));
 }
 
-class MeetingTransaction {
+export class MeetingTransaction {
   constructor(private readonly db: DatabaseQueries) {}
 
   lockGroup(groupId: string) {
@@ -66,10 +72,71 @@ class MeetingTransaction {
     return row ?? null;
   }
 
-  async lockMeeting(meetingId: string) {
-    const [meeting] = await this.db.select({ id: meetings.id, createdAt: meetings.created_at })
-      .from(meetings).where(eq(meetings.id, meetingId)).for('update');
+  async findVisibleMeetingGroup(meetingId: string, actorId: bigint) {
+    const [row] = await this.db.select({ groupId: meetings.group_id }).from(meetings)
+      .leftJoin(groups, eq(groups.id, meetings.group_id))
+      .where(and(eq(meetings.id, meetingId), visibleTo(this.db, actorId)));
+    return row ?? null;
+  }
+
+  async findTransferMeetingForRecipient(meetingId: string, transferId: string, recipientId: bigint) {
+    const [row] = await this.db.select({ groupId: meetings.group_id }).from(meetingOrganizerTransfers)
+      .innerJoin(meetings, eq(meetings.id, meetingOrganizerTransfers.meeting_id))
+      .where(and(eq(meetings.id, meetingId), eq(meetingOrganizerTransfers.id, transferId),
+        eq(meetingOrganizerTransfers.recipient_user_id, recipientId)));
+    return row ?? null;
+  }
+
+  async lockActiveMeeting(meetingId: string, groupId: string | null) {
+    if (groupId !== null) {
+      const group = await this.lockGroup(groupId);
+      if (!group || group.group.deleted_at) return null;
+    }
+    const [meeting] = await this.db.select().from(meetings).where(and(
+      eq(meetings.id, meetingId),
+      groupId === null ? isNull(meetings.group_id) : eq(meetings.group_id, groupId),
+    )).for('update');
     return meeting ?? null;
+  }
+
+  async isEligibleParticipant(meetingId: string, userId: bigint) {
+    const [row] = await this.db.select({ id: meetingParticipants.user_id }).from(meetingParticipants)
+      .innerJoin(meetings, eq(meetings.id, meetingParticipants.meeting_id))
+      .innerJoin(users, eq(users.id, meetingParticipants.user_id))
+      .where(and(eq(meetings.id, meetingId), eq(meetingParticipants.user_id, userId), eligibleParticipant(this.db)));
+    return row !== undefined;
+  }
+
+  async findPendingTransfer(meetingId: string) {
+    const [transfer] = await this.db.select({ id: meetingOrganizerTransfers.id }).from(meetingOrganizerTransfers)
+      .where(and(eq(meetingOrganizerTransfers.meeting_id, meetingId), eq(meetingOrganizerTransfers.status, 'pending')));
+    return transfer ?? null;
+  }
+
+  async findTransfer(meetingId: string, transferId: string) {
+    const [transfer] = await this.db.select().from(meetingOrganizerTransfers)
+      .where(and(eq(meetingOrganizerTransfers.meeting_id, meetingId), eq(meetingOrganizerTransfers.id, transferId)));
+    return transfer ?? null;
+  }
+
+  async insertTransfer(transfer: typeof meetingOrganizerTransfers.$inferInsert) {
+    const [created] = await this.db.insert(meetingOrganizerTransfers).values(transfer).returning();
+    return created;
+  }
+
+  async resolveTransfer(transfer: OrganizerTransfer, status: TransferResolution, now: Date) {
+    const [updated] = await this.db.update(meetingOrganizerTransfers).set({
+      status, resolved_at: now < transfer.requested_at ? transfer.requested_at : now,
+    }).where(and(eq(meetingOrganizerTransfers.id, transfer.id), eq(meetingOrganizerTransfers.status, 'pending')))
+      .returning({ id: meetingOrganizerTransfers.id });
+    return updated !== undefined;
+  }
+
+  async changeOrganizer(meetingId: string, currentOrganizerId: bigint, recipientId: bigint) {
+    const [updated] = await this.db.update(meetings).set({ organizer_user_id: recipientId })
+      .where(and(eq(meetings.id, meetingId), eq(meetings.organizer_user_id, currentOrganizerId)))
+      .returning({ id: meetings.id });
+    return updated !== undefined;
   }
 
   async resolveInvitation(meetingId: string, userId: bigint, decision: InvitationDecision, now: Date) {
@@ -114,8 +181,7 @@ export class PostgresMeetingsRepository {
   }
 
   listParticipants(meetingId: string, actorId: bigint, page: PageInput<bigint>) {
-    const eligible = and(eq(users.status, 'verified'),
-      confirmedParticipantWithAccess(hasGroupMembership(this.db, meetingParticipants.user_id)));
+    const eligible = eligibleParticipant(this.db);
     // O lateral conserva a reunião no resultado quando a página está vazia e só
     // carrega participantes se o ator for organizador na mesma consulta.
     const participantPage = this.db.select({
@@ -141,6 +207,40 @@ export class PostgresMeetingsRepository {
       .leftJoinLateral(participantPage, sql`true`)
       .where(and(eq(meetings.id, meetingId), visibleTo(this.db, actorId)))
       .orderBy(participantPage.user_id);
+  }
+
+  async findOutgoingTransfer(meetingId: string, actorId: bigint, now: Date) {
+    const [row] = await this.db.select({
+      canManage: sql<boolean>`${meetings.organizer_user_id} = ${actorId}`,
+      transfer: meetingOrganizerTransfers,
+    }).from(meetings).leftJoin(groups, eq(groups.id, meetings.group_id))
+      .leftJoin(meetingOrganizerTransfers, and(
+        eq(meetingOrganizerTransfers.meeting_id, meetings.id),
+        eq(meetings.organizer_user_id, actorId),
+        eq(meetingOrganizerTransfers.requested_by_user_id, actorId),
+        eq(meetingOrganizerTransfers.status, 'pending'),
+        gt(meetings.starts_at, now),
+      )).where(and(eq(meetings.id, meetingId), visibleTo(this.db, actorId)));
+    return row ?? null;
+  }
+
+  listReceivedTransfers(actorId: bigint, page: PageInput<string>, now: Date) {
+    const requester = alias(users, 'transfer_requester');
+    return this.db.select({
+      transfer: meetingOrganizerTransfers, subject: meetings.subject, starts_at: meetings.starts_at,
+      requested_by_user_name: requester.name,
+    }).from(meetingOrganizerTransfers)
+      .innerJoin(meetings, eq(meetings.id, meetingOrganizerTransfers.meeting_id))
+      .innerJoin(requester, eq(requester.id, meetingOrganizerTransfers.requested_by_user_id))
+      .innerJoin(meetingParticipants, and(eq(meetingParticipants.meeting_id, meetings.id),
+        eq(meetingParticipants.user_id, meetingOrganizerTransfers.recipient_user_id)))
+      .innerJoin(users, eq(users.id, meetingParticipants.user_id))
+      .leftJoin(groups, eq(groups.id, meetings.group_id))
+      .where(and(eq(meetingOrganizerTransfers.recipient_user_id, actorId), eq(meetingOrganizerTransfers.status, 'pending'),
+        eq(meetingOrganizerTransfers.requested_by_user_id, meetings.organizer_user_id), gt(meetings.starts_at, now),
+        isNull(groups.deleted_at), eligibleParticipant(this.db),
+        page.after === undefined ? undefined : gt(meetingOrganizerTransfers.id, page.after)))
+      .orderBy(meetingOrganizerTransfers.id).limit(page.limit + 1);
   }
 
   listPendingInvitations(userId: bigint, page: PageInput<string>) {

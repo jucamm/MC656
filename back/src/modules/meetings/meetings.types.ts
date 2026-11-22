@@ -1,4 +1,4 @@
-import type { meetingAccessMode, meetingParticipantStatus, meetingParticipants, meetings } from '../../db/schema';
+import type { meetingAccessMode, meetingOrganizerTransfers, meetingParticipantStatus, meetingParticipants, meetings } from '../../db/schema';
 
 export type MeetingAccessMode = typeof meetingAccessMode.enumValues[number];
 export type InvitationDecision = Exclude<typeof meetingParticipantStatus.enumValues[number], 'pending'>;
@@ -42,4 +42,22 @@ export interface MeetingParticipantDto {
   status: Participant['status'];
   is_eligible: boolean;
   is_moderator: boolean;
+}
+
+export type OrganizerTransfer = typeof meetingOrganizerTransfers.$inferSelect;
+export type TransferResolution = Exclude<OrganizerTransfer['status'], 'pending'>;
+
+export interface OrganizerTransferDto {
+  id: string;
+  meeting_id: string;
+  requested_by_user_id: string;
+  recipient_user_id: string;
+  status: OrganizerTransfer['status'];
+  requested_at: string;
+}
+
+export interface ReceivedOrganizerTransferDto extends OrganizerTransferDto {
+  subject: string;
+  starts_at: string;
+  requested_by_user_name: string;
 }

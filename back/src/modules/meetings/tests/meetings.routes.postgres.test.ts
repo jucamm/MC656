@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../../app';
-import { authenticationSessions, groupMemberships, groups, meetingParticipants, meetings, users } from '../../../db/schema';
+import { authenticationSessions, groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetings, users } from '../../../db/schema';
 import { GroupsService } from '../../groups/groups.service';
 import { PostgresGroupsRepository } from '../../groups/groups.repository';
 import { PasswordService } from '../../identity/password.service';
@@ -13,7 +13,7 @@ import { PostgresSessionRepository } from '../../identity/session.repository';
 import { SessionService } from '../../identity/session.service';
 import { migrateIdentityTestDatabase } from '../../identity/tests/postgres-test-utils';
 import { PostgresUserRepository } from '../../identity/user.repository';
-import { PostgresMeetingsRepository } from '../meetings.repository';
+import { MeetingTransaction, PostgresMeetingsRepository } from '../meetings.repository';
 import { MeetingsService } from '../meetings.service';
 import { validateCreateMeeting } from '../meetings.validator';
 
@@ -30,12 +30,14 @@ describe.skipIf(!connectionString)('rotas de reuniões com PostgreSQL', () => {
   const repository = new PostgresMeetingsRepository(db);
   const groupsRepository = new PostgresGroupsRepository(db);
   const groupService = new GroupsService(groupsRepository, () => clock);
-  const app = request(createApp(undefined, sessions, undefined, { meetings: new MeetingsService(repository, () => clock) }));
+  let meetingClock = clock;
+  const app = request(createApp(undefined, sessions, undefined, { meetings: new MeetingsService(repository, () => meetingClock) }));
   let fixture: { id: bigint; email: string; token: string }[] = [];
   let groupId: string;
 
   beforeAll(async () => { await migrateIdentityTestDatabase(pool); });
   beforeEach(async () => {
+    meetingClock = clock;
     const hash = await passwords.hash('Senha de teste');
     const accounts = await db.insert(users).values(['Organizador', 'Integrante', 'Convidado', 'Pendente', 'Outro integrante'].map((name, index) => ({
       name, email: `${randomUUID()}@example.com`, password_hash: hash,
@@ -59,6 +61,7 @@ describe.skipIf(!connectionString)('rotas de reuniões com PostgreSQL', () => {
     const owned = await db.select({ id: meetings.id }).from(meetings).where(inArray(meetings.created_by_user_id, userIds));
     if (owned.length) {
       const ids = owned.map(row => row.id);
+      await db.delete(meetingOrganizerTransfers).where(inArray(meetingOrganizerTransfers.meeting_id, ids));
       await db.delete(meetingParticipants).where(inArray(meetingParticipants.meeting_id, ids));
       await db.delete(meetings).where(inArray(meetings.id, ids));
     }
@@ -385,5 +388,156 @@ describe.skipIf(!connectionString)('rotas de reuniões com PostgreSQL', () => {
     }, [creator, creator]))).rejects.toMatchObject({ cause: { code: '23505' } });
     expect(await db.select().from(meetings).where(eq(meetings.id, id))).toEqual([]);
     expect(await db.select().from(meetingParticipants).where(eq(meetingParticipants.meeting_id, id))).toEqual([]);
+  });
+
+  describe('transferência da organização', () => {
+    function transferPath(meetingId: string) {
+      return `/meetings/${meetingId}/organizer-transfers`;
+    }
+
+    function propose(id: string, recipient: number, actor = 0) {
+      return app.post(transferPath(id)).set('Authorization', bearer(actor))
+        .send({ recipient_user_id: fixture[recipient].id.toString() });
+    }
+
+    function sent(id: string, actor = 0) {
+      return app.get(transferPath(id)).set('Authorization', bearer(actor));
+    }
+
+    function received(actor: number) {
+      return app.get('/meeting-organizer-transfers').set('Authorization', bearer(actor));
+    }
+
+    function resolve(id: string, transferId: string, actor: number, decision: 'accept' | 'decline' | 'cancel') {
+      const url = `${transferPath(id)}/${transferId}`;
+      return (decision === 'cancel' ? app.delete(url) : app.post(`${url}/${decision}`)).set('Authorization', bearer(actor));
+    }
+
+    async function createWithParticipants() {
+      const { body: response } = await create().send({
+        ...grouped(), participant_ids: [fixture[1].id.toString()], participant_emails: [fixture[2].email],
+      }).expect(201);
+      return response.data.id as string;
+    }
+
+    it('valida o destinatário e reserva a troca ao aceite da conta indicada', async () => {
+      const id = await createWithParticipants();
+      await received(3).expect(403).expect('Cache-Control', 'no-store');
+      await app.get('/meeting-organizer-transfers').expect(401).expect('Cache-Control', 'no-store');
+      await sent(id, 1).expect(403);
+      await propose(id, 1, 2).expect(404);
+      await propose(id, 2, 1).expect(403);
+      await propose(id, 0).expect(422);
+      await propose(id, 2).expect(422);
+      await propose(id, 4).expect(422);
+      await app.post(transferPath(id)).set('Authorization', bearer(0)).send({ recipient_user_id: 1 }).expect(400);
+
+      await respond(id, 2).expect(204);
+      const { body: requested } = await propose(id, 2).expect(201);
+      const transfer = requested.data;
+      expect(transfer).toEqual({
+        id: expect.any(String), meeting_id: id, status: 'pending', requested_at: clock.toISOString(),
+        requested_by_user_id: fixture[0].id.toString(), recipient_user_id: fixture[2].id.toString(),
+      });
+      expect((await sent(id).expect(200)).body).toEqual({ data: transfer });
+      expect((await received(2).expect(200)).body.data).toEqual({
+        items: [{ ...transfer, subject: 'Assembleia', starts_at: '2028-02-29T11:00:00.000Z', requested_by_user_name: 'Organizador' }],
+        next_cursor: null,
+      });
+      expect((await received(1).expect(200)).body.data.items).toEqual([]);
+      expect((await detail(id, 0).expect(200)).body.data.actions.can_manage).toBe(true);
+      expect((await detail(id, 2).expect(200)).body.data.actions.can_manage).toBe(false);
+      await resolve(id, transfer.id, 1, 'accept').expect(404);
+      await resolve(id, transfer.id, 0, 'accept').expect(404);
+      await resolve(id, transfer.id, 2, 'cancel').expect(403);
+      await resolve(randomUUID(), transfer.id, 2, 'accept').expect(404);
+      await resolve(id, transfer.id, 2, 'accept').expect(204);
+      await resolve(id, transfer.id, 2, 'accept').expect(409);
+      await participantList(id, 0).expect(403);
+      await participantList(id, 2).expect(200);
+      expect((await detail(id, 2).expect(200)).body.data).toMatchObject({
+        organizer_name: 'Convidado', actions: { can_manage: true },
+      });
+      expect((await received(2).expect(200)).body.data.items).toEqual([]);
+
+      const [meeting] = await db.select().from(meetings).where(eq(meetings.id, id));
+      expect(meeting).toMatchObject({ created_by_user_id: fixture[0].id, organizer_user_id: fixture[2].id });
+      const [stored] = await db.select().from(meetingOrganizerTransfers).where(eq(meetingOrganizerTransfers.id, transfer.id));
+      expect(stored).toMatchObject({ status: 'accepted', resolved_at: clock });
+    });
+
+    it('serializa propostas e respostas concorrentes e libera nova proposta após recusa ou cancelamento', async () => {
+      const id = await createWithParticipants();
+      const proposals = await Promise.all([propose(id, 1), propose(id, 1)]);
+      expect(proposals.map(result => result.status).sort()).toEqual([201, 409]);
+      const pending = proposals.find(result => result.status === 201)?.body.data;
+      expect(proposals.find(result => result.status === 409)?.body.error.code).toBe('ORGANIZER_TRANSFER_ALREADY_PENDING');
+      await resolve(id, pending.id, 1, 'decline').expect(204);
+      const { body: cancelled } = await propose(id, 1).expect(201);
+      await resolve(id, cancelled.data.id, 0, 'cancel').expect(204);
+      expect((await sent(id).expect(200)).body).toEqual({ data: null });
+
+      const { body: requested } = await propose(id, 1).expect(201);
+      const decisions = await Promise.all([
+        resolve(id, requested.data.id, 1, 'accept'), resolve(id, requested.data.id, 1, 'accept'),
+      ]);
+      expect(decisions.map(result => result.status).sort()).toEqual([204, 409]);
+      const rows = await db.select().from(meetingOrganizerTransfers).where(eq(meetingOrganizerTransfers.meeting_id, id));
+      expect(rows.map(row => row.status).sort()).toEqual(['accepted', 'cancelled', 'declined']);
+    });
+
+    it('revalida vínculo de grupo e oculta os pedidos até a recuperação do grupo', async () => {
+      const id = await createWithParticipants();
+      const { body: requested } = await propose(id, 1).expect(201);
+      await groupService.deleteGroup(groupId, fixture[0].id);
+      await sent(id).expect(404);
+      expect((await received(1).expect(200)).body.data.items).toEqual([]);
+      await resolve(id, requested.data.id, 1, 'accept').expect(404);
+      await groupService.restoreGroup(groupId, fixture[0].id);
+      expect((await received(1).expect(200)).body.data.items).toHaveLength(1);
+      await groupService.removeMember(groupId, fixture[0].id, fixture[1].id);
+      expect((await received(1).expect(200)).body.data.items).toEqual([]);
+      const rejected = await resolve(id, requested.data.id, 1, 'accept').expect(422);
+      expect(rejected.body.error.code).toBe('ORGANIZER_TRANSFER_RECIPIENT_NOT_ELIGIBLE');
+      await resolve(id, requested.data.id, 1, 'decline').expect(204);
+      expect((await detail(id, 0).expect(200)).body.data.actions.can_manage).toBe(true);
+    });
+
+    it('pagina pedidos recebidos ainda futuros e encerra alterações no instante de início', async () => {
+      const ids = [await createWithParticipants(), await createWithParticipants(), await createWithParticipants()];
+      meetingClock = new Date('2028-02-29T10:59:59.999Z');
+      const first = (await propose(ids[0], 1).expect(201)).body.data.id;
+      const second = (await propose(ids[1], 1).expect(201)).body.data.id;
+      const { body: page } = await received(1).query({ limit: 1 }).expect(200);
+      expect(page.data.items[0].id).toBe([first, second].sort()[0]);
+      const { body: next } = await received(1).query({ cursor: page.data.next_cursor, limit: 1 }).expect(200);
+      expect(next.data.items[0].id).toBe([first, second].sort()[1]);
+      expect(next.data.next_cursor).toBeNull();
+
+      for (const now of ['2028-02-29T11:00:00.000Z', '2028-02-29T11:00:00.001Z']) {
+        meetingClock = new Date(now);
+        expect((await received(1).expect(200)).body.data.items).toEqual([]);
+        expect((await sent(ids[0]).expect(200)).body).toEqual({ data: null });
+        for (const decision of ['accept', 'decline', 'cancel'] as const) {
+          const expired = await resolve(ids[0], first, decision === 'cancel' ? 0 : 1, decision).expect(409);
+          expect(expired.body.error.code).toBe('MEETING_STARTED');
+        }
+        expect((await propose(ids[2], 1).expect(409)).body.error.code).toBe('MEETING_STARTED');
+      }
+    });
+
+    it('reverte o aceite se a atualização do organizador não ocorrer', async () => {
+      const id = await createWithParticipants();
+      const { body: proposed } = await propose(id, 1).expect(201);
+      const update = vi.spyOn(MeetingTransaction.prototype, 'changeOrganizer').mockResolvedValueOnce(false);
+      try {
+        await resolve(id, proposed.data.id, 1, 'accept').expect(409);
+      } finally {
+        update.mockRestore();
+      }
+      expect((await received(1).expect(200)).body.data.items).toMatchObject([{ id: proposed.data.id, status: 'pending' }]);
+      expect((await detail(id, 0).expect(200)).body.data.actions.can_manage).toBe(true);
+      await resolve(id, proposed.data.id, 1, 'accept').expect(204);
+    });
   });
 });

@@ -3,8 +3,11 @@ import { requireActiveGroupMember, requireGroupAdministrator } from '../groups/g
 import type { PageDto, PageInput } from '../groups/groups.types';
 import { invalidField } from '../identity/validators/registration.validator';
 import { meetingError } from './meetings.errors';
-import type { PostgresMeetingsRepository } from './meetings.repository';
-import type { CreateMeetingInput, InvitationDecision, MeetingCursor, MeetingDto, MeetingInvitationDto, MeetingParticipantDto, Meeting, Participant } from './meetings.types';
+import type { MeetingTransaction, PostgresMeetingsRepository } from './meetings.repository';
+import type {
+  CreateMeetingInput, InvitationDecision, Meeting, MeetingCursor, MeetingDto, MeetingInvitationDto,
+  MeetingParticipantDto, OrganizerTransfer, OrganizerTransferDto, Participant, ReceivedOrganizerTransferDto, TransferResolution,
+} from './meetings.types';
 
 function toMeetingDto(row: Pick<Meeting, 'id' | 'subject' | 'starts_at' | 'access_mode'> & {
   organizer_name: string;
@@ -15,6 +18,19 @@ function toMeetingDto(row: Pick<Meeting, 'id' | 'subject' | 'starts_at' | 'acces
     visibility: row.access_mode === 'public' ? 'public' : 'private',
     organizer_name: row.organizer_name, actions: { can_manage: row.canManage },
   };
+}
+
+function toOrganizerTransferDto(transfer: OrganizerTransfer): OrganizerTransferDto {
+  return {
+    id: transfer.id, meeting_id: transfer.meeting_id, status: transfer.status,
+    requested_by_user_id: transfer.requested_by_user_id.toString(),
+    recipient_user_id: transfer.recipient_user_id.toString(),
+    requested_at: transfer.requested_at.toISOString(),
+  };
+}
+
+function requireOrganizer(meeting: Meeting, actorId: bigint): void {
+  if (meeting.organizer_user_id !== actorId) throw meetingError('MEETING_ORGANIZER_REQUIRED');
 }
 
 export class MeetingsService {
@@ -90,18 +106,92 @@ export class MeetingsService {
     await this.repository.transaction(async tx => {
       const availability = await tx.findInvitationMeeting(meetingId, actorId);
       if (!availability) throw meetingError('MEETING_INVITATION_NOT_FOUND');
-      if (availability.groupId) {
-        const group = await tx.lockGroup(availability.groupId);
-        if (!group || group.group.deleted_at) throw meetingError('MEETING_INVITATION_NOT_FOUND');
-      }
-      const meeting = await tx.lockMeeting(meetingId);
+      const meeting = await tx.lockActiveMeeting(meetingId, availability.groupId);
       if (!meeting) throw meetingError('MEETING_INVITATION_NOT_FOUND');
 
       const now = this.clock();
-      const resolvedAt = now < meeting.createdAt ? meeting.createdAt : now;
+      const resolvedAt = now < meeting.created_at ? meeting.created_at : now;
       if (!await tx.resolveInvitation(meetingId, actorId, decision, resolvedAt)) {
         throw meetingError('MEETING_INVITATION_RESOLVED');
       }
     });
+  }
+
+  async requestOrganizerTransfer(meetingId: string, actorId: bigint, recipientId: bigint): Promise<OrganizerTransferDto> {
+    const transfer = await this.repository.transaction(async tx => {
+      const meeting = await this.lockMeetingForOrganizer(tx, meetingId, actorId);
+      const eligible = recipientId !== actorId && await tx.isEligibleParticipant(meetingId, recipientId);
+      const pending = await tx.findPendingTransfer(meetingId);
+      const now = this.requireBeforeStart(meeting);
+      if (!eligible) throw meetingError('ORGANIZER_TRANSFER_RECIPIENT_NOT_ELIGIBLE');
+      if (pending) throw meetingError('ORGANIZER_TRANSFER_ALREADY_PENDING');
+
+      return tx.insertTransfer({
+        id: randomUUID(), meeting_id: meetingId, requested_by_user_id: actorId,
+        recipient_user_id: recipientId, requested_at: now,
+      });
+    });
+    return toOrganizerTransferDto(transfer);
+  }
+
+  async getOutgoingTransfer(meetingId: string, actorId: bigint): Promise<OrganizerTransferDto | null> {
+    const row = await this.repository.findOutgoingTransfer(meetingId, actorId, this.clock());
+    if (!row) throw meetingError('MEETING_NOT_FOUND');
+    if (!row.canManage) throw meetingError('MEETING_ORGANIZER_REQUIRED');
+    return row.transfer ? toOrganizerTransferDto(row.transfer) : null;
+  }
+
+  async listReceivedTransfers(actorId: bigint, page: PageInput<string>): Promise<PageDto<ReceivedOrganizerTransferDto>> {
+    const rows = await this.repository.listReceivedTransfers(actorId, page, this.clock());
+    const items = rows.slice(0, page.limit).map(row => ({
+      ...toOrganizerTransferDto(row.transfer), subject: row.subject,
+      starts_at: row.starts_at.toISOString(), requested_by_user_name: row.requested_by_user_name,
+    }));
+    return { items, next_cursor: rows.length > page.limit ? items[page.limit - 1].id : null };
+  }
+
+  async resolveOrganizerTransfer(meetingId: string, transferId: string, actorId: bigint, decision: TransferResolution): Promise<void> {
+    await this.repository.transaction(async tx => {
+      const meeting = decision === 'cancelled'
+        ? await this.lockMeetingForOrganizer(tx, meetingId, actorId)
+        : await this.lockMeetingForTransferRecipient(tx, meetingId, transferId, actorId);
+      const transfer = await tx.findTransfer(meetingId, transferId);
+      if (!transfer || (decision !== 'cancelled' && transfer.recipient_user_id !== actorId)) {
+        throw meetingError('ORGANIZER_TRANSFER_NOT_FOUND');
+      }
+      if (transfer.status !== 'pending' || transfer.requested_by_user_id !== meeting.organizer_user_id) {
+        throw meetingError('ORGANIZER_TRANSFER_RESOLVED');
+      }
+      const eligible = decision !== 'accepted' || await tx.isEligibleParticipant(meetingId, actorId);
+      const now = this.requireBeforeStart(meeting);
+      if (!eligible) throw meetingError('ORGANIZER_TRANSFER_RECIPIENT_NOT_ELIGIBLE');
+      if (!await tx.resolveTransfer(transfer, decision, now)) throw meetingError('ORGANIZER_TRANSFER_RESOLVED');
+      if (decision === 'accepted' && !await tx.changeOrganizer(meetingId, meeting.organizer_user_id, actorId)) {
+        throw meetingError('ORGANIZER_TRANSFER_RESOLVED');
+      }
+    });
+  }
+
+  private async lockMeetingForOrganizer(tx: MeetingTransaction, meetingId: string, actorId: bigint): Promise<Meeting> {
+    const scope = await tx.findVisibleMeetingGroup(meetingId, actorId);
+    const meeting = scope && await tx.lockActiveMeeting(meetingId, scope.groupId);
+    if (!meeting) throw meetingError('MEETING_NOT_FOUND');
+    requireOrganizer(meeting, actorId);
+    return meeting;
+  }
+
+  private async lockMeetingForTransferRecipient(
+    tx: MeetingTransaction, meetingId: string, transferId: string, actorId: bigint,
+  ): Promise<Meeting> {
+    const scope = await tx.findTransferMeetingForRecipient(meetingId, transferId, actorId);
+    const meeting = scope && await tx.lockActiveMeeting(meetingId, scope.groupId);
+    if (!meeting) throw meetingError('ORGANIZER_TRANSFER_NOT_FOUND');
+    return meeting;
+  }
+
+  private requireBeforeStart(meeting: Meeting): Date {
+    const now = this.clock();
+    if (meeting.starts_at <= now) throw meetingError('MEETING_STARTED');
+    return now;
   }
 }

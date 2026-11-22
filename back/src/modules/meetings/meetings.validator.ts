@@ -82,3 +82,8 @@ export function validateMeetingCursor(input: unknown, field: string): MeetingCur
   if (!Number.isFinite(date.getTime()) || date.toISOString() !== iso) invalidField(field, 'Informe um cursor válido.');
   return { startsAt: instant, id: validateUuid(id, field) };
 }
+
+export function validateOrganizerTransfer(input: unknown): bigint {
+  const body = readObject(input, 'body', ['recipient_user_id']);
+  return validateUserId(body.recipient_user_id, 'recipient_user_id');
+}

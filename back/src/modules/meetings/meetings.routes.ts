@@ -46,6 +46,13 @@ export function createMeetingsRouter(service: MeetingsService) {
   router.get('/meeting-invitations', controller.listInvitations);
   router.post('/meetings/:meetingId/invitation/accept', noBody, controller.respondToInvitation('confirmed'));
   router.post('/meetings/:meetingId/invitation/decline', noBody, controller.respondToInvitation('declined'));
+  router.get('/meeting-organizer-transfers', controller.listReceivedTransfers);
+  router.route('/meetings/:meetingId/organizer-transfers')
+    .get(controller.getOutgoingTransfer)
+    .post(express.json(), controller.requestOrganizerTransfer);
+  router.post('/meetings/:meetingId/organizer-transfers/:transferId/accept', noBody, controller.resolveOrganizerTransfer('accepted'));
+  router.post('/meetings/:meetingId/organizer-transfers/:transferId/decline', noBody, controller.resolveOrganizerTransfer('declined'));
+  router.delete('/meetings/:meetingId/organizer-transfers/:transferId', noBody, controller.resolveOrganizerTransfer('cancelled'));
   router.use(meetingErrorHandler);
   return router;
 }

@@ -3,7 +3,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { groups, meetingParticipants, meetings, users } from '../../../db/schema';
+import { groups, meetingOrganizerTransfers, meetingParticipants, meetings, users } from '../../../db/schema';
 import { migrateIdentityTestDatabase } from '../../identity/tests/postgres-test-utils';
 
 const connectionString = process.env.HU03_TEST_DATABASE_URL;
@@ -32,6 +32,7 @@ describe.skipIf(!connectionString)('schema de reuniões com PostgreSQL', () => {
 
   afterEach(async () => {
     if (!userIds.length) return;
+    await db.delete(meetingOrganizerTransfers).where(eq(meetingOrganizerTransfers.meeting_id, meetingId));
     await db.delete(meetingParticipants).where(eq(meetingParticipants.meeting_id, meetingId));
     await db.delete(meetings).where(eq(meetings.id, meetingId));
     await db.delete(groups).where(eq(groups.id, groupId));
@@ -102,5 +103,24 @@ describe.skipIf(!connectionString)('schema de reuniões com PostgreSQL', () => {
     const [storedParticipant] = await db.select().from(meetingParticipants).where(eq(meetingParticipants.meeting_id, meetingId));
     expect(storedMeeting).toMatchObject({ group_id: groupId, access_mode: 'public' });
     expect(storedParticipant).toMatchObject({ user_id: userIds[1], status: 'pending', is_moderator: false });
+  });
+
+  it('exige destinatário da mesma reunião e apenas um pedido pendente com resolução coerente', async () => {
+    await meeting();
+    function transfer(overrides: Partial<typeof meetingOrganizerTransfers.$inferInsert> = {}) {
+      return db.insert(meetingOrganizerTransfers).values({
+        id: randomUUID(), meeting_id: meetingId, requested_by_user_id: userIds[0],
+        recipient_user_id: userIds[1], requested_at: createdAt, ...overrides,
+      });
+    }
+    await expect(transfer()).rejects.toMatchObject({ cause: { code: '23503', constraint: 'meeting_organizer_transfers_recipient_fk' } });
+    await participant({ origin: 'group', status: 'confirmed' });
+    await expect(transfer({ requested_by_user_id: userIds[1] })).rejects
+      .toMatchObject({ cause: { code: '23514', constraint: 'meeting_organizer_transfers_distinct_users_check' } });
+    await expect(transfer({ status: 'accepted' })).rejects
+      .toMatchObject({ cause: { code: '23514', constraint: 'meeting_organizer_transfers_resolution_check' } });
+    await transfer();
+    await expect(transfer()).rejects.toMatchObject({ cause: { code: '23505', constraint: 'meeting_organizer_transfers_pending_idx' } });
+    await transfer({ status: 'declined', resolved_at: createdAt });
   });
 });

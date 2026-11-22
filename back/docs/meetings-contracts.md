@@ -26,6 +26,7 @@ As rotas passam por autenticação Bearer e verificação por e-mail. Extrair o 
 | `GET /meeting-invitations` | Retorna `200` com os convites pendentes da própria conta para reuniões disponíveis. |
 | `POST /meetings/:meetingId/invitation/accept` e `POST /meetings/:meetingId/invitation/decline` | A conta destinatária responde ao próprio convite. Retorna `204`. |
 | `POST /meetings/:meetingId/organizer-transfers` | O organizador envia `recipient_user_id` de outro participante elegível. Retorna `201` com o pedido pendente. |
+| `GET /meetings/:meetingId/organizer-transfers` | O organizador vigente consulta o pedido enviado, inclusive após recarregar a página. Retorna `200` com o pedido pendente em `data` ou `data: null` quando não há pedido ativo. |
 | `GET /meeting-organizer-transfers` | Retorna `200` com os pedidos pendentes recebidos pela própria conta em reuniões disponíveis e ainda futuras. |
 | `POST /meetings/:meetingId/organizer-transfers/:transferId/accept` e `POST /meetings/:meetingId/organizer-transfers/:transferId/decline` | O destinatário resolve o pedido. Retorna `204`. O aceite troca o organizador. |
 | `DELETE /meetings/:meetingId/organizer-transfers/:transferId` | O organizador vigente cancela o pedido pendente. Retorna `204`. |
@@ -42,6 +43,8 @@ O campo `access` contém `visibility` com valor `public` ou `private`. No modo p
 | `422` | Participante ou destinatário inelegível para a operação. |
 
 Nas listas de reuniões e participantes, `limit` vai de 1 a 100 e tem padrão 20. A lista de participantes retorna `user_id`, `name`, `origin`, `status`, `is_eligible` e `is_moderator`. O status preserva o registro de confirmação ou convite. A elegibilidade exige conta verificada e participação confirmada com vínculo vigente quando o acesso deriva do grupo. A moderação exibida reflete a designação vigente após essa checagem. Em reunião visível para a conta, apenas o organizador consulta a lista de participantes. Outra conta que pode consultar a reunião recebe `403 MEETING_MANAGEMENT_FORBIDDEN`. Fora da audiência, a API retorna `404 MEETING_NOT_FOUND`.
+
+O pedido de transferência contém `id`, `meeting_id`, `requested_by_user_id`, `recipient_user_id`, `status` e `requested_at`. A caixa pessoal retorna `{ items, next_cursor }` e acrescenta `subject`, `starts_at` e `requested_by_user_name` por item. Use `limit` de 1 a 100 (padrão 20) e o UUID do último pedido como cursor. O destinatário só recebe pedidos de reuniões ativas e futuras para as quais ainda é elegível. No instante de início, pedidos pendentes saem das consultas operacionais e as mutações retornam `409 MEETING_STARTED` para pedidos ainda pendentes. Um pedido resolvido retorna `409 ORGANIZER_TRANSFER_RESOLVED`, e uma nova proposta enquanto existe outro pedido pendente retorna `409 ORGANIZER_TRANSFER_ALREADY_PENDING`. O aceite reavalia a elegibilidade e pode retornar `422 ORGANIZER_TRANSFER_RECIPIENT_NOT_ELIGIBLE`.
 
 ## Integridade e concorrência
 

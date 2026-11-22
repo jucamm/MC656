@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  bigint, bigserial, boolean, check, index, integer, pgEnum, pgTable,
+  bigint, bigserial, boolean, check, foreignKey, index, integer, pgEnum, pgTable,
   primaryKey, text, timestamp, unique, uniqueIndex, uuid, varchar,
 } from 'drizzle-orm/pg-core';
 
@@ -181,4 +181,31 @@ export const meetingParticipants = pgTable('meeting_participants', {
     AND (${table.resolved_at} IS NULL OR ${table.resolved_at} >= ${table.created_at})
   `),
   index('meeting_participants_user_meeting_idx').on(table.user_id, table.meeting_id),
+]);
+
+export const meetingOrganizerTransferStatus = pgEnum('meeting_organizer_transfer_status', [
+  'pending', 'accepted', 'declined', 'cancelled',
+]);
+
+export const meetingOrganizerTransfers = pgTable('meeting_organizer_transfers', {
+  id: uuid('id').primaryKey(),
+  meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
+  requested_by_user_id: bigint('requested_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  recipient_user_id: bigint('recipient_user_id', { mode: 'bigint' }).notNull(),
+  status: meetingOrganizerTransferStatus('status').notNull().default('pending'),
+  requested_at: timestamp('requested_at', { withTimezone: true }).notNull(),
+  resolved_at: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => [
+  foreignKey({
+    name: 'meeting_organizer_transfers_recipient_fk',
+    columns: [table.meeting_id, table.recipient_user_id],
+    foreignColumns: [meetingParticipants.meeting_id, meetingParticipants.user_id],
+  }),
+  check('meeting_organizer_transfers_distinct_users_check', sql`${table.requested_by_user_id} <> ${table.recipient_user_id}`),
+  check('meeting_organizer_transfers_resolution_check', sql`
+    (${table.status} = 'pending') = (${table.resolved_at} IS NULL)
+    AND (${table.resolved_at} IS NULL OR ${table.resolved_at} >= ${table.requested_at})
+  `),
+  uniqueIndex('meeting_organizer_transfers_pending_idx').on(table.meeting_id).where(sql`${table.status} = 'pending'`),
+  index('meeting_organizer_transfers_recipient_idx').on(table.recipient_user_id, table.id).where(sql`${table.status} = 'pending'`),
 ]);

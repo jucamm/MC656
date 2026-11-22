@@ -2,8 +2,8 @@ import type { Request, RequestHandler } from 'express';
 import { DomainError } from '../../errors/domain.error';
 import { validatePage, validateUserId, validateUuid } from '../groups/groups.validator';
 import type { MeetingsService } from './meetings.service';
-import type { InvitationDecision } from './meetings.types';
-import { validateCreateMeeting, validateMeetingCursor } from './meetings.validator';
+import type { InvitationDecision, TransferResolution } from './meetings.types';
+import { validateCreateMeeting, validateMeetingCursor, validateOrganizerTransfer } from './meetings.validator';
 
 function actorId(request: Request): bigint {
   if (!request.auth) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
@@ -47,6 +47,29 @@ export class MeetingsController {
   respondToInvitation(decision: InvitationDecision): RequestHandler {
     return async (request, response) => {
       await this.service.respondToInvitation(meetingId(request), actorId(request), decision);
+      response.status(204).end();
+    };
+  }
+
+  requestOrganizerTransfer: RequestHandler = async (request, response) => {
+    const recipientId = validateOrganizerTransfer(request.body);
+    const transfer = await this.service.requestOrganizerTransfer(meetingId(request), actorId(request), recipientId);
+    response.status(201).json({ data: transfer });
+  };
+
+  getOutgoingTransfer: RequestHandler = async (request, response) => {
+    response.json({ data: await this.service.getOutgoingTransfer(meetingId(request), actorId(request)) });
+  };
+
+  listReceivedTransfers: RequestHandler = async (request, response) => {
+    const page = validatePage(request.query, validateUuid);
+    response.json({ data: await this.service.listReceivedTransfers(actorId(request), page) });
+  };
+
+  resolveOrganizerTransfer(decision: TransferResolution): RequestHandler {
+    return async (request, response) => {
+      const transferId = validateUuid(request.params.transferId, 'transferId');
+      await this.service.resolveOrganizerTransfer(meetingId(request), transferId, actorId(request), decision);
       response.status(204).end();
     };
   }
