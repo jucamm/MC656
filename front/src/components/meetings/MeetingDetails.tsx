@@ -5,6 +5,7 @@ import { buttonStyle, Feedback, inputStyle, primaryStyle } from '../groups/Group
 import { groupError, useGroupAction } from '../groups/groups-state';
 import { MeetingAgendaPanel } from '../meeting-agenda/MeetingAgendaPanel';
 import { MeetingConferencingPanel } from '../meeting-conferencing/MeetingConferencingPanel';
+import { MeetingModerationPanel } from '../meeting-moderation/MeetingModerationPanel';
 import { formatMeetingTime, localTimeZone } from './meeting-time';
 
 const statusLabels = { confirmed: 'Confirmado', pending: 'Aguardando aceite', declined: 'Recusado' };
@@ -34,11 +35,13 @@ async function loadMeeting(id: string, signal: AbortSignal): Promise<DetailResul
 
 export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: string; onChanged: () => void }) {
   const [revision, setRevision] = useState(0);
+  const [featureRevision, setFeatureRevision] = useState(0);
   const [result, setResult] = useState<{ revision: number; data?: DetailResult; error?: string } | null>(null);
   const refresh = () => {
     setRevision(value => value + 1);
     onChanged();
   };
+  const refreshFeatures = () => setFeatureRevision(value => value + 1);
   const action = useGroupAction(code => {
     if (['MEETING_STARTED', 'MEETING_ORGANIZER_REQUIRED', 'MEETING_NOT_FOUND', 'ORGANIZER_TRANSFER_NOT_FOUND',
       'ORGANIZER_TRANSFER_RESOLVED', 'ORGANIZER_TRANSFER_ALREADY_PENDING', 'ORGANIZER_TRANSFER_RECIPIENT_NOT_ELIGIBLE',
@@ -73,8 +76,9 @@ export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: 
             <p className="text-sm text-slate-600">{meeting.visibility === 'public' ? 'Reunião pública' : 'Reunião privada'}</p>
             <p className="break-words text-sm text-slate-700">Organizador <strong>{meeting.organizer_name}</strong></p>
           </div>
-          <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={revision} />
-          <MeetingAgendaPanel meetingId={id} revision={revision} />
+          <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={featureRevision} />
+          <MeetingAgendaPanel meetingId={id} revision={featureRevision} />
+          <MeetingModerationPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           {management && (
             <MeetingManagement key={revision} userId={userId} data={management} busy={action.busy}
               startsAt={meeting.starts_at}

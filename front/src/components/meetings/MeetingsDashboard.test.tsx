@@ -37,7 +37,7 @@ function fail(code: string, message: string, status: number, fields?: Record<str
 
 type Call = { method: string; path: string; query: URLSearchParams; body: unknown; authorization: string | null };
 
-function mockApi(route: (call: Call) => Response) {
+function mockApi(route: (call: Call) => Response, mockExtensions = true) {
   const calls: Call[] = [];
   vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input);
@@ -49,12 +49,16 @@ function mockApi(route: (call: Call) => Response) {
       authorization: new Headers(init?.headers).get('Authorization'),
     };
     calls.push(call);
-    if (call.method === 'GET' && call.path.endsWith('/agenda-items')) {
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/agenda-items')) {
       return ok({ items: [], next_cursor: null, actions: { can_submit: false, can_review: false } });
     }
-    if (call.method === 'GET' && call.path.endsWith('/conferencing')) {
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/conferencing')) {
       return ok({ mode: 'in_person', actions: { can_join: false, can_configure: false } });
     }
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/moderation')) {
+      return ok({ phase: 'scheduled', actions: { can_moderate: false, can_end: false, can_manage_polls: false }, targets: [] });
+    }
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/polls')) return page();
     return route(call);
   }));
   return calls;
@@ -251,4 +255,52 @@ it('recarrega a reunião e remove os controles quando a organização muda duran
   expect(await screen.findByRole('alert')).toHaveTextContent('Apenas o organizador vigente');
   expect(await screen.findByText('Bia')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Salvar moderadores' })).not.toBeInTheDocument();
+});
+
+
+it('atualiza pautas e ingresso após encerrar a reunião no painel de moderação', async () => {
+  let ended = false;
+  const joinUrl = 'https://meet.google.com/abc-defg-hij';
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const calls = mockApi(({ method, path }) => {
+    if (path === '/meetings') return page([baseMeeting]);
+    if (path === '/meetings/reuniao') return ok({ ...baseMeeting, actions: { can_manage: false } });
+    if (path.endsWith('/moderation')) return ok({
+      phase: ended ? 'ended' : 'in_progress',
+      actions: { can_moderate: !ended, can_end: !ended, can_manage_polls: !ended },
+      targets: [],
+    });
+    if (path.endsWith('/polls')) return page();
+    if (path.endsWith('/agenda-items')) return ok({
+      items: [], next_cursor: null, actions: { can_submit: !ended, can_review: !ended },
+    });
+    if (path.endsWith('/conferencing')) return ok({
+      mode: 'hybrid', actions: { can_configure: false, can_join: !ended },
+    });
+    if (method === 'POST' && path.endsWith('/conferencing/join')) return ok({ join_url: joinUrl });
+    if (method === 'POST' && path.endsWith('/end')) {
+      ended = true;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(path);
+  }, false);
+
+  try {
+    const browser = userEvent.setup();
+    dashboard();
+    await browser.click(await screen.findByRole('button', { name: /Assembleia/ }));
+    await browser.click(await screen.findByRole('checkbox', { name: 'Aceito usar áudio e vídeo no Google Meet' }));
+    await browser.click(screen.getByRole('button', { name: 'Liberar link do Meet' }));
+    expect(await screen.findByRole('link', { name: 'Abrir Google Meet' })).toHaveAttribute('href', joinUrl);
+    expect(screen.getByRole('button', { name: 'Registrar pauta' })).toBeInTheDocument();
+
+    await browser.click(await screen.findByRole('button', { name: 'Encerrar na plataforma' }));
+    expect(await screen.findByText('Situação da reunião: Encerrada')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Registrar pauta' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Abrir Google Meet' })).not.toBeInTheDocument();
+    expect(calls.filter(call => call.path.endsWith('/agenda-items')).length).toBeGreaterThan(1);
+    expect(calls.filter(call => call.path.endsWith('/conferencing')).length).toBeGreaterThan(1);
+  } finally {
+    confirm.mockRestore();
+  }
 });

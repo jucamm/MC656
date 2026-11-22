@@ -25,6 +25,7 @@ import type { MeetingsService } from './modules/meetings/meetings.service';
  * @property {DecisionProcessGroupAccess | undefined} decisionProcessGroupAccess - Autorização dos processos decisórios.
  * @property {GroupsHttpServices | undefined} groups - Serviços de grupos e convites.
  * @property {MeetingsService | undefined} meetings - Serviço de reuniões e seus convites.
+ * @property {Router[] | undefined} meetingExtensionRouters - Rotas de recursos de reunião atrás do mesmo gate.
  */
 export interface AppOptions {
   trustedOrigin?: string;
