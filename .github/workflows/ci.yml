@@ -1,9 +1,9 @@
 name: Pipeline de CI
 
 on:
-  # roda quando abre ou atualiza PR nas branches develop ou main
+  # Inclui PRs empilhados sobre uma branch de funcionalidade.
   pull_request:
-    branches: [ develop, main ]
+    branches: [ develop, main, "feature/hu*" ]
   # roda quando merge/push é feito direto em develop ou main
   push:
     branches: [ develop, main ]
@@ -59,6 +59,9 @@ jobs:
               HU01_TEST_DATABASE_URL="$db_url" \
                 HU02_TEST_DATABASE_URL="$db_url" \
                 HU03_TEST_DATABASE_URL="$db_url" \
+                HU04_TEST_DATABASE_URL="$db_url" \
+                HU05_TEST_DATABASE_URL="$db_url" \
+                HU06_TEST_DATABASE_URL="$db_url" \
                 npm run test:coverage
               exit 0
             fi
