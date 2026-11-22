@@ -209,3 +209,14 @@ export const meetingOrganizerTransfers = pgTable('meeting_organizer_transfers', 
   uniqueIndex('meeting_organizer_transfers_pending_idx').on(table.meeting_id).where(sql`${table.status} = 'pending'`),
   index('meeting_organizer_transfers_recipient_idx').on(table.recipient_user_id, table.id).where(sql`${table.status} = 'pending'`),
 ]);
+
+export const meetingConferencing = pgTable('meeting_conferencing', {
+  meeting_id: uuid('meeting_id').primaryKey().references(() => meetings.id),
+  mode: varchar('mode', { length: 7 }).$type<'virtual' | 'hybrid'>().notNull(),
+  google_meet_url: varchar('google_meet_url', { length: 80 }).notNull(),
+}, (table) => [
+  check('meeting_conferencing_mode_check', sql`${table.mode} IN ('virtual', 'hybrid')`),
+  check('meeting_conferencing_url_check', sql`
+    ${table.google_meet_url} ~ '^https://meet[.]google[.]com/[a-z]{3}-[a-z]{4}-[a-z]{3}$'
+  `),
+]);
