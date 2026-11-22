@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { authApi } from '../../services/authApi';
 import type { Meeting, MeetingParticipant, OrganizerTransfer } from '../../types/meetings';
+import type { AgendaItem } from '../../types/meetingAgenda';
 import { MeetingsDashboard } from './MeetingsDashboard';
 
 const futureLocal = '2099-06-10T19:30';
@@ -303,4 +304,48 @@ it('atualiza pautas e ingresso após encerrar a reunião no painel de moderaçã
   } finally {
     confirm.mockRestore();
   }
+});
+
+it('atualiza a fila de revisão após registrar pauta e reflete a decisão na lista', async () => {
+  let item: AgendaItem = {
+    id: 'pauta-integracao', meeting_id: 'reuniao', subject: 'Orçamento anual',
+    context: 'Debater os custos', proposed_by_user_id: '1', proposer_name: 'Ana',
+    created_at: '2099-05-01T11:00:00Z', review_status: 'pending',
+    reviewed_by_user_id: null, reviewed_at: null,
+  };
+  let created = false;
+  mockApi(({ method, path, query }) => {
+    if (path === '/meetings') return page([baseMeeting]);
+    if (path === '/meetings/reuniao') return ok({ ...baseMeeting, actions: { can_manage: false } });
+    if (path.endsWith('/moderation')) return ok({
+      phase: 'scheduled', actions: { can_moderate: true, can_end: false, can_manage_polls: false }, targets: [],
+    });
+    if (path.endsWith('/polls')) return page();
+    if (path.endsWith('/conferencing')) return ok({ mode: 'in_person', actions: { can_configure: false, can_join: false } });
+    if (path.endsWith('/agenda-items') && method === 'GET') return ok({
+      items: created && (!query.has('review_status') || item.review_status === 'pending') ? [item] : [],
+      next_cursor: null, actions: { can_submit: true, can_review: true },
+    });
+    if (path.endsWith('/agenda-items') && method === 'POST') {
+      created = true;
+      return ok(item, 201);
+    }
+    if (path.endsWith('/pauta-integracao/review')) {
+      item = { ...item, review_status: 'approved', reviewed_by_user_id: '1', reviewed_at: '2099-05-01T11:00:00Z' };
+      return ok(item);
+    }
+    throw new Error(path);
+  }, false);
+
+  const browser = userEvent.setup();
+  dashboard();
+  await browser.click(await screen.findByRole('button', { name: /Assembleia/ }));
+  expect(await screen.findByText('Nenhuma pauta pendente.')).toBeInTheDocument();
+  await browser.type(await screen.findByRole('textbox', { name: 'Assunto da pauta' }), item.subject);
+  await browser.type(screen.getByRole('textbox', { name: 'Contexto da pauta' }), item.context);
+  await browser.click(screen.getByRole('button', { name: 'Registrar pauta' }));
+  await browser.click(await screen.findByRole('button', { name: 'Aprovar pauta Orçamento anual' }));
+  expect(await screen.findByText('Pauta aprovada.')).toBeInTheDocument();
+  expect(await screen.findByText('Aprovada · Ana')).toBeInTheDocument();
+  expect(await screen.findByText('Nenhuma pauta pendente.')).toBeInTheDocument();
 });

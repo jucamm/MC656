@@ -4,6 +4,8 @@ import { createMeetingAgendaRouter } from '../meeting-agenda/meeting-agenda.rout
 import { MeetingAgendaService } from '../meeting-agenda/meeting-agenda.service';
 import { createMeetingConferencingRouter } from '../meeting-conferencing/meeting-conferencing.routes';
 import { MeetingConferencingService } from '../meeting-conferencing/meeting-conferencing.service';
+import { createAgendaReviewRouter } from '../meeting-moderation/agenda-review.routes';
+import { AgendaReviewService } from '../meeting-moderation/agenda-review.service';
 import { createMeetingModerationRouter } from '../meeting-moderation/meeting-moderation.routes';
 import { MeetingModerationService } from '../meeting-moderation/meeting-moderation.service';
 import { PostgresMeetingsRepository } from './meetings.repository';
@@ -18,6 +20,7 @@ export function composeMeetingServices(db: NodePgDatabase, clock = () => new Dat
       createMeetingAgendaRouter(new MeetingAgendaService(repository, clock)),
       createMeetingConferencingRouter(new MeetingConferencingService(repository, clock)),
       createMeetingModerationRouter(new MeetingModerationService(repository, clock)),
+      createAgendaReviewRouter(new AgendaReviewService(repository, clock)),
     ],
   };
 }
