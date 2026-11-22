@@ -12,7 +12,7 @@ import { VerificationService } from './modules/identity/verification.service';
 import { MockChannelVerificationDelivery } from './modules/identity/notifications/verification-delivery';
 import { RegistrationService } from './modules/identity/registration.service';
 import { GmailEmailAdapter } from './modules/identity/notifications/gmail-email.adapter';
-import { ResendEmailAdapter } from './modules/identity/notifications/resend-email.adapter';
+import { readGmailSmtpConfig } from './modules/identity/notifications/gmail-smtp.config';
 
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -35,17 +35,13 @@ if (!Number.isInteger(port) || port < 1 || port > 65_535) {
 // A validação acontece antes de abrir a porta do servidor.
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a plataforma autenticada.');
 
+const mailConfig = readGmailSmtpConfig();
+const emailDelivery = mailConfig ? new GmailEmailAdapter(mailConfig) : new MockChannelVerificationDelivery('email');
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const database = drizzle({ client: pool });
 const users = new PostgresUserRepository(database);
 const sessions = new SessionService(users, new PostgresSessionRepository(database));
-
-const resendApiKey = process.env.RESEND_API_KEY?.trim();
-const emailDelivery = resendApiKey
-  ? new ResendEmailAdapter({ apiKey: resendApiKey })
-  : process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
-    ? new GmailEmailAdapter()
-    : new MockChannelVerificationDelivery('email');
 
 const verification = new VerificationService(new PostgresVerificationRepository(database), emailDelivery);
 
@@ -75,6 +71,7 @@ const tlsOptions: https.ServerOptions = {
  */
 export const server = https.createServer(tlsOptions, app).listen(port, () => {
   console.log(`Servidor HTTPS executando na porta ${port}.`);
+  if (!mailConfig) console.warn('Gmail SMTP desativado. O envio de e-mails está em modo simulado.');
 });
 
 // O fechamento do pool é assíncrono; o evento não publica nem serializa credenciais.

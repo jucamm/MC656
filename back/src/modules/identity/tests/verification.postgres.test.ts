@@ -3,10 +3,12 @@ import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { createApp } from '../../../app';
 import { authenticationSessions, rateLimits, users, verificationChallenges } from '../../../db/schema';
-import { MockVerificationDelivery } from '../notifications/verification-delivery';
+import { GmailEmailAdapter } from '../notifications/gmail-email.adapter';
+import { MockVerificationDelivery, type VerificationDelivery } from '../notifications/verification-delivery';
 import { PasswordService } from '../password.service';
 import { RegistrationService } from '../registration.service';
 import { PostgresSessionRepository } from '../session.repository';
@@ -37,12 +39,17 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     now = new Date('2026-10-23T12:00:00.000Z');
     ids = [];
     delivery = new MockVerificationDelivery();
-    verification = new VerificationService(repository, delivery, key, () => new Date(now));
-    const sessions = new SessionService(userRepository, new PostgresSessionRepository(db), passwords, () => new Date(now));
-    app = createApp(undefined, sessions, { verification, registration: new RegistrationService(userRepository, verification, passwords) });
+    configureDelivery(delivery);
   });
 
+  function configureDelivery(emailDelivery: VerificationDelivery) {
+    verification = new VerificationService(repository, emailDelivery, key, () => new Date(now));
+    const sessions = new SessionService(userRepository, new PostgresSessionRepository(db), passwords, () => new Date(now));
+    app = createApp(undefined, sessions, { verification, registration: new RegistrationService(userRepository, verification, passwords) });
+  }
+
   afterEach(async () => {
+    vi.restoreAllMocks();
     if (!ids.length) return;
     await db.delete(authenticationSessions).where(inArray(authenticationSessions.user_id, ids));
     await db.delete(verificationChallenges).where(inArray(verificationChallenges.user_id, ids));
@@ -230,6 +237,39 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     
     delivery.fail = false;
     await send(account.token, 'email').expect(200);
+  });
+
+  it('preserva cadastro, falha HTTP, reenvio e confirmação com o adaptador Gmail', async () => {
+    const sendMail = vi.fn().mockRejectedValueOnce(Object.assign(new Error('diagnóstico interno'), { code: 'EAUTH' }))
+      .mockRejectedValueOnce(Object.assign(new Error('falha interna'), { code: 'ETIMEDOUT' }))
+      .mockResolvedValueOnce({ messageId: 'smtp-fixture' });
+    vi.spyOn(nodemailer, 'createTransport').mockReturnValue({ sendMail } as unknown as Transporter);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    configureDelivery(new GmailEmailAdapter({
+      host: 'smtp.gmail.com', port: 587, user: 'sender@example.com', appPassword: 'FAKETESTONLYPASS',
+    }));
+
+    const account = await register();
+    expect(account.email_verification).toEqual({ delivery_status: 'failed', challenge_id: null, expires_at: null });
+    expect(account.user.status).toBe('pending');
+    expect(await challenge(account.user.id)).toBeUndefined();
+    expect(sendMail).toHaveBeenCalledTimes(1);
+
+    const failed = await send(account.token, 'email').expect(503);
+    expect(failed.body.error).toEqual({
+      code: 'VERIFICATION_DELIVERY_FAILED', message: 'Não foi possível enviar o código. Tente novamente.', details: {},
+    });
+    expect(await challenge(account.user.id)).toBeUndefined();
+    expect(sendMail).toHaveBeenCalledTimes(2);
+
+    const sent = await send(account.token, 'email').expect(200);
+    expect(sendMail).toHaveBeenCalledTimes(3);
+    const outgoing = sendMail.mock.calls[2][0];
+    expect(outgoing.to).toBe(account.user.email);
+    const code = outgoing.text.match(/\b\d{6}\b/)?.[0];
+    expect(code).toBeDefined();
+    const confirmed = await confirm(account.token, 'email', sent.body.data.challenge_id, code).expect(200);
+    expect(confirmed.body.data.user.status).toBe('verified');
   });
 
   it('canal confirmado não recebe reenvio e desafio consumido não é reutilizado', async () => {

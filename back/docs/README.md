@@ -8,7 +8,7 @@ A HU01 implementa a identificação dos usuários e o controle de entrada na pla
 
 O backend entrega cadastro, senhas protegidas, sessões persistidas, logout, consulta da própria conta, verificação de e-mail, limites de envio e controle de acesso com CORS.
 
-**Entrega de códigos.** O servidor usa o adaptador Gmail quando as credenciais estão configuradas. O adaptador simulado é usado nos testes e em configuração local sem provedor, com captura interna das mensagens nos testes. O frontend já oferece cadastro, login e verificação.
+**Entrega de códigos.** O cadastro inicial e o reenvio autenticado usam o mesmo adaptador de [Gmail SMTP](#gmail-smtp). Os convites de grupo são recebidos dentro da plataforma. O código atual não tem fluxos de recuperação de senha ou outras notificações por e-mail.
 
 ## 2. Organização da solução
 
@@ -21,7 +21,7 @@ O módulo está em `back/src/modules/identity`. As responsabilidades são separa
 | Middlewares | Executam verificações antes dos handlers: origem, sessão, estado da conta e identidade usada nos grupos. |
 | Services e validadores | Aplicam cadastro, senha, normalização dos contatos, sessões e verificação. |
 | Repositories e schema | Consultam e alteram o PostgreSQL pelo Drizzle ORM, preservando transações e restrições. |
-| Adaptadores de comunicação | Simulam sucesso/falha e capturam mensagens para inspeção nos testes. |
+| Adaptadores de comunicação | Enviam códigos via Gmail SMTP. Os testes simulam a entrega e inspecionam as mensagens capturadas. |
 
 As quatro tabelas da HU01 guardam contas (`users`), sessões (`authentication_sessions`), desafios correntes (`verification_challenges`) e cotas de envio (`rate_limits`).
 
@@ -30,7 +30,7 @@ As quatro tabelas da HU01 guardam contas (`users`), sessões (`authentication_se
 - **Autenticação e autorização:** autenticar identifica a pessoa; autorizar decide seu acesso. Uma conta `pending` pode concluir o cadastro inicial, chamado de onboarding, e sair da sessão. Só fica `verified` após confirmar o e-mail. Mesmo assim, grupos exigem associação/papel próprios: não há concessão automática de administrador.
 - **Sessão:** cada login emite um token opaco, uma credencial aleatória sem permissões embutidas. Ele é enviado exclusivamente em `Authorization: Bearer <token>`; o banco guarda apenas seu hash. Não há autenticação por cookies, JWT ou refresh token. A sessão expira após um mês de calendário UTC sem atividade; requisições válidas renovam o prazo. Logout revoga somente a sessão atual.
 - **Desafio:** é uma solicitação de confirmação, com UUID e código de seis dígitos. O desafio de e-mail expira em 30 minutos. O código é protegido por HMAC, calculado com chave secreta externa ao banco. Reenvio substitui o desafio; três códigos incorretos exigem novo envio.
-- **Cotas e falhas:** cada conta/canal permite três envios por hora e seis por dia. Exceder o diário bloqueia envios por 72 horas. As janelas começam no primeiro envio aceito. Falhas do mock não consomem cota nem substituem um desafio válido. Falha no envio inicial preserva o cadastro com `201` e `delivery_status: failed`.
+- **Cotas e falhas:** cada conta/canal permite três envios por hora e seis por dia. Exceder o diário bloqueia envios por 72 horas. As janelas começam no primeiro envio aceito. Falhas de envio não consomem cota nem substituem um desafio válido. Falha no envio inicial preserva o cadastro com `201` e `delivery_status: failed`.
 - **Senha:** Bcrypt protege a senha sem alterar seu conteúdo. O máximo é 72 bytes, não necessariamente 72 caracteres. Os defaults de custo e mínimo são escolhas técnicas configuráveis; a referência ISO 27100 registrada pela equipe não implica certificação nem define esses valores nos materiais fornecidos.
 
 ## 4. Fluxo de funcionamento
@@ -60,6 +60,40 @@ Depois, execute `npm run db:migrate`, `npm run build` e `npm start`. Para valida
 - **Acesso:** monte novos routers de negócio depois da autenticação e da verificação globais. A HU02 resolve os papéis a partir do vínculo persistido da conta autenticada. Os processos decisórios retornam `403` quando a conta verificada está sem o vínculo ou papel exigido em um grupo ativo. [Contratos da HU02](groups-contracts.md)
 - **Frontend:** envie o Bearer explicitamente. Trate `401` como autenticação inválida, examine a causa de `403` e respeite `Retry-After`/`details.retry_at` em `429`. O armazenamento do token no navegador ainda é escolha da equipe. CORS exige a origem exata, permite preflight sem Bearer e não substitui autenticação.
 - **Evolução:** preserve transações e a ordem dos locks. Tentativas incorretas e bloqueios precisam permanecer gravados mesmo quando o HTTP retorna erro. Crie novas migrations, sem editar as já aplicadas. Provedores futuros devem integrar pela interface `sendVerification`, respeitando as garantias de falha e a proteção dos códigos.
+
+### Gmail SMTP
+
+Use a conta Google que enviará os códigos. Em **Segurança** na Conta Google, ative a [verificação em duas etapas](https://support.google.com/accounts/answer/185839) e crie uma [senha de aplicativo](https://myaccount.google.com/apppasswords) para o backend. Use essa senha de 16 caracteres em `MAIL_PASSWORD`. A opção pode estar indisponível em contas gerenciadas, no Programa de Proteção Avançada ou quando a verificação em duas etapas usa somente chaves de segurança. Consulte o administrador se a conta for institucional. [Ajuda do Google sobre senhas de app](https://support.google.com/mail/answer/185833?hl=pt-BR)
+
+Em desenvolvimento, configure `back/.env` com os valores abaixo e substitua os dois últimos pelos dados da conta de teste. Reinicie o backend após modificar a configuração.
+
+```dotenv
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=seuemail@gmail.com
+MAIL_PASSWORD=sua_senha_de_app
+```
+
+Para trabalhar com o simulador local, deixe `MAIL_USERNAME` e `MAIL_PASSWORD` vazias. Nesse modo, nenhum e-mail sai do backend. Preencher somente uma credencial gera um erro de configuração na inicialização. Em produção, defina `NODE_ENV=production`, injete as cinco variáveis pelo gerenciador de segredos do ambiente e permita conexões de saída para `smtp.gmail.com:587`. O endereço de `MAIL_USERNAME` também é o remetente. [Configuração SMTP do Gmail](https://developers.google.com/workspace/gmail/imap/imap-smtp)
+
+O serviço aguarda uma tentativa SMTP por solicitação, dentro do fluxo existente de emissão. A aceitação pelo Gmail habilita a gravação do desafio e da cota local. Falhas preservam o desafio anterior e permitem reenvio explícito. Um timeout após o servidor receber a mensagem pode deixar o resultado incerto. Como a API não repete o envio automaticamente, confira a caixa de entrada antes de solicitar outro código. Aceitação SMTP não confirma a chegada à caixa de entrada.
+
+**Cotas.** Cadastro e reenvio compartilham a cota da conta remetente, inclusive com o que essa conta envia fora da plataforma. O Gmail pessoal tem limite de 500 mensagens por dia. No Google Workspace, o limite usual é de 2.000 mensagens por usuário em 24 horas e cai para 500 em contas de teste. Há também limites por destinatário e políticas antispam. Eventuais fluxos transacionais que usem a mesma conta vão dividir essa capacidade. As cotas do Gmail são independentes dos limites de verificação por usuário da aplicação. [Limites do Gmail pessoal](https://support.google.com/mail/answer/22839?hl=pt-BR) · [Limites do Google Workspace](https://support.google.com/a/answer/166852?hl=pt-BR)
+
+**Diagnóstico.** Falha no cadastro inicial mantém a conta pendente e a tela orienta a solicitar outro código. Um reenvio rejeitado retorna `503 VERIFICATION_DELIVERY_FAILED`. O backend registra apenas a categoria da falha SMTP, sem credenciais, destinatários ou códigos de verificação.
+
+| Categoria | O que conferir |
+|---|---|
+| Autenticação | Endereço completo, senha de aplicativo correspondente, revogação após troca da senha da conta e políticas da organização. |
+| Conexão, TLS ou tempo limite | DNS, firewall, saída TCP 587, relógio do servidor e cadeia de certificação. Use o comando abaixo no ambiente do backend. |
+| Mensagem rejeitada | Validade do destinatário, cotas e restrições da conta remetente. Se o SMTP aceitou a mensagem, confira spam, filtros e eventuais devoluções. |
+
+```bash
+openssl s_client -starttls smtp -connect smtp.gmail.com:587 -servername smtp.gmail.com -verify_hostname smtp.gmail.com -verify_return_error </dev/null
+```
+
+**Verificação manual.** O comando testa conectividade e TLS sem autenticar. Para testar a entrega completa, inicie o backend com a conta Gmail configurada, cadastre uma conta com um endereço que você controle, espere o código chegar e confirme-o na interface. Com outra conta de teste ainda pendente, use **Solicitar novo código**, confirme a chegada da nova mensagem e use seu código. Os testes automatizados simulam o transporte SMTP e não validam autenticação nem entrega no Gmail real.
 
 ## 6. Aprofundamentos
 

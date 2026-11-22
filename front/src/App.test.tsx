@@ -21,7 +21,7 @@ it('mantém a conta criada e permite reenviar o código quando a entrega inicial
     });
     vi.spyOn(authApi, 'login').mockResolvedValue({ user, token: 'session' });
     vi.spyOn(authApi, 'getMe').mockResolvedValue({ user, verification_challenges: [] });
-    const resend = vi.spyOn(authApi, 'sendVerification').mockResolvedValue({
+    const sendVerification = vi.spyOn(authApi, 'sendVerification').mockResolvedValue({
         channel: 'email', challenge_id: 'challenge', expires_at: '2026-11-21T12:30:00Z',
     });
     const browser = userEvent.setup();
@@ -35,6 +35,6 @@ it('mantém a conta criada e permite reenviar o código quando a entrega inicial
 
     expect(await screen.findByRole('alert')).toHaveTextContent('O envio do código falhou');
     await browser.click(screen.getByRole('button', { name: 'Solicitar novo código' }));
-    expect(resend).toHaveBeenCalledWith('email');
+    expect(sendVerification).toHaveBeenCalledWith('email');
     expect(await screen.findByRole('status')).toHaveTextContent('Código enviado');
 });

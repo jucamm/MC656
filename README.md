@@ -69,7 +69,7 @@ npm start
 
 O servidor backend estará disponível em `https://localhost:3000`.
 
-Para enviar códigos de verificação por e-mail, configure `RESEND_API_KEY` e `RESEND_FROM_EMAIL` em `back/.env` antes de iniciar o backend. O remetente de teste `onboarding@resend.dev` só envia para o endereço associado à sua conta no Resend. Para enviar a outros destinatários, use um remetente de um domínio verificado no Resend. Sem a chave do Resend, o backend usa Gmail SMTP se `GMAIL_USER` e `GMAIL_APP_PASSWORD` estiverem configuradas ou simula o envio localmente.
+Para enviar códigos de verificação por e-mail, configure `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USE_TLS`, `MAIL_USERNAME` e `MAIL_PASSWORD` em `back/.env`. O backend usa Gmail SMTP com STARTTLS na porta 587. Em desenvolvimento, deixar usuário e senha vazios ativa o simulador. Para configurar a conta Google, testar uma entrega real ou diagnosticar falhas, consulte o [guia de Gmail SMTP](back/docs/README.md#gmail-smtp).
 
 ---
 
