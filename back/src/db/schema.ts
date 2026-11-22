@@ -230,3 +230,21 @@ export const meetingParticipationBlocks = pgTable('meeting_participation_blocks'
   }),
   check('meeting_participation_blocks_actor_check', sql`${table.user_id} <> ${table.blocked_by_user_id}`),
 ]);
+
+export const meetingPolls = pgTable('meeting_polls', {
+  id: uuid('id').primaryKey(),
+  meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
+  question: varchar('question', { length: 150 }).notNull(),
+  opened_at: timestamp('opened_at', { withTimezone: true }).notNull(),
+  opened_by_user_id: bigint('opened_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  closed_at: timestamp('closed_at', { withTimezone: true }),
+  closed_by_user_id: bigint('closed_by_user_id', { mode: 'bigint' }).references(() => users.id),
+}, table => [
+  check('meeting_polls_question_not_blank_check', sql`${table.question} ~ '[^[:space:]]'`),
+  check('meeting_polls_close_state_check', sql`
+    (${table.closed_at} IS NULL) = (${table.closed_by_user_id} IS NULL)
+    AND (${table.closed_at} IS NULL OR ${table.closed_at} >= ${table.opened_at})
+  `),
+  index('meeting_polls_meeting_id_idx').on(table.meeting_id, table.id),
+  uniqueIndex('meeting_polls_one_open_idx').on(table.meeting_id).where(sql`${table.closed_at} IS NULL`),
+]);

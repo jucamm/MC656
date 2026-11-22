@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../../app';
-import { authenticationSessions, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../../db/schema';
+import { authenticationSessions, meetingParticipants, meetingParticipationBlocks, meetingPolls, meetings, users } from '../../../db/schema';
 import { PasswordService } from '../../identity/password.service';
 import { PostgresSessionRepository } from '../../identity/session.repository';
 import { SessionService } from '../../identity/session.service';
@@ -64,6 +64,7 @@ describe.skipIf(!connectionString)('moderação local com PostgreSQL', () => {
   });
   afterEach(async () => {
     if (!accounts?.length) return;
+    await db.delete(meetingPolls).where(eq(meetingPolls.meeting_id, id));
     await db.delete(meetingParticipationBlocks).where(eq(meetingParticipationBlocks.meeting_id, id));
     await db.delete(meetingParticipants).where(eq(meetingParticipants.meeting_id, id));
     await db.delete(meetings).where(eq(meetings.id, id));
@@ -140,5 +141,50 @@ describe.skipIf(!connectionString)('moderação local com PostgreSQL', () => {
     const [meeting] = await db.select().from(meetings).where(eq(meetings.id, id));
     expect(meeting).toMatchObject({ ended_at: start, ended_by_user_id: accounts[1].id, created_by_user_id: accounts[0].id });
     expect(await db.select().from(meetingParticipants).where(eq(meetingParticipants.meeting_id, id))).toHaveLength(4);
+  });
+
+  it('valida abertura, isola votação por reunião e preserva autoria no fechamento', async () => {
+    const path = `/meetings/${id}/polls`;
+    expect((await app.post(path).set('Authorization', bearer(0)).send({ question: 'Questão?' }).expect(409)).body.error.code)
+      .toBe('MEETING_NOT_STARTED');
+    clock = start;
+    await app.post(path).set('Authorization', bearer(2)).send({ question: 'Questão?' }).expect(403);
+    await app.post(path).set('Authorization', bearer(1)).send({ question: '  ' }).expect(400);
+    const responses = await Promise.all([0, 1].map(actor =>
+      app.post(path).set('Authorization', bearer(actor)).send({ question: ' Questão? ' })));
+    expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+    const winner = responses.find(response => response.status === 201)?.body.data;
+    expect(winner).toMatchObject({ question: 'Questão?', status: 'open', closed_at: null, meeting_id: id });
+    const closePath = `${path}/${winner.id}/close`;
+    await app.post(`${path}/${randomUUID()}/close`).set('Authorization', bearer(1)).expect(404);
+    await app.post(closePath).set('Authorization', bearer(1)).expect(204);
+    await app.post(closePath).set('Authorization', bearer(0)).expect(204);
+    const { body } = await app.get(path).set('Authorization', bearer(3)).expect(200);
+    expect(body.data.items).toEqual([expect.objectContaining({
+      id: winner.id, status: 'closed', closed_by_user_id: accounts[1].id.toString(), closed_at: start.toISOString(),
+    })]);
+  });
+
+  it('serializa abertura com encerramento e nunca preserva votação aberta no fim', async () => {
+    clock = start;
+    const path = `/meetings/${id}/polls`;
+    const [opened] = await Promise.all([
+      app.post(path).set('Authorization', bearer(1)).send({ question: 'Questão concorrente' }),
+      end(0).expect(204),
+    ]);
+    expect([201, 409]).toContain(opened.status);
+    const polls = await db.select().from(meetingPolls).where(eq(meetingPolls.meeting_id, id));
+    expect(polls.every(poll => poll.closed_at?.getTime() === start.getTime())).toBe(true);
+    await app.post(path).set('Authorization', bearer(1)).send({ question: 'Outra questão' }).expect(409);
+  });
+
+  it('encerra votação aberta na mesma transação e preserva o fechamento em repetição', async () => {
+    clock = start;
+    const path = `/meetings/${id}/polls`;
+    const { body } = await app.post(path).set('Authorization', bearer(1)).send({ question: 'Proposta' }).expect(201);
+    await end(0).expect(204);
+    await app.post(`${path}/${body.data.id}/close`).set('Authorization', bearer(1)).expect(204);
+    const [poll] = await db.select().from(meetingPolls).where(eq(meetingPolls.id, body.data.id));
+    expect(poll).toMatchObject({ closed_by_user_id: accounts[0].id, closed_at: start });
   });
 });

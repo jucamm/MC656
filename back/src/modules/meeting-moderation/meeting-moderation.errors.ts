@@ -6,6 +6,8 @@ export const moderationErrors = {
   MEETING_ENDED: meetingErrors.MEETING_ENDED,
   MEETING_NOT_STARTED: { status: 409, message: 'A reunião ainda não começou.' },
   MODERATION_FORBIDDEN: { status: 403, message: 'Você não pode realizar esta ação de moderação.' },
+  POLL_NOT_FOUND: { status: 404, message: 'Votação não encontrada nesta reunião.' },
+  POLL_ALREADY_OPEN: { status: 409, message: 'Já existe uma votação aberta nesta reunião.' },
   PARTICIPANT_NOT_FOUND: { status: 404, message: 'Participante não encontrado nesta reunião.' },
   PARTICIPANT_NOT_ELIGIBLE: { status: 422, message: 'Este participante não tem participação confirmada e vigente.' },
 } as const;
