@@ -112,6 +112,21 @@ describe.skipIf(!connectionString)('videoconferência com PostgreSQL e sessão p
     expect((await join().expect(409)).body.error.code).toBe('CONFERENCING_NOT_CONFIGURED');
   });
 
+  it('impõe FK, cardinalidade, modo remoto e formato no banco', async () => {
+    await expect(db.insert(meetingConferencing).values({ meeting_id: randomUUID(), mode: 'virtual', google_meet_url: url }))
+      .rejects.toMatchObject({ cause: { code: '23503' } });
+    await expect(db.insert(meetingConferencing).values({
+      meeting_id: meetingId, mode: 'virtual', google_meet_url: 'https://external.example/abc-defg-hij',
+    })).rejects.toMatchObject({ cause: { code: '23514' } });
+    await expect(pool.query(
+      'INSERT INTO meeting_conferencing (meeting_id, mode, google_meet_url) VALUES ($1, $2, $3)',
+      [meetingId, 'local', url],
+    )).rejects.toMatchObject({ code: '23514' });
+    await db.insert(meetingConferencing).values({ meeting_id: meetingId, mode: 'hybrid', google_meet_url: url });
+    await expect(db.insert(meetingConferencing).values({ meeting_id: meetingId, mode: 'virtual', google_meet_url: url }))
+      .rejects.toMatchObject({ cause: { code: '23505' } });
+  });
+
   it('protege a rota, revalida consentimento e papéis, e só devolve o link no horário', async () => {
     await api.get(route()).expect(401).expect('Cache-Control', 'no-store');
     await get(3).expect(403);
