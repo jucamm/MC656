@@ -1,10 +1,14 @@
 import { and, eq, exists, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { alias } from 'drizzle-orm/pg-core';
-import { groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetings, users } from '../../db/schema';
+import { groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../db/schema';
 import { lockGroup } from '../groups/groups.repository';
 import type { PageInput } from '../groups/groups.types';
-import type { InvitationDecision, MeetingCursor, OrganizerTransfer, Participant, TransferResolution } from './meetings.types';
+import type { InvitationDecision, MeetingCursor, MeetingScope, OrganizerTransfer, Participant, TransferResolution } from './meetings.types';
+
+type MeetingTransactionCallback = Parameters<NodePgDatabase['transaction']>[0];
+export type MeetingDatabaseTransaction = Parameters<MeetingTransactionCallback>[0];
+type MeetingTransactionConfig = Parameters<NodePgDatabase['transaction']>[1];
 
 type DatabaseQueries = Pick<NodePgDatabase, 'select' | 'insert' | 'update' | 'delete'>;
 
@@ -29,6 +33,13 @@ function confirmedParticipantWithAccess(member: ReturnType<typeof hasGroupMember
 function eligibleParticipant(db: DatabaseQueries) {
   return and(eq(users.status, 'verified'),
     confirmedParticipantWithAccess(hasGroupMembership(db, meetingParticipants.user_id)));
+}
+
+function blockedParticipant(db: DatabaseQueries, actorId: bigint | typeof meetingParticipants.user_id) {
+  return exists(db.select({ one: sql`1` }).from(meetingParticipationBlocks).where(and(
+    eq(meetingParticipationBlocks.meeting_id, meetings.id),
+    eq(meetingParticipationBlocks.user_id, actorId),
+  )));
 }
 
 function visibleTo(db: DatabaseQueries, actorId: bigint) {
@@ -77,6 +88,28 @@ export class MeetingTransaction {
       .leftJoin(groups, eq(groups.id, meetings.group_id))
       .where(and(eq(meetings.id, meetingId), visibleTo(this.db, actorId)));
     return row ?? null;
+  }
+
+  async readScope(meetingId: string, actorId: bigint): Promise<MeetingScope | null> {
+    const [row] = await this.db.select({
+      meeting: meetings,
+      isOrganizer: sql<boolean>`${meetings.organizer_user_id} = ${actorId}`,
+      isEligibleParticipant: sql<boolean>`coalesce(${eligibleParticipant(this.db)}, false)`,
+      isModerator: sql<boolean>`coalesce(${meetingParticipants.is_moderator}, false)`,
+      isBlocked: sql<boolean>`${blockedParticipant(this.db, actorId)}`,
+    }).from(meetings)
+      .leftJoin(groups, eq(groups.id, meetings.group_id))
+      .leftJoin(meetingParticipants, and(eq(meetingParticipants.meeting_id, meetings.id), eq(meetingParticipants.user_id, actorId)))
+      .leftJoin(users, eq(users.id, meetingParticipants.user_id))
+      .where(and(eq(meetings.id, meetingId), visibleTo(this.db, actorId)));
+
+    return row ? { ...row, isModerator: row.isModerator && row.isEligibleParticipant && !row.isBlocked } : null;
+  }
+
+  async lockScope(meetingId: string, actorId: bigint): Promise<MeetingScope | null> {
+    const visible = await this.findVisibleMeetingGroup(meetingId, actorId);
+    if (!visible || !await this.lockActiveMeeting(meetingId, visible.groupId)) return null;
+    return this.readScope(meetingId, actorId);
   }
 
   async findTransferMeetingForRecipient(meetingId: string, transferId: string, recipientId: bigint) {
@@ -165,8 +198,11 @@ export class MeetingTransaction {
 export class PostgresMeetingsRepository {
   constructor(private readonly db: NodePgDatabase) {}
 
-  transaction<Result>(operation: (tx: MeetingTransaction) => Promise<Result>): Promise<Result> {
-    return this.db.transaction(tx => operation(new MeetingTransaction(tx)));
+  transaction<Result>(
+    operation: (tx: MeetingTransaction, dbTx: MeetingDatabaseTransaction) => Promise<Result>,
+    config?: MeetingTransactionConfig,
+  ): Promise<Result> {
+    return this.db.transaction(tx => operation(new MeetingTransaction(tx), tx), config);
   }
 
   listVisible(actorId: bigint, page: PageInput<MeetingCursor>) {
