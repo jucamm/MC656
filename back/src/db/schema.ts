@@ -156,10 +156,16 @@ export const meetings = pgTable('meetings', {
   organizer_user_id: bigint('organizer_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
   group_id: uuid('group_id').references(() => groups.id),
   access_mode: meetingAccessMode('access_mode').notNull(),
+  ended_at: timestamp('ended_at', { withTimezone: true }),
+  ended_by_user_id: bigint('ended_by_user_id', { mode: 'bigint' }).references(() => users.id),
 }, (table) => [
   check('meetings_subject_not_blank_check', sql`${table.subject} ~ '[^[:space:]]'`),
   check('meetings_starts_after_creation_check', sql`${table.starts_at} > ${table.created_at}`),
   check('meetings_group_access_check', sql`${table.access_mode} <> 'group' OR ${table.group_id} IS NOT NULL`),
+  check('meetings_end_state_check', sql`
+    (${table.ended_at} IS NULL) = (${table.ended_by_user_id} IS NULL)
+    AND (${table.ended_at} IS NULL OR ${table.ended_at} >= ${table.starts_at})
+  `),
   index('meetings_starts_at_id_idx').on(table.starts_at, table.id),
   index('meetings_group_id_idx').on(table.group_id),
 ]);
@@ -208,6 +214,21 @@ export const meetingOrganizerTransfers = pgTable('meeting_organizer_transfers', 
   `),
   uniqueIndex('meeting_organizer_transfers_pending_idx').on(table.meeting_id).where(sql`${table.status} = 'pending'`),
   index('meeting_organizer_transfers_recipient_idx').on(table.recipient_user_id, table.id).where(sql`${table.status} = 'pending'`),
+]);
+
+export const meetingParticipationBlocks = pgTable('meeting_participation_blocks', {
+  meeting_id: uuid('meeting_id').notNull(),
+  user_id: bigint('user_id', { mode: 'bigint' }).notNull(),
+  blocked_by_user_id: bigint('blocked_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  blocked_at: timestamp('blocked_at', { withTimezone: true }).notNull(),
+}, table => [
+  primaryKey({ columns: [table.meeting_id, table.user_id] }),
+  foreignKey({
+    name: 'meeting_participation_blocks_target_fk',
+    columns: [table.meeting_id, table.user_id],
+    foreignColumns: [meetingParticipants.meeting_id, meetingParticipants.user_id],
+  }),
+  check('meeting_participation_blocks_actor_check', sql`${table.user_id} <> ${table.blocked_by_user_id}`),
 ]);
 
 export const meetingConferencing = pgTable('meeting_conferencing', {
