@@ -49,6 +49,9 @@ function mockApi(route: (call: Call) => Response) {
       authorization: new Headers(init?.headers).get('Authorization'),
     };
     calls.push(call);
+    if (call.method === 'GET' && call.path.endsWith('/agenda-items')) {
+      return ok({ items: [], next_cursor: null, actions: { can_submit: false, can_review: false } });
+    }
     return route(call);
   }));
   return calls;
