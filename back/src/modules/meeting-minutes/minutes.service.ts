@@ -3,20 +3,14 @@ import { groups, meetingMinuteRevisions, meetingMinutes, meetings } from '../../
 import { DomainError } from '../../errors/domain.error';
 import type { PageInput } from '../groups/groups.types';
 import { visibleTo, type MeetingDatabaseTransaction, type PostgresMeetingsRepository } from '../meetings/meetings.repository';
-import { canModerate, type MeetingCursor, type MeetingScope } from '../meetings/meetings.types';
+import { type MeetingCursor } from '../meetings/meetings.types';
+import { editorialActions, minutesMissing as missing, requireMinutesManager } from '../meeting-minutes-review/minutes-review.policy';
 import { TranscriptError, type MeetTranscriptClient } from './meet-transcript.client';
-import { revisionDto } from './minutes.types';
+import { revisionDto, type Minutes } from './minutes.types';
 
 const readOnly = { isolationLevel: 'repeatable read', accessMode: 'read only' } as const;
-const missing = () => new DomainError('MINUTES_NOT_FOUND', 'Ata indisponível.');
 const conflict = () => new DomainError('MINUTES_CONFLICT', 'A ata já está em processamento ou revisão.');
 const noTranscript = () => new DomainError('TRANSCRIPT_UNAVAILABLE', 'Transcrição indisponível.');
-
-function requireReview(scope: MeetingScope | null) {
-  if (!scope) throw missing();
-  if (!canModerate(scope)) throw new DomainError('MINUTES_FORBIDDEN', 'A ação exige moderação da reunião.');
-  if (!scope.meeting.ended_at) throw new DomainError('MEETING_NOT_ENDED', 'A reunião ainda não foi encerrada.');
-}
 
 async function load(db: MeetingDatabaseTransaction, id: string) {
   const [row] = await db.select().from(meetingMinutes).where(eq(meetingMinutes.meeting_id, id));
@@ -33,6 +27,25 @@ async function revision(db: MeetingDatabaseTransaction, meetingId: string, id: s
 
 const recoverable = new Set(['MEET_UNAVAILABLE', 'MEET_WAITING_ARTIFACT', 'SLA_EXCEEDED',
   'MEET_ACCESS_DENIED', 'MEET_NOT_CONFIGURED', 'GROUP_UNAVAILABLE', 'GENERATION_FAILED']);
+
+export async function describeMinutesReview(db: MeetingDatabaseTransaction, id: string, row?: Minutes) {
+  const hasDraft = !!(row?.draft_revision_id || row?.published_revision_id);
+  const busy = row?.generation_status === 'queued' || row?.generation_status === 'running';
+  return {
+    version: row?.version ?? 1, generation_status: row?.generation_status ?? 'unavailable',
+    visibility: row?.visibility ?? 'unpublished', draft_status: row?.draft_status ?? null,
+    draft: revisionDto(await revision(db, id, row?.draft_revision_id)),
+    published: revisionDto(await revision(db, id, row?.published_revision_id)),
+    deadline_at: row?.deadline_at?.toISOString() ?? null,
+    transcript_ready_at: row?.transcript_ready_at?.toISOString() ?? null,
+    sla_missed_at: row?.sla_missed_at?.toISOString() ?? null, failure_code: row?.failure_code ?? null,
+    actions: {
+      ...editorialActions(row),
+      can_add_notes: !busy && !hasDraft, can_retry: !busy && !hasDraft && recoverable.has(row?.failure_code ?? ''),
+      can_read_transcript: !!(row?.conference_name && row.source_transcripts?.length),
+    },
+  };
+}
 
 export class MinutesService {
   constructor(private readonly meetings: PostgresMeetingsRepository,
@@ -76,29 +89,15 @@ export class MinutesService {
 
   review(id: string, actor: bigint) {
     return this.meetings.transaction(async (tx, db) => {
-      requireReview(await tx.readScope(id, actor));
+      requireMinutesManager(await tx.readScope(id, actor));
       const row = await load(db, id);
-      const hasDraft = !!(row?.draft_revision_id || row?.published_revision_id);
-      const busy = row?.generation_status === 'queued' || row?.generation_status === 'running';
-      return {
-        version: row?.version ?? 1, generation_status: row?.generation_status ?? 'unavailable',
-        visibility: row?.visibility ?? 'unpublished', draft_status: row?.draft_status ?? null,
-        draft: revisionDto(await revision(db, id, row?.draft_revision_id)),
-        published: revisionDto(await revision(db, id, row?.published_revision_id)),
-        deadline_at: row?.deadline_at?.toISOString() ?? null,
-        transcript_ready_at: row?.transcript_ready_at?.toISOString() ?? null,
-        sla_missed_at: row?.sla_missed_at?.toISOString() ?? null, failure_code: row?.failure_code ?? null,
-        actions: {
-          can_add_notes: !busy && !hasDraft, can_retry: !busy && !hasDraft && recoverable.has(row?.failure_code ?? ''),
-          can_read_transcript: !!(row?.conference_name && row.source_transcripts?.length),
-        },
-      };
+      return describeMinutesReview(db, id, row);
     }, readOnly);
   }
 
   async transcript(id: string, actor: bigint, limit: number, cursor: number) {
     const read = () => this.meetings.transaction(async (tx, db) => {
-      requireReview(await tx.readScope(id, actor));
+      requireMinutesManager(await tx.readScope(id, actor));
       return load(db, id);
     }, readOnly);
     const row = await read();
@@ -120,7 +119,7 @@ export class MinutesService {
 
   queue(id: string, actor: bigint, notes?: string) {
     return this.meetings.transaction(async (tx, db) => {
-      requireReview(await tx.lockScope(id, actor));
+      requireMinutesManager(await tx.lockScope(id, actor));
       const row = await load(db, id);
       if (row && (row.draft_revision_id || row.published_revision_id ||
           row.generation_status === 'queued' || row.generation_status === 'running')) throw conflict();

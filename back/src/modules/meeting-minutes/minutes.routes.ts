@@ -10,11 +10,11 @@ import type { MinutesService } from './minutes.service';
 
 const status: Record<string, number> = {
   MINUTES_NOT_FOUND: 404, MEETING_NOT_FOUND: 404, MINUTES_FORBIDDEN: 403, TRANSCRIPT_UNAVAILABLE: 404,
-  MEETING_NOT_ENDED: 409, MINUTES_CONFLICT: 409, TRANSCRIPTION_CONFIG_LOCKED: 409,
+  MEETING_NOT_ENDED: 409, MINUTES_VERSION_CONFLICT: 409, MINUTES_INVALID_TRANSITION: 409, MINUTES_CONFLICT: 409, TRANSCRIPTION_CONFIG_LOCKED: 409,
   TRANSCRIPTION_ROOM_UNAVAILABLE: 422, MEET_UNAVAILABLE: 503,
 };
 
-const handleError: ErrorRequestHandler = (error, request, response, next) => {
+export const minutesErrorHandler: ErrorRequestHandler = (error, request, response, next) => {
   if (error instanceof DomainError && Object.hasOwn(status, error.code)) {
     response.status(status[error.code]).json({ error: { code: error.code, message: error.message, details: error.details ?? {} } });
     return;
@@ -28,11 +28,11 @@ const handleError: ErrorRequestHandler = (error, request, response, next) => {
   identityErrorHandler(error, request, response, next);
 };
 
-function actor(req: Request) {
+export function minutesActor(req: Request) {
   if (!req.auth) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.');
   return BigInt(req.auth.user_id);
 }
-const meeting = (req: Request) => validateUuid(req.params.meetingId, 'meetingId');
+export const minutesMeetingId = (req: Request) => validateUuid(req.params.meetingId, 'meetingId');
 
 function field(body: unknown, key: string): unknown {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || !Object.hasOwn(body, key)) {
@@ -45,44 +45,44 @@ export function createMinutesRouter(service: MinutesService, capture: MinutesCap
   const router = Router();
   const path = '/meetings/:meetingId/minutes';
   router.get('/meeting-minutes', meetingsNoStore, async (req, res) => {
-    res.json({ data: await service.history(actor(req), validatePage(req.query, validateMeetingCursor)) });
+    res.json({ data: await service.history(minutesActor(req), validatePage(req.query, validateMeetingCursor)) });
   });
   router.get(path, meetingsNoStore, async (req, res) => {
-    res.json({ data: await service.published(meeting(req), actor(req)) });
+    res.json({ data: await service.published(minutesMeetingId(req), minutesActor(req)) });
   });
   router.get(path + '/review', meetingsNoStore, async (req, res) => {
-    res.json({ data: await service.review(meeting(req), actor(req)) });
+    res.json({ data: await service.review(minutesMeetingId(req), minutesActor(req)) });
   });
   router.get(path + '/transcript', meetingsNoStore, async (req, res) => {
-    const id = meeting(req);
+    const id = minutesMeetingId(req);
     const page = validatePage(req.query, (cursor, key) => {
       if (typeof cursor !== 'string' || !cursor.startsWith(id + ':') || !/^[1-9][0-9]{0,3}$/.test(cursor.slice(37))) {
         invalidField(key, 'Informe um cursor válido para a reunião.');
       }
       return Number(cursor.slice(37));
     });
-    res.json({ data: await service.transcript(id, actor(req), page.limit, page.after ?? 0) });
+    res.json({ data: await service.transcript(id, minutesActor(req), page.limit, page.after ?? 0) });
   });
   router.put(path + '/capture', meetingsNoStore, express.json(), async (req, res) => {
     const enabled = field(req.body, 'enabled');
     if (typeof enabled !== 'boolean') invalidField('enabled', 'Informe um valor booleano.');
-    res.json({ data: await capture.configure(meeting(req), actor(req), enabled) });
+    res.json({ data: await capture.configure(minutesMeetingId(req), minutesActor(req), enabled) });
   });
   router.post(path + '/notes', meetingsNoStore, express.json(), async (req, res) => {
     const value = field(req.body, 'notes');
     if (typeof value !== 'string' || !value.trim() || [...value.trim()].length > 8000 || value.includes('\u0000')) {
       invalidField('notes', 'Informe notas de até 8.000 caracteres.');
     }
-    await service.queue(meeting(req), actor(req), value.trim());
+    await service.queue(minutesMeetingId(req), minutesActor(req), value.trim());
     res.status(202).json({ data: { generation_status: 'queued' } });
   });
   router.post(path + '/retry', meetingsNoStore, async (req, res) => {
     if (req.headers['transfer-encoding'] || Number(req.headers['content-length']) > 0) {
       invalidField('body', 'Esta operação não recebe corpo.');
     }
-    await service.queue(meeting(req), actor(req));
+    await service.queue(minutesMeetingId(req), minutesActor(req));
     res.status(202).json({ data: { generation_status: 'queued' } });
   });
-  router.use(handleError);
+  router.use(minutesErrorHandler);
   return router;
 }

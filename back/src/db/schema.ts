@@ -348,6 +348,29 @@ export const meetingMinuteRevisions = pgTable('meeting_minute_revisions', {
 ]);
 
 
+export const meetingMinuteEvents = pgTable('meeting_minute_events', {
+  id: uuid('id').primaryKey(),
+  meeting_id: uuid('meeting_id').notNull().references(() => meetingMinutes.meeting_id),
+  actor_user_id: bigint('actor_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  action: text('action', { enum: ['edit', 'publish', 'reject', 'hide', 'delete'] }).notNull(),
+  revision_id: uuid('revision_id'),
+  from_visibility: text('from_visibility', { enum: ['unpublished', 'published', 'hidden'] }).notNull(),
+  to_visibility: text('to_visibility', { enum: ['unpublished', 'published', 'hidden', 'deleted'] }).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  resulting_version: integer('resulting_version').notNull(),
+}, table => [
+  foreignKey({ name: 'minute_events_revision_fk', columns: [table.meeting_id, table.revision_id],
+    foreignColumns: [meetingMinuteRevisions.meeting_id, meetingMinuteRevisions.id] }),
+  unique('minute_events_version_unique').on(table.meeting_id, table.resulting_version),
+  check('minute_events_state_check', sql`
+    ${table.resulting_version} > 1
+    AND ${table.action} IN ('edit','publish','reject','hide','delete')
+    AND ${table.from_visibility} IN ('unpublished','published','hidden')
+    AND ${table.to_visibility} IN ('unpublished','published','hidden','deleted')
+    AND (${table.revision_id} IS NULL) = (${table.action} = 'delete')
+  `),
+]);
+
 export const meetingTranscriptionConsents = pgTable('meeting_transcription_consents', {
   meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
   user_id: bigint('user_id', { mode: 'bigint' }).notNull().references(() => users.id),

@@ -1,3 +1,5 @@
+import { createMinutesReviewRouter } from '../meeting-minutes-review/minutes-review.routes';
+import { MinutesReviewService } from '../meeting-minutes-review/minutes-review.service';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { MeetTranscriptClient, type MeetCaptureConfig } from '../meeting-minutes/meet-transcript.client';
 import { MinutesService } from '../meeting-minutes/minutes.service';
@@ -26,6 +28,7 @@ export function composeMeetingServices(db: NodePgDatabase, clock = () => new Dat
       createMeetingConferencingRouter(new MeetingConferencingService(repository, clock, capture)),
       createMeetingModerationRouter(new MeetingModerationService(repository, clock)),
       createMinutesRouter(new MinutesService(repository, client, clock), new MinutesCapture(repository, client, clock)),
+      createMinutesReviewRouter(new MinutesReviewService(repository, clock)),
       createAgendaReviewRouter(new AgendaReviewService(repository, clock)),
     ],
   };

@@ -22,13 +22,13 @@ describe('regras editoriais das atas', () => {
 
   it('aprova a revisão exata com versão atual e permite republicar só quando oculta', () => {
     const publish = { action: 'publish', expected_version: 4, revision_id: draft } as const;
-    expect(validateTransition(pending, publish)).toBe(pending);
+    expect(validateTransition(pending, publish)).toEqual(pending);
     expect(() => validateTransition(pending, { ...publish, expected_version: 3 }))
       .toThrow(expect.objectContaining({ code: 'MINUTES_VERSION_CONFLICT' }));
     expect(() => validateTransition(pending, { ...publish, revision_id: published }))
       .toThrow(expect.objectContaining({ code: 'MINUTES_INVALID_TRANSITION' }));
     const hidden = { ...pending, visibility: 'hidden', draft_status: 'rejected' } as const;
-    expect(validateTransition(hidden, { ...publish, revision_id: published })).toBe(hidden);
+    expect(validateTransition(hidden, { ...publish, revision_id: published })).toEqual(hidden);
     expect(editorialActions(hidden)).toMatchObject({ can_edit: true, can_republish: true, can_publish: false });
     expect(() => validateTransition(hidden, publish)).toThrow(expect.objectContaining({ code: 'MINUTES_INVALID_TRANSITION' }));
   });

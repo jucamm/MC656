@@ -23,7 +23,7 @@ export function editorialActions(row?: EditorialState) {
   };
 }
 
-export function validateTransition(row: EditorialState | undefined, command: ReviewCommand) {
+export function validateTransition<T extends EditorialState>(row: T | undefined, command: ReviewCommand) {
   if (!row || row.visibility === 'deleted') throw minutesMissing();
   if (row.version !== command.expected_version) {
     throw new DomainError('MINUTES_VERSION_CONFLICT', 'A ata mudou. Atualize a revisão antes de continuar.');
@@ -48,5 +48,5 @@ export function validateTransition(row: EditorialState | undefined, command: Rev
       permitted = actions.can_delete;
   }
   if (!permitted) throw new DomainError('MINUTES_INVALID_TRANSITION', 'A ação não se aplica à revisão informada.');
-  return row;
+  return { ...row, visibility: row.visibility };
 }
