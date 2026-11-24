@@ -4,6 +4,12 @@ import { API_BASE } from './apiBase';
 const fallbackMessage = 'Não foi possível concluir a operação. Tente novamente.';
 // Mensagens públicas conhecidas do backend; respostas externas nunca viram texto de interface.
 const messages: Record<string, string> = {
+    MEETING_CANCELLED: 'A reunião foi cancelada.',
+    MEETING_VERSION_CONFLICT: 'A agenda mudou. Atualize a reunião.',
+    TRANSCRIPT_NOT_AVAILABLE: 'Transcrição indisponível. Atualize a reunião.',
+    GOOGLE_INVALID_STATE: 'A autorização expirou. Inicie novamente.',
+    GOOGLE_OPERATOR_REQUIRED: 'A ação exige um operador da integração.',
+    GOOGLE_AUTHORIZATION_REQUIRED: 'A conta central precisa de nova autorização.',
     AGENDA_ITEM_ALREADY_REVIEWED: "Esta pauta já foi revisada.",
     AGENDA_ITEM_NOT_FOUND: "Pauta não encontrada nesta reunião.",
     CONFERENCING_NOT_CONFIGURED: "A reunião é presencial ou está sem sala do Meet.",

@@ -63,7 +63,13 @@ export class MeetTranscriptClient {
   }
 
   private async accessToken(deadline?: AbortSignal) {
-    if (this.tokenProvider) return this.tokenProvider.accessToken(deadline);
+    if (this.tokenProvider) {
+      try { return await this.tokenProvider.accessToken(deadline); }
+      catch (error) {
+        const retryable = !!(error && typeof error === 'object' && 'retryable' in error && error.retryable);
+        throw new TranscriptError(retryable ? 'MEET_UNAVAILABLE' : 'MEET_ACCESS_DENIED', retryable);
+      }
+    }
     if (this.token && this.token.expires > Date.now()) return this.token.value;
     const value = await this.json<{ access_token?: string; expires_in?: number }>(
       new URL('https://oauth2.googleapis.com/token'), {

@@ -31,6 +31,7 @@ function assignmentDto(row: Assignment) {
 async function permissions(tx: MeetingTransaction, repo: ActionItemsRepository, meeting: string, actor: bigint, lock: boolean) {
   const scope = await (lock ? tx.lockScope(meeting, actor) : tx.readScope(meeting, actor));
   const role = scope?.meeting.group_id && await repo.role(scope.meeting.group_id, actor);
+  if (scope?.meeting.cancelled_at && lock) throw actionItemError('ACTION_ITEM_FORBIDDEN');
   if (!scope || !role) throw actionItemError('ACTION_ITEM_NOT_FOUND');
   return { ...actionItemPermissions(scope, role === 'ADMIN'), eligible: !scope.isBlocked };
 }

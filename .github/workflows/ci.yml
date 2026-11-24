@@ -64,6 +64,8 @@ jobs:
               hu11_db_url="${db_url%/*}/mc656_hu11_test"
               docker exec "$postgres_id" createdb -U mc656 mc656_hu12_test
               hu12_db_url="${db_url%/*}/mc656_hu12_test"
+              docker exec "$postgres_id" createdb -U mc656 mc656_meet_test
+              meet_db_url="${db_url%/*}/mc656_meet_test"
               hu08_db_url="${db_url%/*}/mc656_hu08_test"
               HU01_TEST_DATABASE_URL="$db_url" \
                 HU02_TEST_DATABASE_URL="$db_url" \
@@ -76,6 +78,7 @@ jobs:
                 HU10_TEST_DATABASE_URL="$hu10_db_url" \
                 HU11_TEST_DATABASE_URL="$hu11_db_url" \
                 HU12_TEST_DATABASE_URL="$hu12_db_url" \
+                MEET_TEST_DATABASE_URL="$meet_db_url" \
                 HU08_TEST_DATABASE_URL="$hu08_db_url" \
                 npm run test:coverage
               exit 0

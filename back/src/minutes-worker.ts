@@ -1,3 +1,5 @@
+import { PostgresTranscriptSourceReader } from './modules/meeting-transcripts/transcript.reader';
+import { TranscriptStorage } from './modules/meeting-transcripts/transcript.storage';
 import 'dotenv/config';
 import { setTimeout as wait } from 'node:timers/promises';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -11,8 +13,10 @@ async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória.');
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = drizzle({ client: pool });
-  // Coordinator injects the local TranscriptSourceReader alongside ai after the Meet handoff.
-  const worker = new MinutesWorker(db, { ai: new GeminiClient(config), pipeline: minutesPipelineRevision + ':' + config.model });
+  const directory = process.env.MEETING_TRANSCRIPT_STORAGE_DIR;
+  const policy = process.env.MEET_TRANSCRIPTION_POLICY_VERSION;
+  const transcripts = directory && policy && process.env.MEET_TRANSCRIPTION_ENABLED === 'true' ? new PostgresTranscriptSourceReader(db, new TranscriptStorage(directory), policy) : undefined;
+  const worker = new MinutesWorker(db, { ai: new GeminiClient(config), transcripts, pipeline: minutesPipelineRevision + ':' + config.model });
   let stopping = false;
   const stop = () => { stopping = true; };
   process.on('SIGINT', stop);

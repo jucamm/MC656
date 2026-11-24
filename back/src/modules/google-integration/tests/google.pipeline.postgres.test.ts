@@ -1,3 +1,5 @@
+import { enqueueMinutes } from '../../meeting-minutes/minutes.worker';
+import { MinutesCapture } from '../../meeting-minutes/minutes.capture';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
@@ -6,7 +8,7 @@ import { Pool } from 'pg';
 import express from 'express';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { meetingConferencing, meetingGoogleIntegrations, meetingParticipants, meetings, meetingTranscriptImports, meetingTranscriptSnapshots, users } from '../../../db/schema';
+import { meetingConferencing, meetingGoogleIntegrations, meetingParticipants, meetingMinutes, meetings, meetingTranscriptImports, meetingTranscriptSnapshots, users } from '../../../db/schema';
 import { migrateIdentityTestDatabase } from '../../identity/tests/postgres-test-utils';
 import { PostgresMeetingsRepository } from '../../meetings/meetings.repository';
 import { MeetingsService } from '../../meetings/meetings.service';
@@ -57,12 +59,14 @@ describe.skipIf(!connectionString)('pipeline Google/agenda/transcrição com Pos
     await db.delete(meetingTranscriptImports).where(eq(meetingTranscriptImports.meeting_id, id));
     await db.delete(meetingGoogleIntegrations).where(eq(meetingGoogleIntegrations.meeting_id, id));
     await db.delete(meetingConferencing).where(eq(meetingConferencing.meeting_id, id));
+    await db.delete(meetingMinutes).where(eq(meetingMinutes.meeting_id, id));
     await db.delete(meetingParticipants).where(eq(meetingParticipants.meeting_id, id)); await db.delete(meetings).where(eq(meetings.id, id));
     await db.delete(users).where(inArray(users.id, accounts)); await rm(directory, { recursive: true, force: true }); vi.restoreAllMocks();
   });
   afterAll(async () => { await pool.end(); }); const worker = () => new GoogleIntegrationWorker(db, config, calendar, meet, () => now);
   it('cria agenda cedo, respeita T−15min, recupera pending/ETag e dois workers sem duplicar evento', async () => {
     await conference.configure(id, accounts[0], { mode: 'virtual', provisioning: 'automatic', google_meet_url: null });
+    expect(await new MinutesCapture(repository, meet, () => now).configure(id, accounts[0], true)).toEqual({ enabled: true, policy_version: 'policy-1' });
     await Promise.all([worker().runOnce(), worker().runOnce()]); expect(inserts).toBe(1); expect(patches).toBe(0);
     now = new Date(+start - 900001); expect(await worker().runOnce()).toBe(false);
     now = new Date(+start - 900000); await worker().runOnce(); expect(patches).toBe(1);
@@ -97,6 +101,8 @@ describe.skipIf(!connectionString)('pipeline Google/agenda/transcrição com Pos
     await expect(reader.loadForGeneration(randomUUID(), status.ref!, AbortSignal.timeout(1000))).rejects.toThrow();
     let actor = accounts[0]; const app = express(); app.use((req, _res, next) => { req.auth = { user_id: actor.toString(), session_id: 'mock' }; next(); }); app.use(createMeetingTranscriptRouter(repository, reader, storage));
     await request(app).get('/meetings/' + id + '/transcript').expect(409); await db.update(meetings).set({ ended_at: now, ended_by_user_id: accounts[0] }).where(eq(meetings.id, id));
+    await db.transaction(tx => enqueueMinutes(tx, id, now));
+    const [projection] = await db.select().from(meetingMinutes).where(eq(meetingMinutes.meeting_id, id)); expect(projection.transcript_ready_at).not.toBeNull();
     const download = await request(app).get('/meetings/' + id + '/transcript/download?version=1').expect(200); expect(download.headers['cache-control']).toBe('no-store'); expect(download.headers['content-type']).toContain('application/vnd.openxmlformats');
     actor = accounts[1]; await request(app).get('/meetings/' + id + '/transcript').expect(403);
     await db.update(meetingConferencing).set({ transcription_policy_version: null, transcription_space_name: null }).where(eq(meetingConferencing.meeting_id, id)); expect(await reader.isCurrent(status.ref!)).toBe(false);

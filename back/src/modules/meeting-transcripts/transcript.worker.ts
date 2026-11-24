@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { groups, meetingConferencing, meetings, meetingTranscriptImports as jobs, meetingTranscriptSnapshots as snapshots } from '../../db/schema';
+import { groups, meetingConferencing, meetingMinutes, meetings, meetingTranscriptImports as jobs, meetingTranscriptSnapshots as snapshots } from '../../db/schema';
 import { TranscriptError, type MeetTranscriptClient } from '../meeting-minutes/meet-transcript.client';
 import { normalizeEntries, sha256, type TranscriptStorage } from './transcript.storage';
 /** Separate from minutes/AI. Remote endTime and FILE_GENERATED are mandatory. */
@@ -74,6 +74,7 @@ export class MeetingTranscriptWorker {
             provider_transcript_names: result.transcripts, conference_ended_at: new Date(result.conferenceEndedAt), policy_version: job.policy_version,
             entries, docx_storage_key: file.key, docx_hash: file.hash, docx_bytes: file.bytes });
         }
+        await tx.update(meetingMinutes).set({ transcript_ready_at: sql`coalesce(${meetingMinutes.transcript_ready_at}, ${this.clock().toISOString()}::timestamptz)` }).where(eq(meetingMinutes.meeting_id, job.meeting_id));
         await tx.update(jobs).set({ state: 'available', conference_name: result.conference,
           conference_ended_at: new Date(result.conferenceEndedAt), deadline_at: new Date(+new Date(result.conferenceEndedAt) + 86_400_000),
           failure_code: null, consecutive_failures: 0, lease_token: null, lease_until: null, updated_at: this.clock() })

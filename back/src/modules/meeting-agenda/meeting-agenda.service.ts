@@ -13,7 +13,7 @@ export class MeetingAgendaService {
       const scope = await meetingTx.lockScope(meetingId, actorId);
       if (!scope) throw agendaError('MEETING_NOT_FOUND');
       if (!canParticipate(scope)) throw agendaError('PARTICIPATION_FORBIDDEN');
-      if (scope.meeting.ended_at !== null) throw agendaError('MEETING_ENDED');
+      if ((scope.meeting.ended_at !== null || scope.meeting.cancelled_at !== null)) throw agendaError('MEETING_ENDED');
 
       return new PostgresMeetingAgendaRepository(dbTx).insert({
         id: randomUUID(), meeting_id: meetingId, proposed_by_user_id: actorId,
@@ -30,7 +30,7 @@ export class MeetingAgendaService {
 
       const rows = await new PostgresMeetingAgendaRepository(dbTx).list(meetingId, page);
       const items = rows.slice(0, page.limit).map(toAgendaItemDto);
-      const open = scope.meeting.ended_at === null;
+      const open = (scope.meeting.ended_at === null && scope.meeting.cancelled_at === null);
       return {
         items, next_cursor: rows.length > page.limit ? rows[page.limit - 1].id : null,
         actions: { can_submit: open && canParticipate(scope), can_review: open && canModerate(scope) },

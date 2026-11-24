@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { and, asc, eq, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { meetingAgendaItems, meetingMinuteRevisions, meetingMinutes, meetings } from '../../db/schema';
+import { meetingAgendaItems, meetingMinuteRevisions, meetingMinutes, meetings, meetingTranscriptSnapshots } from '../../db/schema';
 import { findConferencing } from '../meeting-conferencing/meeting-conferencing.repository';
 import { PostgresMeetingsRepository, type MeetingDatabaseTransaction } from '../meetings/meetings.repository';
 import { TranscriptError } from './meet-transcript.client';
@@ -24,7 +24,9 @@ export async function enqueueMinutes(db: MeetingDatabaseTransaction, meetingId: 
   const config = await findConferencing(db, meetingId);
   const space = config?.transcription_space_name;
   if (!space) return; // Sem captura, a revisão projeta indisponível até receber notas.
+  const [snapshot] = await db.select({ created_at: meetingTranscriptSnapshots.created_at }).from(meetingTranscriptSnapshots).where(eq(meetingTranscriptSnapshots.meeting_id, meetingId)).orderBy(desc(meetingTranscriptSnapshots.version)).limit(1);
   await db.insert(meetingMinutes).values({
+    transcript_ready_at: snapshot?.created_at ?? null,
     meeting_id: meetingId, source_kind: 'meet_transcript',
     source_space_name: space, generation_status: 'queued',
     next_attempt_at: endedAt,

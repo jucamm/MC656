@@ -1,3 +1,4 @@
+import { fixtureAi } from '../../ai/tests/ai.fixture';
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -31,7 +32,7 @@ describe.skipIf(!connectionString)('HU07 e HU08 com PostgreSQL', () => {
   const passwords = new PasswordService({ cost: 4, min_length: 8 });
   const sessions = new SessionService(new PostgresUserRepository(db), new PostgresSessionRepository(db), passwords, clock);
   const http = request(createApp(undefined, sessions, undefined, composeMeetingServices(db, clock)));
-  const worker = new MinutesWorker(db, async () => { throw new Error('Reunião presencial.'); }, clock);
+  const worker = new MinutesWorker(db, { ai: fixtureAi }, clock);
 
   beforeAll(async () => {
     await migrateIdentityTestDatabase(pool);
@@ -236,12 +237,12 @@ describe.skipIf(!connectionString)('HU07 e HU08 com PostgreSQL', () => {
     });
     now = fixture.starts;
     await call('post', fixture.meeting + '/end').expect(204);
-    const worker = new MinutesWorker(db, async () => {
+    const worker = new MinutesWorker(db, { ai: fixtureAi, transcripts: { async describe() {
       const running = (await call('get', fixture.path + '/review').expect(200)).body.data;
       expect(running.generation_status).toBe('running');
       await call('post', fixture.path + '/delete').send({ expected_version: running.version }).expect(204);
-      return { conference: 'conferenceRecords/test', transcripts: ['fixture'], excerpt: 'Trecho após exclusão' };
-    }, clock);
+      return { state: 'pending', ref: null, failureCode: null };
+    }, async loadForGeneration() { throw new Error('Fonte revogada.'); }, async isCurrent() { return false; } } }, clock);
     expect(await worker.runOnce()).toBe(true);
     expect(await worker.runOnce()).toBe(false);
     const [row] = await db.select().from(meetingMinutes).where(eq(meetingMinutes.meeting_id, fixture.id));

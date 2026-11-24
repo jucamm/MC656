@@ -1,3 +1,6 @@
+import requestHttp from 'supertest';
+import { createApp } from '../../../app';
+import { createGoogleAuthorizationRouter, createGoogleCallbackRouter } from '../google.routes';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EncryptedTokenStore, GoogleOAuth } from '../google.oauth';
@@ -61,4 +64,16 @@ describe('Google central OAuth e Calendar', () => {
     expect(init?.headers).toMatchObject({ 'If-Match': 'etag-v1', Authorization: 'Bearer secret-access' });
     await expect(client.patch('event', {}, 'stale')).rejects.toMatchObject({ code: 'GOOGLE_EVENT_CONFLICT', retryable: false });
   });
+});
+
+it('expõe só callback com state antes do gate e mantém autorização central autenticada', async () => {
+  const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ access_token: 'access', refresh_token: 'refresh', expires_in: 3600, scope: GOOGLE_SCOPES.join(' ') }))
+    .mockResolvedValueOnce(Response.json({ sub: 'organizer-sub', email: 'central@example.edu', email_verified: true }));
+  const { oauth } = await setup(transport);
+  const app = createApp(undefined, undefined, undefined, { googleCallbackRouter: createGoogleCallbackRouter(oauth), meetingExtensionRouters: [createGoogleAuthorizationRouter(oauth)] });
+  const state = new URL(oauth.authorize('1').authorization_url).searchParams.get('state')!;
+  await requestHttp(app).get('/integrations/google/callback').query({ state, code: 'code' }).expect(200);
+  await requestHttp(app).get('/integrations/google/callback').query({ state, code: 'code' }).expect(403);
+  await requestHttp(app).post('/integrations/google/authorization').expect(401);
+  await requestHttp(app).get('/meetings').expect(401);
 });

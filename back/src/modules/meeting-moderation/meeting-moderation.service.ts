@@ -19,6 +19,7 @@ function mayTarget(scope: MeetingScope, actorId: bigint, target: Target): boolea
 export async function lockModerationScope(tx: MeetingTransaction, meetingId: string, actorId: bigint): Promise<MeetingScope> {
   const scope = await tx.lockScope(meetingId, actorId);
   if (!scope) throw moderationError('MEETING_NOT_FOUND');
+  if (scope.meeting.cancelled_at) throw moderationError('MEETING_ENDED');
   if (!canModerate(scope)) throw moderationError('MODERATION_FORBIDDEN');
   return scope;
 }

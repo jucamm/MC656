@@ -308,7 +308,7 @@ export const meetingConferencing = pgTable('meeting_conferencing', {
   transcription_policy_version: varchar('transcription_policy_version', { length: 80 }),
 }, (table) => [
   check('meeting_provisioning_check', sql`${table.provisioning} IN ('manual','automatic') AND (${table.provisioning} = 'automatic' OR ${table.google_meet_url} IS NOT NULL)`),
-  check('meeting_capture_pair_check', sql`(${table.transcription_space_name} IS NULL) = (${table.transcription_policy_version} IS NULL)`),
+  check('meeting_capture_pair_check', sql`((${table.transcription_space_name} IS NULL) = (${table.transcription_policy_version} IS NULL)) OR (${table.provisioning} = 'automatic' AND ${table.transcription_space_name} IS NULL AND ${table.transcription_policy_version} IS NOT NULL)`),
   check('meeting_conferencing_mode_check', sql`${table.mode} IN ('virtual', 'hybrid')`),
   check('meeting_conferencing_url_check', sql`
     ${table.google_meet_url} ~ '^https://meet[.]google[.]com/[a-z]{3}-[a-z]{4}-[a-z]{3}$'

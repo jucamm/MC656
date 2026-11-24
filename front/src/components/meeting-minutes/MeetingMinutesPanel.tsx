@@ -1,3 +1,4 @@
+import { MeetingTranscriptPanel } from '../meeting-transcripts/MeetingTranscriptPanel';
 import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import { meetingMinutesApi } from '../../services/meetingMinutesApi';
 import type { MinutesReview, PublishedMinutes } from '../../types/meetingMinutes';
@@ -90,6 +91,7 @@ export function MeetingMinutesPanel({ meetingId, revision, ReviewPanel }: {
       {deleted && <Feedback message={{ failed: false, text: 'Ata excluída.' }} />}
       {!deleted && <Feedback message={action.message} />}
       {published && !editor && <article><h5>{published.title}</h5><p className="whitespace-pre-wrap break-words">{published.body}</p></article>}
+      {draft && <MeetingTranscriptPanel key={meetingId} meetingId={meetingId} />}
       {draft && <div className="space-y-2">
         <p role="status">{draft.generation_status === 'ready' && !draft.draft ? 'Geração da ata concluída.' : statusLabels[draft.generation_status]}</p>
         {draft.ai?.configuration === 'pending' && <p role="status">Configuração da IA pendente. As notas e revisões existentes permanecem disponíveis.</p>}

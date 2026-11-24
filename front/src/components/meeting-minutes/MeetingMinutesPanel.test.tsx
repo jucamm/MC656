@@ -1,3 +1,4 @@
+import { meetingTranscriptsApi } from '../../services/meetingTranscriptsApi';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +9,7 @@ import { MeetingMinutesPanel, MinutesHistory } from './MeetingMinutesPanel';
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 it('mantém notas após falha e confirma somente depois da resposta', async () => {
+  vi.spyOn(meetingTranscriptsApi, 'get').mockResolvedValue({ state: 'unavailable', ref: null, failureCode: null, actions: { can_download: false } });
   vi.spyOn(meetingMinutesApi, 'published').mockRejectedValue({ code: 'MINUTES_NOT_FOUND', message: 'Indisponível' });
   vi.spyOn(meetingMinutesApi, 'review').mockResolvedValue({
     version: 1, generation_status: 'unavailable', visibility: 'unpublished', draft_status: null,
