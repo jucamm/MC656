@@ -16,7 +16,10 @@ it('baixa com Bearer e versão sem colocar token na URL e revoga objectURL', asy
   URL.createObjectURL = create; URL.revokeObjectURL = revoke;
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   const fetch = vi.fn().mockResolvedValueOnce(Response.json({ data: { state: 'available', ref: { version: 3 }, actions: { can_download: true } } }))
-    .mockResolvedValueOnce(new Response(new Blob(['docx']))); vi.stubGlobal('fetch', fetch);
+    .mockResolvedValueOnce(new Response('docx', {
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    }));
+  vi.stubGlobal('fetch', fetch);
   render(<MeetingTranscriptPanel meetingId="meeting" />);
   await userEvent.click(await screen.findByRole('button', { name: 'Baixar transcrição DOCX' }));
   expect(fetch.mock.calls[1][0]).toMatch(/download\?version=3$/); expect(fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer private-token');

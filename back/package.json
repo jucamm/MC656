@@ -46,6 +46,7 @@
     "test:mutation:dry-run": "stryker run --dryRunOnly",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "worker:meeting-integration": "node dist/meeting-integration-worker.js"
+    "worker:meeting-integration": "node dist/meeting-integration-worker.js",
+    "demo:pls": "tsx src/scripts/seed-legislative-demo.ts"
   }
 }
