@@ -82,7 +82,6 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
       const updated = await meetingConferencingApi.configure(meetingId, mode === 'in_person'
         ? { mode } : { mode, google_meet_url: url.trim() });
       setConfiguration(updated);
-      refresh();
       setMode(updated.mode);
       setUrl('');
     }, 'Modalidade salva.');

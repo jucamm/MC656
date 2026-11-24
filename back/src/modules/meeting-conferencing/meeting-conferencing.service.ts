@@ -30,24 +30,29 @@ export class MeetingConferencingService {
     private readonly capture?: MeetCaptureConfig,
   ) {}
 
+  private describe(scope: MeetingScope, mode: ConferencingMode, now: Date,
+    version: string | null, hasRoom: boolean, actorId: bigint): ConferencingDto {
+    const dto = describeConferencing(scope, mode, now);
+    if (hasRoom && (version || (scope.isOrganizer && this.capture?.operators.has(actorId.toString())))) {
+      const available = !version || this.capture?.policyVersion === version;
+      dto.transcription = {
+        policy_version: version ?? '',
+        notice: version && available ? this.capture?.notice ?? '' : '',
+        available,
+        can_configure: scope.isOrganizer && now < scope.meeting.starts_at,
+      };
+      if (!available) dto.actions.can_join = false;
+    }
+    return dto;
+  }
+
   get(meetingId: string, actorId: bigint): Promise<ConferencingDto> {
     return this.meetings.transaction(async (meetingTx, dbTx) => {
       const scope = requireScope(await meetingTx.readScope(meetingId, actorId));
       const configuration = await findConferencing(dbTx, meetingId);
       const now = this.clock();
-      const dto = describeConferencing(scope, configuration?.mode ?? 'in_person', now);
-      const version = configuration?.transcription_policy_version;
-      if (configuration && (version || (scope.isOrganizer && this.capture?.operators.has(actorId.toString())))) {
-        const available = !version || this.capture?.policyVersion === version;
-        dto.transcription = {
-          policy_version: version ?? '',
-          notice: version && available ? this.capture?.notice ?? '' : '',
-          available,
-          can_configure: scope.isOrganizer && now < scope.meeting.starts_at,
-        };
-        if (!available) dto.actions.can_join = false;
-      }
-      return dto;
+      return this.describe(scope, configuration?.mode ?? 'in_person', now,
+        configuration?.transcription_policy_version ?? null, configuration !== null, actorId);
     }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
   }
 
@@ -67,7 +72,8 @@ export class MeetingConferencingService {
         throw new DomainError('TRANSCRIPTION_CONFIG_LOCKED', 'Desative a captura antes de alterar a sala.');
       }
       await setConferencing(dbTx, meetingId, input);
-      return describeConferencing(scope, input.mode, now);
+      return this.describe(scope, input.mode, now, current?.transcription_policy_version ?? null,
+        input.mode !== 'in_person', actorId);
     });
   }
 
