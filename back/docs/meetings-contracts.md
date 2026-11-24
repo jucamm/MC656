@@ -86,3 +86,21 @@ A HU03 executou 23 testes HTTP e 6 de schema com PostgreSQL, além de 24 testes 
 | Gestão | A consulta de participantes, a proposta de transferência e a designação de moderadores são restritas ao organizador vigente. O aceite é exclusivo do destinatário. Transferência e moderação respeitam o horário de início e a elegibilidade atual. |
 
 Para reproduzir, execute `npm run build`, `npm run lint` e `npm run test:coverage` em `back/` e `front/`. Configure as três variáveis de banco no backend conforme o [runbook](identity-2-database-runbook.md#testar-em-postgresql-real).
+
+## Atas e transcrições (HU07)
+
+As rotas usam as mesmas sessões verificadas por e-mail, envelope HTTP e política de visibilidade das reuniões. Uma ata publicada segue a audiência da reunião. O grupo excluído deixa a ata indisponível. Rascunho e transcrição são privados ao organizador vigente e aos moderadores elegíveis.
+
+| Rota | Contrato |
+|---|---|
+| `GET /meeting-minutes` | Histórico paginado de atas publicadas e acessíveis, com `items` e `next_cursor`. Cada item contém `meeting_id`, `title`, `starts_at` e `published_at`. Ordena por publicação decrescente e ID de reunião. |
+| `GET /meetings/:meetingId/minutes` | Retorna `meeting_id`, `revision_id`, `title`, `body` e `published_at` da revisão publicada. **404** se a ata estiver indisponível para o ator. |
+| `GET /meetings/:meetingId/minutes/review` | Após o encerramento, retorna `version`, `generation_status`, `visibility`, `draft_status`, `draft`, `published`, `deadline_at`, `transcript_ready_at`, `sla_missed_at`, `failure_code` e `actions`. Ações atuais: `can_add_notes`, `can_retry`, `can_read_transcript`. |
+| `GET /meetings/:meetingId/minutes/transcript` | Fonte privada paginada com `items` e `next_cursor`. Cada trecho contém `text`, `start_at` e `end_at`. **404** para fonte ausente e **503** para indisponibilidade temporária. |
+| `POST /meetings/:meetingId/minutes/notes` | Recebe `{ notes }` com até 8.000 caracteres. **202** quando aceita o job. |
+| `POST /meetings/:meetingId/minutes/retry` | Corpo vazio. **202** quando reenfileira uma falha recuperável. Preserva o prazo e a marca de atraso. |
+| `PUT /meetings/:meetingId/minutes/capture` | Recebe `{ enabled }` e devolve `{ enabled, policy_version }`. O organizador operador pode habilitar a captura antes do início em sala remota exclusiva. |
+
+A captura ativada exige `accepted_transcription: true` e `transcription_policy_version` no ingresso. O consentimento de áudio e vídeo permanece obrigatório. A aplicação condiciona a liberação local do link ao aceite e a conta anfitriã configura o consentimento no Google Meet para o acesso direto.
+
+As revisões são inseridas no histórico com ID próprio. A fila gera a primeira revisão e avança `version` na mesma transação. A HU08 deverá usar a versão da ata e o ID da revisão para proteger a edição e a publicação contra alterações concorrentes. A HU07 entrega as projeções de leitura, o rascunho e o acesso à fonte. Consulte as [instruções do piloto](../../README.md#piloto-de-transcrição-do-google-meet).
