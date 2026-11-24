@@ -88,3 +88,12 @@ it('mostra o estado vazio quando ainda não há publicações elegíveis', async
   render(<CompendiumPanel />);
   expect(await screen.findByText('Nenhum compêndio encontrado.')).toBeVisible();
 });
+
+it('mantém atas publicadas e votação com configuração da IA pendente', async () => {
+  mockData({ ...initial, summary: { status: 'unavailable', topics: [], generated_at: null, reason: 'AI_CONFIGURATION_PENDING' } });
+  render(<CompendiumPanel />);
+  await userEvent.click(await screen.findByRole('button', { name: /PL 35/ }));
+  expect(await screen.findByText('Configuração da IA pendente.')).toBeVisible();
+  expect(await screen.findByText(minute.title)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'A favor' })).toBeEnabled();
+});

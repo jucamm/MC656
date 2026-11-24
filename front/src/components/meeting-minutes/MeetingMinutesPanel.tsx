@@ -92,6 +92,11 @@ export function MeetingMinutesPanel({ meetingId, revision, ReviewPanel }: {
       {published && !editor && <article><h5>{published.title}</h5><p className="whitespace-pre-wrap break-words">{published.body}</p></article>}
       {draft && <div className="space-y-2">
         <p role="status">{draft.generation_status === 'ready' && !draft.draft ? 'Geração da ata concluída.' : statusLabels[draft.generation_status]}</p>
+        {draft.ai?.configuration === 'pending' && <p role="status">Configuração da IA pendente. As notas e revisões existentes permanecem disponíveis.</p>}
+        {draft.ai?.source_outdated && <p>A fonte foi atualizada. Confira a versão da transcrição antes da revisão.</p>}
+        {draft.failure_code && <p>{draft.failure_code === 'AI_INPUT_LIMIT' || draft.failure_code === 'AI_OUTPUT_LIMIT'
+          ? 'Registro excede o limite de processamento.' : 'A proposta ainda não pôde ser gerada. Preserve as notas e tente novamente quando o serviço estiver disponível.'}</p>}
+        {draft.draft?.body.includes('Proposta gerada por IA — requer revisão') && <p>Proposta gerada por IA — requer revisão humana antes da publicação.</p>}
         {draft.deadline_at && <p>Prazo da transcrição <time dateTime={draft.deadline_at}>{new Date(draft.deadline_at).toLocaleString('pt-BR')}</time></p>}
         {draft.sla_missed_at && <p>O prazo de transcrição foi excedido.</p>}
         {!editor && draft.draft && <article><h5>Rascunho · {draft.draft.title}</h5>

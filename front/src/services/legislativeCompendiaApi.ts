@@ -24,6 +24,7 @@ export interface Compendium {
   summary: {
     status: 'empty' | 'updating' | 'ready' | 'unavailable';
     generated_at: string | null;
+    reason?: string;
     topics: { stance: VoteChoice | 'unclassified'; argument: string; references: (MinuteReference & { quote: string })[] }[];
   };
   opinion: {

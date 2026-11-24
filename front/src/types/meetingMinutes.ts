@@ -26,6 +26,7 @@ export interface MinutesReview {
   transcript_ready_at: string | null;
   sla_missed_at: string | null;
   failure_code: string | null;
+  ai?: { configuration: 'pending' | 'ready'; reason?: string; source_outdated?: boolean };
   actions: {
     can_add_notes: boolean; can_retry: boolean; can_read_transcript: boolean;
     can_edit: boolean; can_publish: boolean; can_republish: boolean; can_reject: boolean; can_hide: boolean; can_delete: boolean;
