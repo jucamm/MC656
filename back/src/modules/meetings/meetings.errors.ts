@@ -8,6 +8,8 @@ export const meetingErrors = {
   MEETING_NOT_FOUND: { status: 404, message: 'Reunião indisponível.' },
   MEETING_MANAGEMENT_FORBIDDEN: { status: 403, message: 'Apenas o organizador pode consultar os participantes da reunião.' },
   MEETING_ORGANIZER_REQUIRED: { status: 403, message: 'Apenas o organizador vigente pode realizar esta ação.' },
+  MEETING_VERSION_CONFLICT: { status: 409, message: 'A agenda mudou. Atualize a reunião.' },
+  MEETING_CANCELLED: { status: 409, message: 'A reunião foi cancelada.' },
   MEETING_ENDED: { status: 409, message: 'A reunião já foi encerrada.' },
   MEETING_STARTED: { status: 409, message: 'A reunião já começou.' },
   ORGANIZER_TRANSFER_NOT_FOUND: { status: 404, message: 'Pedido de transferência indisponível.' },

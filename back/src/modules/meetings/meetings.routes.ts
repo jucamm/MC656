@@ -41,6 +41,8 @@ export function createMeetingsRouter(service: MeetingsService) {
   const router = Router();
   const controller = new MeetingsController(service);
   router.route('/meetings').get(controller.list).post(express.json(), controller.create);
+  router.route('/meetings/:meetingId/schedule').get(meetingsNoStore, controller.getSchedule).put(meetingsNoStore, express.json(), controller.updateSchedule);
+  router.post('/meetings/:meetingId/cancel', meetingsNoStore, express.json(), controller.cancel);
   router.get('/meetings/:meetingId', controller.get);
   router.get('/meetings/:meetingId/participants', controller.listParticipants);
   router.get('/meeting-invitations', controller.listInvitations);

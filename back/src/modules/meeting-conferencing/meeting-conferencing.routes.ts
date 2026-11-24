@@ -1,4 +1,5 @@
 import express, { Router, type ErrorRequestHandler } from 'express';
+import { validateUuid } from '../groups/groups.validator';
 import { DomainError } from '../../errors/domain.error';
 import { identityErrorHandler } from '../identity/session.middleware';
 import { meetingsNoStore } from '../meetings/meetings.routes';
@@ -6,6 +7,7 @@ import { MeetingConferencingController } from './meeting-conferencing.controller
 import type { MeetingConferencingService } from './meeting-conferencing.service';
 
 const statusByCode = {
+  MEETING_CANCELLED: 409,
   MEETING_NOT_FOUND: 404,
   MEETING_ORGANIZER_REQUIRED: 403,
   PARTICIPATION_FORBIDDEN: 403,
@@ -42,6 +44,10 @@ export function createMeetingConferencingRouter(service: MeetingConferencingServ
   const controller = new MeetingConferencingController(service);
   const path = '/meetings/:meetingId/conferencing';
   router.route(path).get(meetingsNoStore, controller.get).put(meetingsNoStore, express.json(), controller.configure);
+  router.post(`${path}/retry`, meetingsNoStore, async (req, res) => {
+    if (!req.auth) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.');
+    res.json({ data: await service.retry(validateUuid(req.params.meetingId, 'meetingId'), BigInt(req.auth.user_id)) });
+  });
   router.post(`${path}/join`, meetingsNoStore, express.json(), controller.join);
   router.use(conferencingErrorHandler);
   return router;

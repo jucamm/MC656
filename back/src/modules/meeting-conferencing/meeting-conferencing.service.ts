@@ -1,3 +1,6 @@
+import { eq } from 'drizzle-orm';
+import { meetingGoogleIntegrations } from '../../db/schema';
+import { bumpGoogleIntent } from '../google-integration/google.intent';
 import { meetingTranscriptionConsents } from '../../db/schema';
 import type { MeetCaptureConfig } from '../meeting-minutes/meet-transcript.client';
 import { DomainError } from '../../errors/domain.error';
@@ -51,14 +54,21 @@ export class MeetingConferencingService {
       const scope = requireScope(await meetingTx.readScope(meetingId, actorId));
       const configuration = await findConferencing(dbTx, meetingId);
       const now = this.clock();
-      return this.describe(scope, configuration?.mode ?? 'in_person', now,
+      const dto = this.describe(scope, configuration?.mode ?? 'in_person', now,
         configuration?.transcription_policy_version ?? null, configuration !== null, actorId);
+      dto.actions.can_join = dto.actions.can_join && !!configuration?.google_meet_url;
+      if (configuration?.provisioning === 'automatic') dto.provisioning = 'automatic';
+      const [integration] = await dbTx.select().from(meetingGoogleIntegrations).where(eq(meetingGoogleIntegrations.meeting_id, meetingId));
+      if (integration && scope.isOrganizer) dto.integration = { state: integration.state, agenda_state: integration.agenda_state,
+        link_due_at: integration.link_due_at?.toISOString() ?? null, failure_code: integration.failure_code };
+      return dto;
     }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
   }
 
   configure(meetingId: string, actorId: bigint, input: ConferencingInput): Promise<ConferencingDto> {
     return this.meetings.transaction(async (meetingTx, dbTx) => {
       const scope = requireScope(await meetingTx.lockScope(meetingId, actorId));
+      if (scope.meeting.cancelled_at) throw meetingError('MEETING_CANCELLED');
       if (!scope.isOrganizer) throw meetingError('MEETING_ORGANIZER_REQUIRED');
       const now = this.clock();
       if (meetingPhase(scope.meeting, now) === 'ended') {
@@ -66,15 +76,35 @@ export class MeetingConferencingService {
       }
 
       const current = await findConferencing(dbTx, meetingId);
+      const intendedUrl = input.mode === 'in_person' ? null : input.provisioning === 'automatic' && current?.provisioning === 'automatic' ? current.google_meet_url : input.google_meet_url;
       if (current?.transcription_policy_version && (input.mode === 'in_person' ||
-          current.google_meet_url !== input.google_meet_url ||
+          current.google_meet_url !== intendedUrl ||
           (now >= scope.meeting.starts_at && current.mode !== input.mode))) {
         throw new DomainError('TRANSCRIPTION_CONFIG_LOCKED', 'Desative a captura antes de alterar a sala.');
       }
-      await setConferencing(dbTx, meetingId, input);
-      return this.describe(scope, input.mode, now, current?.transcription_policy_version ?? null,
-        input.mode !== 'in_person', actorId);
+      const changed = input.mode === 'in_person' ? current !== null : current?.mode !== input.mode ||
+        current?.provisioning !== (input.provisioning ?? 'manual') || current?.google_meet_url !== intendedUrl;
+      if (changed) {
+        await setConferencing(dbTx, meetingId, input.mode === 'in_person' ? input : { ...input, google_meet_url: intendedUrl });
+        await bumpGoogleIntent(dbTx, meetingId, now);
+      }
+      const dto = this.describe(scope, input.mode, now, current?.transcription_policy_version ?? null, input.mode !== 'in_person', actorId);
+      if (input.mode !== 'in_person' && input.provisioning === 'automatic') dto.provisioning = 'automatic';
+      dto.actions.can_join = dto.actions.can_join && !!intendedUrl;
+      return dto;
     });
+  }
+
+  async retry(meetingId: string, actorId: bigint) {
+    await this.meetings.transaction(async (tx, db) => {
+      const scope = requireScope(await tx.lockScope(meetingId, actorId));
+      if (!scope.isOrganizer) throw meetingError('MEETING_ORGANIZER_REQUIRED');
+      if (scope.meeting.cancelled_at) throw meetingError('MEETING_CANCELLED');
+      if (scope.meeting.ended_at) throw meetingError('MEETING_ENDED');
+      await db.update(meetingGoogleIntegrations).set({ state: 'configuration_pending', attempts: 0, next_attempt_at: this.clock(),
+        failure_code: null, lease_token: null, lease_until: null }).where(eq(meetingGoogleIntegrations.meeting_id, meetingId));
+    });
+    return this.get(meetingId, actorId);
   }
 
   join(meetingId: string, actorId: bigint, consent?: { accepted: boolean; version?: string }): Promise<{ join_url: string }> {
@@ -84,6 +114,7 @@ export class MeetingConferencingService {
         throw new DomainError('PARTICIPATION_FORBIDDEN', 'Sua conta não pode participar desta reunião.');
       }
       const configuration = await findConferencing(dbTx, meetingId);
+      if (scope.meeting.cancelled_at) throw meetingError('MEETING_CANCELLED');
       const phase = meetingPhase(scope.meeting, this.clock());
       if (phase === 'ended') throw new DomainError('MEETING_ENDED', 'A reunião foi encerrada.');
       if (!configuration?.google_meet_url) {

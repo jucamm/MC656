@@ -98,3 +98,20 @@ export function validateModerators(input: unknown): bigint[] {
   }
   return [...new Set(ids.map(id => validateUserId(id, 'participant_ids')))];
 }
+
+export function validateSchedule(body: unknown) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) invalidField('body', 'Informe um objeto JSON.');
+  const fields = body as Record<string, unknown>;
+  if (Object.keys(fields).some(key => !['starts_at', 'scheduled_ends_at', 'version'].includes(key))) invalidField('body', 'Campos de agenda inválidos.');
+  const version = validateScheduleVersion({ version: fields.version });
+  if (typeof fields.starts_at !== 'string' || typeof fields.scheduled_ends_at !== 'string' ||
+    !/T.*(?:Z|[+-]\d\d:\d\d)$/.test(fields.starts_at) || !/T.*(?:Z|[+-]\d\d:\d\d)$/.test(fields.scheduled_ends_at)) invalidField('starts_at', 'Informe horários ISO com fuso.');
+  const startsAt = new Date(fields.starts_at); const endsAt = new Date(fields.scheduled_ends_at);
+  if (!Number.isFinite(+startsAt) || !Number.isFinite(+endsAt) || endsAt <= startsAt) invalidField('scheduled_ends_at', 'Informe fim posterior ao início.');
+  return { startsAt, endsAt, version };
+}
+export function validateScheduleVersion(body: unknown): number {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'version') ||
+    !Number.isSafeInteger((body as { version?: unknown }).version) || Number((body as { version?: unknown }).version) < 1) invalidField('version', 'Informe a versão atual da agenda.');
+  return (body as { version: number }).version;
+}

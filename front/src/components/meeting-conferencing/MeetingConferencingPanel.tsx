@@ -1,3 +1,4 @@
+import { MeetingSchedulePanel } from './MeetingSchedulePanel';
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
 import { meetingMinutesApi } from '../../services/meetingMinutesApi';
 import { meetingConferencingApi } from '../../services/meetingConferencingApi';
@@ -21,6 +22,7 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
   const [configuration, setConfiguration] = useState<ConferencingDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<ConferencingMode>('in_person');
+  const [provisioning, setProvisioning] = useState<'manual' | 'automatic'>('manual');
   const [url, setUrl] = useState('');
   const [transcriptionAccepted, setTranscriptionAccepted] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -48,6 +50,7 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
       if (controller.signal.aborted) return;
       setConfiguration(result);
       setMode(result.mode);
+      setProvisioning(result.provisioning ?? 'manual');
       setUrl('');
     }).catch(error => {
       if (!controller.signal.aborted) setLoadError(groupError(error).message);
@@ -74,13 +77,13 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
     setAccepted(false);
     setTranscriptionAccepted(false);
     setLocalError(null);
-    if (mode !== 'in_person' && !meetUrl.test(url.trim())) {
+    if (mode !== 'in_person' && provisioning === 'manual' && !meetUrl.test(url.trim())) {
       setLocalError('Use um endereço no formato https://meet.google.com/aaa-bbbb-ccc.');
       return;
     }
     void action.run(async () => {
       const updated = await meetingConferencingApi.configure(meetingId, mode === 'in_person'
-        ? { mode } : { mode, google_meet_url: url.trim() });
+        ? { mode } : provisioning === 'automatic' ? { mode, provisioning } : { mode, google_meet_url: url.trim() });
       setConfiguration(updated);
       setMode(updated.mode);
       setUrl('');
@@ -113,6 +116,12 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
       {configuration && (
         <>
           <p className="text-sm text-slate-700">Modalidade <strong>{labels[configuration.mode]}</strong></p>
+          <MeetingSchedulePanel meetingId={meetingId} onChanged={refresh} />
+          {configuration.integration && <div role="status" className="text-sm">
+            <p>{configuration.integration.state === 'ready' ? 'Sala Meet pronta.' : configuration.integration.state === 'failed' ? 'A integração precisa de revisão pela organização.' : 'Aguardando sincronização da conta central.'}</p>
+            {configuration.integration.link_due_at && <p>Criação do link prevista para {new Date(configuration.integration.link_due_at).toLocaleString('pt-BR')}.</p>}
+            {configuration.integration.failure_code === 'GOOGLE_SOME_INVITEES_INELIGIBLE' && <p>Alguns participantes não têm endereço institucional elegível para convite Google.</p>}
+          </div>}
           {configuration.actions.can_configure && (
             <form className="space-y-2" onSubmit={configure}>
               <label className="block text-sm font-semibold">Modalidade da reunião
@@ -123,7 +132,12 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
                   {Object.entries(labels).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
                 </select>
               </label>
-              {mode !== 'in_person' && (
+              {mode !== 'in_person' && <label className="block text-sm font-semibold">Criação da sala
+                <select className={inputStyle} value={provisioning} disabled={action.busy} onChange={event => setProvisioning(event.target.value as 'manual' | 'automatic')}>
+                  <option value="manual">Link manual</option><option value="automatic">Conta central automática</option>
+                </select><span className="block font-normal">Participantes usam sua conta do aplicativo. A conta central organiza a agenda e o Meet.</span>
+              </label>}
+              {mode !== 'in_person' && provisioning === 'manual' && (
                 <label className="block text-sm font-semibold">Link do Google Meet
                   <input type="url" className={inputStyle} value={url} onChange={event => setUrl(event.target.value)}
                     placeholder="https://meet.google.com/aaa-bbbb-ccc" disabled={action.busy} required />

@@ -17,11 +17,11 @@ export function readMeetCaptureConfig(env = process.env): MeetCaptureConfig | un
     MEET_OAUTH_REFRESH_TOKEN: refreshToken, MEET_TRANSCRIPTION_POLICY_VERSION: policyVersion,
     MEET_TRANSCRIPTION_NOTICE: notice, MEET_TRANSCRIPTION_OPERATORS: operatorList } = env;
   const operators = new Set(operatorList?.split(',').map(id => id.trim()));
-  if (!clientId || !clientSecret || !refreshToken || !policyVersion || policyVersion.length > 80 ||
+  if (!clientId || !clientSecret || (!refreshToken && env.GOOGLE_INTEGRATION_ENABLED !== 'true') || !policyVersion || policyVersion.length > 80 ||
       !notice?.trim() || !operators.size || [...operators].some(id => !/^[1-9][0-9]{0,18}$/.test(id))) {
     throw new Error('Configure o OAuth, a política e os operadores da transcrição do Meet.');
   }
-  return { clientId, clientSecret, refreshToken, policyVersion, notice, operators };
+  return { clientId, clientSecret, refreshToken: refreshToken ?? '', policyVersion, notice, operators };
 }
 
 export interface TranscriptEntry {
@@ -32,7 +32,8 @@ export interface TranscriptEntry {
 
 export class MeetTranscriptClient {
   private token?: { value: string; expires: number };
-  constructor(readonly config: MeetCaptureConfig, private readonly request = fetch) {}
+  constructor(readonly config: MeetCaptureConfig, private readonly request = fetch,
+    private readonly tokenProvider?: { accessToken(signal?: AbortSignal): Promise<string> }) {}
 
   private async json<T>(url: URL, init: RequestInit, deadline?: AbortSignal): Promise<T> {
     let response: Response;
@@ -62,6 +63,7 @@ export class MeetTranscriptClient {
   }
 
   private async accessToken(deadline?: AbortSignal) {
+    if (this.tokenProvider) return this.tokenProvider.accessToken(deadline);
     if (this.token && this.token.expires > Date.now()) return this.token.value;
     const value = await this.json<{ access_token?: string; expires_in?: number }>(
       new URL('https://oauth2.googleapis.com/token'), {
@@ -87,6 +89,16 @@ export class MeetTranscriptClient {
     const { name } = await this.get<{ name?: string }>('spaces/' + code);
     if (!name || !/^spaces\/[a-zA-Z0-9_-]+$/.test(name)) throw new TranscriptError('MEET_INVALID_ROOM');
     return name;
+  }
+
+  async enableAutoTranscription(space: string) {
+    if (!/^spaces\/[a-zA-Z0-9_-]+$/.test(space)) throw new TranscriptError('MEET_INVALID_ROOM');
+    const url = new URL('https://meet.googleapis.com/v2/' + space);
+    url.searchParams.set('updateMask', 'config.artifactConfig.transcriptionConfig.autoTranscriptionGeneration');
+    const body = { config: { artifactConfig: { transcriptionConfig: { autoTranscriptionGeneration: 'ON' } } } };
+    await this.json(url, { method: 'PATCH', headers: { Authorization: 'Bearer ' + await this.accessToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const result = await this.get<{ config?: { artifactConfig?: { transcriptionConfig?: { autoTranscriptionGeneration?: string } } } }>(space);
+    if (result.config?.artifactConfig?.transcriptionConfig?.autoTranscriptionGeneration !== 'ON') throw new TranscriptError('MEET_TRANSCRIPTION_UNAVAILABLE');
   }
 
   private async pages<T>(path: string, key: string, deadline: AbortSignal, filter?: string): Promise<T[]> {
@@ -127,7 +139,8 @@ export class MeetTranscriptClient {
     }
     if (artifacts.length > 5) throw new TranscriptError('TRANSCRIPT_TOO_LARGE');
     const transcripts = artifacts.sort((a, b) => a.startTime.localeCompare(b.startTime)).map(artifact => artifact.name);
-    return { conference: conference.name, transcripts, entries: await this.entries(conference.name, transcripts, deadline) };
+    if (!Number.isFinite(Date.parse(conference.endTime))) throw new TranscriptError('MEET_INVALID_RESPONSE');
+    return { conference: conference.name, conferenceEndedAt: conference.endTime, transcripts, entries: await this.entries(conference.name, transcripts, deadline) };
   }
 
   async entries(conference: string, transcripts: string[], deadline = AbortSignal.timeout(90_000)): Promise<TranscriptEntry[]> {
@@ -140,7 +153,7 @@ export class MeetTranscriptClient {
       const rows = await this.pages<{ text?: string; startTime?: string; endTime?: string }>(name + '/entries', 'transcriptEntries', deadline);
       for (const row of rows) {
         if (typeof row.text !== 'string' || !row.startTime || !row.endTime ||
-            !Number.isFinite(Date.parse(row.startTime)) || !Number.isFinite(Date.parse(row.endTime))) {
+            !Number.isFinite(Date.parse(row.startTime)) || !Number.isFinite(Date.parse(row.endTime)) || Date.parse(row.endTime) < Date.parse(row.startTime)) {
           throw new TranscriptError('MEET_INVALID_RESPONSE');
         }
         size += row.text.length;
