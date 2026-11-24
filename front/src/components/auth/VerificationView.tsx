@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { authApi } from '../../services/authApi';
+import { Feedback, inputStyle, primaryStyle, buttonStyle } from '../groups/GroupControls';
 import type { User, ApiError } from '../../types/auth';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed, onUserUpdated, onContinue }) => {
+    const running = useRef(false);
     const [emailChallengeId, setEmailChallengeId] = useState<string>('');
     const [emailCode, setEmailCode] = useState('');
     const [emailLoading, setEmailLoading] = useState(false);
@@ -32,10 +34,8 @@ export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed,
                         setEmailChallengeId(emailCh.challenge_id);
                     }
                 }
-            } catch (err) {
-                const errorMessage = err instanceof Error ? err.message : String(err);
-                const sanitizedError = errorMessage.replace(/[\r\n]+/g, ' ');
-                console.error('Erro ao buscar desafios ativos:', sanitizedError);
+            } catch {
+                setEmailMsg(previous => previous ?? { type: 'error', text: 'Não foi possível recuperar o código ativo. Solicite um novo código.' });
             }
         };
         void loadChallenges();
@@ -43,6 +43,8 @@ export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed,
 
     // Solicitar envio/reenvio de código por e-mail
     const handleSend = async () => {
+        if (running.current) return;
+        running.current = true;
         setEmailLoading(true);
         setEmailMsg(null);
 
@@ -54,17 +56,20 @@ export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed,
             const apiErr = err as ApiError;
             setEmailMsg({ type: 'error', text: apiErr.message || 'Falha ao solicitar código.' });
         } finally {
+            running.current = false;
             setEmailLoading(false);
         }
     };
 
     // Confirmar código digitado
     const handleConfirm = async () => {
-        if (!emailCode || emailCode.length !== 6) {
+        if (running.current) return;
+        if (!/^\d{6}$/.test(emailCode)) {
             setEmailMsg({ type: 'error', text: 'Informe exatamente o código de 6 dígitos.' });
             return;
         }
 
+        running.current = true;
         setEmailLoading(true);
         setEmailMsg(null);
 
@@ -86,6 +91,7 @@ export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed,
 
         if (!challengeId) {
             setEmailMsg({ type: 'error', text: 'Desafio não encontrado. Por favor, clique em "Solicitar novo código".' });
+            running.current = false;
             setEmailLoading(false);
             return;
         }
@@ -98,83 +104,26 @@ export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed,
             const apiErr = err as ApiError;
             setEmailMsg({ type: 'error', text: apiErr.message || 'Código incorreto ou expirado.' });
         } finally {
+            running.current = false;
             setEmailLoading(false);
         }
     };
 
-    return (
-        <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md border border-gray-200">
-            <div className="text-center mb-8">
-                <h2 className="text-3xl font-extrabold text-gray-800">Confirmação de E-mail</h2>
-                <p className="text-gray-600 mt-2">
-                    Para acessar a plataforma, confirme seu e-mail com o código de verificação.
-                </p>
-            </div>
-
-            {isEmailVerified ? (
-                <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center space-y-4">
-                    <div className="text-green-600 text-5xl">✓</div>
-                    <h3 className="text-xl font-bold text-green-800">Conta Verificada com Sucesso!</h3>
-                    <p className="text-green-700 text-sm">
-                        Seu e-mail foi confirmado com sucesso. O seu acesso aos recursos de negócio foi liberado.
-                    </p>
-                    <button
-                        onClick={onContinue}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition"
-                    >
-                        Acessar Sistema
-                    </button>
-                </div>
-            ) : (
-                <div className="space-y-6">
-                    <div className="p-6 rounded-xl border bg-white border-gray-200">
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-800">E-mail: {user.email}</h3>
-                            </div>
-                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                                Pendente
-                            </span>
-                        </div>
-
-                        {emailMsg && (
-                            <div role={emailMsg.type === 'error' ? 'alert' : 'status'} className={`p-3 rounded text-sm mb-4 ${emailMsg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                {emailMsg.text}
-                            </div>
-                        )}
-
-                        <div className="space-y-3">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    maxLength={6}
-                                    placeholder="Código (6 dígitos)"
-                                    className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-center font-mono tracking-widest"
-                                    value={emailCode}
-                                    onChange={(e) => setEmailCode(e.target.value.trim())}
-                                />
-                                <button
-                                    onClick={handleConfirm}
-                                    disabled={emailLoading}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-semibold disabled:opacity-50"
-                                >
-                                    {emailLoading ? 'Confirmando...' : 'Confirmar'}
-                                </button>
-                            </div>
-                            <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
-                                <span>Validade: 30 minutos</span>
-                                <button
-                                    onClick={handleSend}
-                                    disabled={emailLoading}
-                                    className="text-indigo-600 hover:underline font-semibold"
-                                >
-                                    Solicitar novo código
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+    return <section className="auth-panel" aria-labelledby="verification-title">
+        <h2 id="verification-title">Confirmação de E-mail</h2>
+        {isEmailVerified ? <div className="space-y-4">
+            <p role="status">Conta Verificada com Sucesso! Seu e-mail foi confirmado.</p>
+            <button type="button" onClick={onContinue} className={primaryStyle}>Acessar Sistema</button>
+        </div> : <div className="space-y-4">
+            <p className="text-sm text-slate-600 break-words">Confirme {user.email} com o código enviado por e-mail. A verificação está pendente.</p>
+            <div id="verification-feedback"><Feedback message={emailMsg ? { text: emailMsg.text, failed: emailMsg.type === 'error' } : null} /></div>
+            <form onSubmit={event => { event.preventDefault(); void handleConfirm(); }} className="space-y-3" aria-busy={emailLoading}>
+                <label htmlFor="verification-code">Código de 6 dígitos</label>
+                <input id="verification-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={inputStyle} value={emailCode} onChange={event => setEmailCode(event.target.value.trim())} aria-invalid={emailMsg?.type === 'error'} aria-describedby="verification-help verification-feedback" />
+                <p id="verification-help" className="text-sm text-slate-600">Use o código mais recente. Se ele expirou, solicite um novo código.</p>
+                <button type="submit" disabled={emailLoading} className={primaryStyle}>{emailLoading ? 'Aguarde…' : 'Confirmar'}</button>
+            </form>
+            <button type="button" onClick={handleSend} disabled={emailLoading} className={buttonStyle}>Solicitar novo código</button>
+        </div>}
+    </section>;
 };
