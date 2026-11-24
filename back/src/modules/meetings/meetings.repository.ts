@@ -46,7 +46,7 @@ function participantCanBeSelected(db: DatabaseQueries) {
   return and(eligibleParticipant(db), not(blockedParticipant(db, meetingParticipants.user_id)));
 }
 
-function visibleTo(db: DatabaseQueries, actorId: bigint) {
+export function visibleTo(db: DatabaseQueries, actorId: bigint) {
   const member = hasGroupMembership(db, actorId);
   const participant = exists(db.select({ one: sql`1` }).from(meetingParticipants).where(and(
     eq(meetingParticipants.meeting_id, meetings.id),
