@@ -8,7 +8,7 @@ it('minimiza contatos e separa atas longas sem truncar texto restante', () => {
   const body = 'A'.repeat(13_000) + '\n' + 'B'.repeat(18_000);
   const parts = segments(body);
   expect(parts.every(part => part.length <= 4000)).toBe(true);
-  expect(parts.join('')).toBe(body.replace('\n', ''));
+  expect(parts.join('') === body).toBe(true);
 });
 
 it('rejeita citação inventada, IDs da resposta e argumentos com contatos', () => {

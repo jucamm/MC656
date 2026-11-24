@@ -51,8 +51,8 @@ export function segments(text: string) {
       while (end > offset + segmentSize / 2 && chars[end - 1] !== '\n') end--;
       if (chars[end - 1] !== '\n') end = limit;
     }
-    const segment = chars.slice(offset, end).join('').trim();
-    if (segment) result.push(segment);
+    const segment = chars.slice(offset, end).join('');
+    if (segment.trim()) result.push(segment);
     offset = end;
   }
   // Um limite operacional acima do máximo previsto para uma ata. Nunca publica uma extração parcial.
