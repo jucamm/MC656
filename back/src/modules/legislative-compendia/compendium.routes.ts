@@ -7,6 +7,7 @@ import { identityErrorHandler } from '../identity/session.middleware';
 import { invalidField } from '../identity/validators/registration.validator';
 import { minutesActor } from '../meeting-minutes/minutes.routes';
 import { castVote, opinion, validateVote } from './compendium-votes';
+import { aiConfiguration } from '../ai/gemini';
 import { pipelineRevision } from './compendium-synthesis';
 import { eligibleManifests, eligibleMinutes } from './eligible-minutes';
 
@@ -53,16 +54,17 @@ export function createCompendiumRouter(db: NodePgDatabase, clock = () => new Dat
       if (!bill) return null;
       const manifests = eligibleManifests(tx);
       const [manifest] = await tx.select().from(manifests).where(eq(manifests.bill_id, id));
-      const model = process.env.LEGISLATIVE_SYNTHESIS_MODEL?.trim();
-      const enabled = process.env.LEGISLATIVE_SYNTHESIS_ENABLED === 'true';
+      const model = process.env.GEMINI_MODEL?.trim();
+      const enabled = process.env.LEGISLATIVE_SYNTHESIS_ENABLED === 'true' && aiConfiguration() === 'ready';
       const [current] = manifest ? await tx.select().from(summaries).where(and(eq(summaries.bill_id, id),
         eq(summaries.source_hash, manifest.source_hash),
-        model ? eq(summaries.pipeline_version, pipelineRevision + ':' + model) : undefined)) : [];
+        eq(summaries.pipeline_version, pipelineRevision + ':' + (model ?? 'unconfigured')))) : [];
       const summary = current?.state === 'ready'
         ? { status: 'ready', topics: current.payload, generated_at: current.generated_at }
         : { status: !manifest ? 'empty'
           : enabled && current?.state !== 'failed'
-            ? 'updating' : 'unavailable', topics: [], generated_at: null };
+            ? 'updating' : 'unavailable', topics: [], generated_at: null,
+          reason: aiConfiguration() === 'pending' ? 'AI_CONFIGURATION_PENDING' : current?.failure_code ?? undefined };
       return { bill, summary,
         opinion: await opinion(tx, id, minutesActor(req), Boolean(manifest)) };
     }, snapshot);

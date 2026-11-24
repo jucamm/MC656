@@ -1,3 +1,5 @@
+import { pipelineRevision } from '../compendium-synthesis';
+import { fixtureAi } from '../../ai/tests/ai.fixture';
 import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -30,7 +32,7 @@ describe.skipIf(!connectionString)('HU12 com PostgreSQL e sessões reais', () =>
   const passwords = new PasswordService({ cost: 4, min_length: 8 });
   const sessions = new SessionService(new PostgresUserRepository(db), new PostgresSessionRepository(db), passwords, clock);
   const http = request(createApp(undefined, sessions, undefined, composeMeetingServices(db, clock)));
-  const minutesWorker = new MinutesWorker(db, async () => { throw new Error('Ata por notas.'); }, clock);
+  const minutesWorker = new MinutesWorker(db, { ai: fixtureAi }, clock);
   const ids: string[] = [];
   const billIds: string[] = [];
   const groupId = randomUUID();
@@ -38,6 +40,7 @@ describe.skipIf(!connectionString)('HU12 com PostgreSQL e sessões reais', () =>
   let tokens: string[];
 
   beforeAll(async () => {
+    vi.stubEnv('GEMINI_MODEL', 'fixture-model');
     await migrateIdentityTestDatabase(pool);
     const password = 'senha fixture HU12';
     const hash = await passwords.hash(password);
@@ -78,7 +81,7 @@ describe.skipIf(!connectionString)('HU12 com PostgreSQL e sessões reais', () =>
         await db.delete(authenticationSessions).where(inArray(authenticationSessions.user_id, userIds));
         await db.delete(users).where(inArray(users.id, userIds));
       }
-    } finally { await pool.end(); }
+    } finally { vi.unstubAllEnvs(); await pool.end(); }
   });
 
   const call = (method: 'get' | 'put' | 'post', url: string, actor = 0) => http[method](url).set('Authorization', tokens[actor]);
@@ -195,8 +198,8 @@ describe.skipIf(!connectionString)('HU12 com PostgreSQL e sessões reais', () =>
     const extract = vi.fn<ExtractInsights>(async segment => ({ points: segment.includes(redacted)
       ? [{ stance: 'for', argument: 'Defesa da oferta de transporte', quote: redacted }]
       : [{ stance: 'against', argument: 'Oposição à ampliação', quote: 'Houve oposição à proposta de ampliação.' }] }));
-    const worker = new LegislativeSynthesisWorker(db, extract, 'fixture-v1', clock);
-    const second = new LegislativeSynthesisWorker(db, extract, 'fixture-v1', clock);
+    const worker = new LegislativeSynthesisWorker(db, extract, pipelineRevision + ':fixture-model', clock);
+    const second = new LegislativeSynthesisWorker(db, extract, pipelineRevision + ':fixture-model', clock);
     const drain = async () => { for (let i = 0; i < 5 && await worker.runOnce(); i++) { /* drena */ } };
     await worker.reconcile();
     await Promise.all([worker.runOnce(), second.runOnce()]);
