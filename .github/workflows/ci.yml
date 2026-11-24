@@ -36,8 +36,34 @@ jobs:
       - name: Rodar análise estática (ESLint)
         run: npm run lint
 
-      - name: Rodar testes automatizados e cobertura (Vitest)
-        run: npm run test:coverage
+      - name: Rodar testes e cobertura com PostgreSQL (Vitest)
+        shell: bash
+        run: |
+          postgres_password=$(node -p 'require("node:crypto").randomBytes(24).toString("hex")')
+          printf '::add-mask::%s\n' "$postgres_password"
+
+          postgres_id=$(POSTGRES_PASSWORD="$postgres_password" docker run --rm --detach \
+            --publish 127.0.0.1::5432 \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_USER=mc656 \
+            --env POSTGRES_DB=mc656_test \
+            --health-cmd 'pg_isready -h 127.0.0.1 -U mc656 -d mc656_test' \
+            --health-interval 2s --health-timeout 3s --health-retries 15 \
+            postgres:17)
+          trap 'docker stop "$postgres_id" >/dev/null' EXIT
+
+          for attempt in {1..45}; do
+            if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$postgres_id")" == healthy ]]; then
+              port_mapping=$(docker port "$postgres_id" 5432/tcp)
+              db_url="postgresql://mc656:$postgres_password@127.0.0.1:${port_mapping##*:}/mc656_test"
+              HU01_TEST_DATABASE_URL="$db_url" HU02_TEST_DATABASE_URL="$db_url" npm run test:coverage
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "O PostgreSQL de teste não ficou disponível a tempo." >&2
+          exit 1
 
   frontend-checks:
     name: Frontend - Build, Lint e Testes

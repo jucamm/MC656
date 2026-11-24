@@ -1,5 +1,7 @@
 # HU01 — Issue 6: mocks e limites de envio
 
+> Registro histórico da entrega original. Consulte o [guia vigente](README.md) para o fluxo exclusivo por e-mail.
+
 ## Entrega e execução
 
 A branch `feature/hu01-verification-delivery` complementa o emissor da Issue 5

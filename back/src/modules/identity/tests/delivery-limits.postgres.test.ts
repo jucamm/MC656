@@ -56,7 +56,7 @@ describe.skipIf(!connectionString)('limites persistidos de envio', () => {
 
   async function register() {
     const email = `limits-${randomUUID()}@example.com`;
-    const response = await request(app).post('/auth/register').send({ name: 'Ana', email, phone: '11987654321', password: 'senha-segura' }).expect(201);
+    const response = await request(app).post('/auth/register').send({ name: 'Ana', email, password: 'senha-segura' }).expect(201);
     ids.push(BigInt(response.body.data.user.id));
     const token = (await request(app).post('/auth/login').send({ email, password: 'senha-segura' }).expect(200)).body.data.token as string;
     return { id: response.body.data.user.id as string, email, token, verification: response.body.data.email_verification };
@@ -206,7 +206,7 @@ describe.skipIf(!connectionString)('limites persistidos de envio', () => {
     await expectLimits(account, 3, 3);
   });
 
-  it('canais e contas mantêm cotas independentes, inclusive para o mesmo telefone', async () => {
+  it('contas mantêm cotas independentes', async () => {
     const first = await register();
     const sixth = await fillDaily(first);
     const emailCode = delivery.email.outbox.at(-1)!.code;
@@ -217,13 +217,8 @@ describe.skipIf(!connectionString)('limites persistidos de envio', () => {
     await request(app).post('/auth/verifications/email/confirm').set('Authorization', `Bearer ${first.token}`)
       .send({ challenge_id: sixth.body.data.challenge_id, code: emailCode }).expect(200);
     
-    await sendMultiple(first, 3, 'phone');
-    
-    expect((await send(first, 'phone').expect(429)).body.error.code).toBe('VERIFICATION_RATE_LIMITED');
-    
-    await expectLimits(first, 3, 3, 'phone');
-    expect((await getDailyLimit(first, 'email')).blocked_until).not.toBeNull();
-    
+    expect((await getDailyLimit(first)).blocked_until).not.toBeNull();
+
     const second = await register();
     await expectLimits(second, 1, 1);
     await send(second).expect(200);

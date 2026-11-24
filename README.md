@@ -10,9 +10,11 @@ O objetivo do sistema é facilitar e estruturar processos de tomada de decisão 
 
 O repositório é organizado no formato de monorepo:
 
-* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém as regras de autenticação (HU01), criação de pautas e apuração de votações.
+* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém autenticação (HU01), [grupos e convites (HU02)](back/docs/groups-contracts.md), criação de pautas e apuração de votações.
 * `front/`: Interface web desenvolvida em **React 19**, **Vite** e **Tailwind CSS**.
 * `.github/workflows/`: Pipeline de Integração Contínua (CI) com GitHub Actions.
+
+Para integrar as próximas histórias, consulte o [guia de reuso da HU02](back/docs/groups-contracts.md#reuso-da-hu02).
 
 ---
 
@@ -22,13 +24,21 @@ Para executar o projeto localmente, você precisará de:
 
 * **Node.js** (versão 22 ou superior recomendada);
 * **npm**;
-* **PostgreSQL** (versão 16 recomendada, para persistência do módulo de identidade).
+* **PostgreSQL** (versão 16 recomendada) ou **Docker** para subir o banco local com `create_bd.sh`.
 
 ---
 
 ## Como Executar
 
 ### 1. Configurar e rodar o Backend
+
+Se for usar Docker, execute na raiz do repositório:
+
+```bash
+./create_bd.sh
+```
+
+O script inicia o PostgreSQL 16 em `127.0.0.1:5432` e exibe a `DATABASE_URL` para o backend. O volume `mc656-postgres-data` preserva os dados entre execuções. Se a porta `5432` já estiver ocupada, escolha outra antes da primeira execução, por exemplo `POSTGRES_PORT=5433 ./create_bd.sh`, e use a mesma porta nas próximas execuções.
 
 Abra um terminal e acesse a pasta `back`:
 
@@ -42,7 +52,9 @@ npm ci
 cp .env.example .env
 ```
 
-> **Atenção:** No arquivo `.env`, certifique-se de configurar a `DATABASE_URL` com os dados do seu PostgreSQL local e definir uma string de pelo menos 32 caracteres em `VERIFICATION_HMAC_KEY`.
+> **Atenção:** Se `back/.env` já existir, pule o `cp`. Configure `DATABASE_URL` com a linha exibida pelo script ou com os dados do seu PostgreSQL local. Defina também uma string de pelo menos 32 caracteres em `VERIFICATION_HMAC_KEY`.
+
+Use um banco vazio com a migration consolidada de identidade. Para reconstruir uma base local descartável ou rodar as suítes PostgreSQL, siga o [runbook de banco](back/docs/identity-2-database-runbook.md).
 
 Com o banco configurado, aplique as migrações e inicie o servidor:
 
@@ -56,6 +68,8 @@ npm start
 ```
 
 O servidor backend estará disponível em `https://localhost:3000`.
+
+Para enviar códigos de verificação por e-mail, configure `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USE_TLS`, `MAIL_USERNAME` e `MAIL_PASSWORD` em `back/.env`. O backend usa Gmail SMTP com STARTTLS na porta 587. Em desenvolvimento, deixar usuário e senha vazios ativa o simulador. Para configurar a conta Google, testar uma entrega real ou diagnosticar falhas, consulte o [guia de Gmail SMTP](back/docs/README.md#gmail-smtp).
 
 ---
 
@@ -74,6 +88,8 @@ npm run dev
 ```
 
 A interface estará acessível no navegador pelo endereço indicado pelo Vite (normalmente `http://localhost:5173`).
+
+O frontend usa `https://localhost:3000` para autenticação, grupos e pautas. Se usar outro endereço de API, configure `VITE_API_URL` em `front/.env.local`. Quando o backend local usar um certificado autoassinado, abra a URL da API no navegador para aceitar o certificado de desenvolvimento antes de entrar pelo frontend. Configure `TRUSTED_ORIGIN` no backend com a origem efetiva do Vite.
 
 ---
 
@@ -105,6 +121,8 @@ O repositório utiliza o **GitHub Actions** (`.github/workflows/ci.yml`). A cada
 1. Checagem de tipos do TypeScript (`npm run build`);
 2. Análise estática com ESLint (`npm run lint`);
 3. Execução completa dos testes automatizados e medição de cobertura com Vitest.
+
+O job de backend inicia um PostgreSQL descartável e configura as URLs de teste da HU01 e da HU02 para executar também as suítes de integração. O [runbook de banco](back/docs/identity-2-database-runbook.md#testar-em-postgresql-real) descreve como reproduzir a execução local.
 
 ---
 

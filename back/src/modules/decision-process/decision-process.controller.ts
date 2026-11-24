@@ -1,9 +1,15 @@
 import type { NextFunction, Request, Response } from 'express';
 
+import { DecisionProcessServiceError } from './decision-process.errors';
 import type { DecisionProcessService } from './decision-process.service';
 import type { DecisionProcessConfigurationInput } from './decision-process.types';
 
 type RequestBody = Record<string, unknown>;
+
+function getActorId(request: Request): string {
+  if (!request.auth) throw new DecisionProcessServiceError('UNAUTHENTICATED', 'Autenticação necessária.');
+  return request.auth.user_id;
+}
 
 function getBody(request: Request): RequestBody {
   if (
@@ -31,7 +37,7 @@ export class DecisionProcessController {
         groupId: request.params.groupId as string,
         name: body.name as string,
         configuration: body.configuration as DecisionProcessConfigurationInput,
-        requestedByUserId: request.user!.id,
+        requestedByUserId: getActorId(request),
       });
 
       response.status(201).json(result);
@@ -66,7 +72,7 @@ export class DecisionProcessController {
         groupId: request.params.groupId as string,
         processId: request.params.processId as string,
         configuration: body.configuration as DecisionProcessConfigurationInput,
-        requestedByUserId: request.user!.id,
+        requestedByUserId: getActorId(request),
       });
 
       response.status(successStatus).json(result);
@@ -84,7 +90,7 @@ export class DecisionProcessController {
       const result = await this.service.getProcess({
         groupId: request.params.groupId as string,
         processId: request.params.processId as string,
-        requestedByUserId: request.user!.id,
+        requestedByUserId: getActorId(request),
       });
 
       response.status(200).json(result);
@@ -102,7 +108,7 @@ export class DecisionProcessController {
       const versions = await this.service.listVersions({
         groupId: request.params.groupId as string,
         processId: request.params.processId as string,
-        requestedByUserId: request.user!.id,
+        requestedByUserId: getActorId(request),
       });
 
       response.status(200).json({ versions });

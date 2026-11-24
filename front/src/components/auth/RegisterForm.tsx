@@ -3,7 +3,7 @@ import { authApi } from '../../services/authApi';
 import type { ApiError } from '../../types/auth';
 
 interface Props {
-    onSuccess: () => void;
+    onSuccess: (deliveryFailed: boolean) => Promise<void>;
     onSwitchToLogin: () => void;
 }
 
@@ -20,10 +20,10 @@ export const RegisterForm: React.FC<Props> = ({ onSuccess, onSwitchToLogin }) =>
         setLoading(true);
 
         try {
-            await authApi.register({ name, email, password });
+            const { email_verification } = await authApi.register({ name, email, password });
             // Realiza o login automático para iniciar a sessão e seguir para a verificação
             await authApi.login({ email, password });
-            onSuccess();
+            await onSuccess(email_verification.delivery_status === 'failed');
         } catch (err) {
             const apiErr = err as ApiError;
             const fieldErrors = apiErr.details?.fields;

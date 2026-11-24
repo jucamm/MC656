@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { users, rateLimits, verificationChallenges as challenges } from '../../db/schema';
 import { DomainError } from '../../errors/domain.error';
@@ -65,7 +65,11 @@ export class VerificationTransaction {
    */
   async blockDelivery(channel: VerificationChannel, until: Date): Promise<void> {
     await this.db.update(rateLimits).set({ blocked_until: until })
-      .where(eq(rateLimits.user_id, this.user.id));
+      .where(and(
+        eq(rateLimits.user_id, this.user.id),
+        eq(rateLimits.channel, channel),
+        eq(rateLimits.window_type, 'day'),
+      ));
   }
 
   /**

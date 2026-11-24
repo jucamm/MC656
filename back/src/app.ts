@@ -1,7 +1,5 @@
 import { DomainError } from './errors/domain.error';
-import type { MockUser } from './mocks/mock-users';
 import { pautasRouter } from './modules/pautas/pautas.routes';
-import { bindGroupIdentity } from './modules/identity/group-identity.middleware';
 import { readTrustedOrigin, trustedOriginCors } from './modules/identity/cors.middleware';
 import { identityErrorHandler, requireAuthentication, requireVerifiedAccount } from './modules/identity/session.middleware';
 import type { IdentityOnboardingServices } from './modules/identity/identity.controller';
@@ -11,20 +9,24 @@ import express, { type Express } from 'express';
 
 import { errorHandlerMiddleware } from './middlewares/error-handler.middleware';
 import { DecisionProcessController } from './modules/decision-process/decision-process.controller';
+import type { DecisionProcessGroupAccess } from './modules/decision-process/decision-process.group-access';
 import { createDecisionProcessRouter } from './modules/decision-process/decision-process.routes';
 import { DecisionProcessService } from './modules/decision-process/decision-process.service';
 import { InMemoryDecisionProcessRepository } from './modules/decision-process/repositories/in-memory-decision-process.repository';
 import type { DecisionProcessRepository } from './modules/decision-process/repositories/decision-process.repository';
+import type { GroupsHttpServices } from './modules/groups/groups.controller';
+import { createGroupsRouter } from './modules/groups/groups.routes';
 
 /**
- * Configuração de origem e permissões de grupo fornecida exclusivamente pela composição.
+ * Configuração e serviços fornecidos pela composição da aplicação.
  * @property {string | undefined} trustedOrigin - Origem HTTP(S) do frontend, sem wildcard.
- * @property {readonly MockUser[] | undefined} groupUsers - Vínculos por ID persistido; ausência não concede associação.
+ * @property {DecisionProcessGroupAccess | undefined} decisionProcessGroupAccess - Autorização dos processos decisórios.
+ * @property {GroupsHttpServices | undefined} groups - Serviços de grupos e convites.
  */
 export interface AppOptions {
   trustedOrigin?: string;
-  /** Vínculos por ID real, fornecidos no servidor. Não cria associações automáticas. */
-  groupUsers?: readonly MockUser[];
+  decisionProcessGroupAccess?: DecisionProcessGroupAccess;
+  groups?: GroupsHttpServices;
 }
 
 /**
@@ -32,7 +34,7 @@ export interface AppOptions {
  * @param {DecisionProcessRepository} repository - Persistência do módulo de processos; default em memória.
  * @param {SessionService | undefined} identitySessions - Sessões persistidas; ausência recusa recursos, sem fallback mockado.
  * @param {IdentityOnboardingServices | undefined} identityOnboarding - Cadastro e verificação da mesma composição.
- * @param {AppOptions} options - Origem e vínculos de grupo definidos no servidor.
+ * @param {AppOptions} options - Origem e serviços definidos no servidor.
  * @returns {Express} Aplicação com CORS antes da autenticação e gate global antes dos recursos.
  * @throws {Error} Configuração de origem inválida interrompe a montagem.
  */
@@ -44,9 +46,6 @@ export function createApp(
   options: AppOptions = {},
 ): Express {
   const application = express();
-  const groupUsers = options.groupUsers ?? [];
-  const service = new DecisionProcessService(repository, undefined, groupUsers);
-  const controller = new DecisionProcessController(service);
 
   // WARNING: A ordem faz parte da política de segurança. Preflight deve responder
   // sem Bearer; handlers /auth resolvem suas próprias exigências antes do gate de
@@ -61,11 +60,15 @@ export function createApp(
   // Este error handler intercepta os erros do gate acima. Os erros posteriores
   // dos módulos mantêm seus contratos legados no handler montado ao final.
   application.use(identityErrorHandler);
+  if (options.groups) application.use(createGroupsRouter(options.groups));
   application.use(express.json());
   // NOTE: Novos routers de negócio devem ser montados aqui, depois do gate;
   // mover uma leitura para cima dele reintroduziria acesso anônimo/parcial.
   application.use('/api/pautas', pautasRouter);
-  application.use(createDecisionProcessRouter(controller, bindGroupIdentity(groupUsers)));
+  if (options.decisionProcessGroupAccess) {
+    const service = new DecisionProcessService(repository, options.decisionProcessGroupAccess);
+    application.use(createDecisionProcessRouter(new DecisionProcessController(service)));
+  }
   application.use(errorHandlerMiddleware);
 
   return application;

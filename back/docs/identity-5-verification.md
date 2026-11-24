@@ -1,5 +1,7 @@
 # HU01 — Issue 5: emissão e confirmação de códigos
 
+> Registro histórico da entrega original. Consulte o [guia vigente](README.md) para o fluxo exclusivo por e-mail.
+
 ## Escopo e execução
 
 Implementação correspondente à Issue 5 de `temp/HU01_Issues.md`, na branch

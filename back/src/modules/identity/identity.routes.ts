@@ -8,7 +8,7 @@ import type { SessionService } from './session.service';
  */
 /**
  * Matriz compartilhada de acesso e sucesso dos seis endpoints de identidade.
- * @remarks Todos aceitam pending quando exigem sessão; a ordem telefone/e-mail continua no serviço.
+ * @remarks Todos aceitam pending quando exigem sessão; a confirmação ativa usa e-mail.
  */
 export const identityRoutes = [
   { method: 'POST', path: '/auth/register', authentication: false, verified_account: false, success_status: 201 },

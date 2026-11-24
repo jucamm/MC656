@@ -3,10 +3,12 @@ import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { createApp } from '../../../app';
 import { authenticationSessions, rateLimits, users, verificationChallenges } from '../../../db/schema';
-import { MockVerificationDelivery } from '../notifications/verification-delivery';
+import { GmailEmailAdapter } from '../notifications/gmail-email.adapter';
+import { MockVerificationDelivery, type VerificationDelivery } from '../notifications/verification-delivery';
 import { PasswordService } from '../password.service';
 import { RegistrationService } from '../registration.service';
 import { PostgresSessionRepository } from '../session.repository';
@@ -37,12 +39,17 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     now = new Date('2026-10-23T12:00:00.000Z');
     ids = [];
     delivery = new MockVerificationDelivery();
-    verification = new VerificationService(repository, delivery, key, () => new Date(now));
-    const sessions = new SessionService(userRepository, new PostgresSessionRepository(db), passwords, () => new Date(now));
-    app = createApp(undefined, sessions, { verification, registration: new RegistrationService(userRepository, verification, passwords) });
+    configureDelivery(delivery);
   });
 
+  function configureDelivery(emailDelivery: VerificationDelivery) {
+    verification = new VerificationService(repository, emailDelivery, key, () => new Date(now));
+    const sessions = new SessionService(userRepository, new PostgresSessionRepository(db), passwords, () => new Date(now));
+    app = createApp(undefined, sessions, { verification, registration: new RegistrationService(userRepository, verification, passwords) });
+  }
+
   afterEach(async () => {
+    vi.restoreAllMocks();
     if (!ids.length) return;
     await db.delete(authenticationSessions).where(inArray(authenticationSessions.user_id, ids));
     await db.delete(verificationChallenges).where(inArray(verificationChallenges.user_id, ids));
@@ -53,7 +60,7 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
 
   async function register() {
     const email = `verification-${randomUUID()}@example.com`;
-    const response = await request(app).post('/auth/register').send({ name: 'Ana', email, phone: '11987654321', password: 'senha-segura' }).expect(201);
+    const response = await request(app).post('/auth/register').send({ name: 'Ana', email, password: 'senha-segura' }).expect(201);
     ids.push(BigInt(response.body.data.user.id));
     const login = await request(app).post('/auth/login').send({ email, password: 'senha-segura' }).expect(200);
     return { ...response.body.data, token: login.body.data.token as string };
@@ -94,7 +101,7 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
   }
   // ------------------------------------------------------------------
 
-  it('cadastro → login → e-mail → telefone → me → logout sem expor códigos', async () => {
+  it('cadastro → login → e-mail → me → logout sem expor códigos', async () => {
     const account = await register();
     expect(account.user.status).toBe('pending');
     expect(account.email_verification).toMatchObject({ delivery_status: 'sent', expires_at: '2026-10-23T12:30:00.000Z' });
@@ -108,31 +115,19 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     expect(stored).not.toHaveProperty('code');
     expect(account.email_verification).not.toHaveProperty('code');
     
-    const email = await confirm(account.token, 'email', stored.id, emailCode).expect(200);
-    expect(email.body.data.user).toMatchObject({ status: 'pending', email_verified_at: now.toISOString(), phone_verified_at: null });
-    
-    const phone = await send(account.token, 'phone').expect(200);
-    expect(phone.body.data).toMatchObject({ channel: 'phone', expires_at: '2026-10-23T12:05:00.000Z' });
-    
-    const phoneCode = getLastCode();
-    expect(delivery.outbox.at(-1)).toMatchObject({ channel: 'phone', destination: '+55 (11) 98765-4321' });
-    
-    const verified = await confirm(account.token, 'phone', phone.body.data.challenge_id, phoneCode).expect(200);
-    expect(verified.body.data.user).toMatchObject({ status: 'verified', email_verified_at: now.toISOString(), phone_verified_at: now.toISOString() });
-    
+    await request(app).get('/api/pautas').set('Authorization', `Bearer ${account.token}`).expect(403);
+    const verified = await confirm(account.token, 'email', stored.id, emailCode).expect(200);
+    expect(verified.body.data.user).toMatchObject({ status: 'verified', email_verified_at: now.toISOString() });
+    await request(app).get('/api/pautas').set('Authorization', `Bearer ${account.token}`).expect(200);
+
     const me = await request(app).get('/auth/me').set('Authorization', `Bearer ${account.token}`).expect(200);
-    expect(me.body.data.verification_challenges).toHaveLength(2);
+    expect(me.body.data.user.status).toBe('verified');
+    expect(me.body.data.verification_challenges).toHaveLength(1);
     expect(JSON.stringify(me.body)).not.toContain('code_hmac');
     expect(JSON.stringify(verified.body)).not.toContain('password_hash');
     
     await request(app).post('/auth/logout').set('Authorization', `Bearer ${account.token}`).expect(204);
-  });
-
-  it('telefone exige e-mail confirmado tanto para enviar quanto para confirmar', async () => {
-    const account = await register();
-    await assertSendError(account.token, 'phone', 'EMAIL_VERIFICATION_REQUIRED', 403);
-    await assertConfirmError(account.token, 'phone', randomUUID(), '123456', 'EMAIL_VERIFICATION_REQUIRED', 403);
-    expect(delivery.outbox).toHaveLength(1);
+    await request(app).get('/auth/me').set('Authorization', `Bearer ${account.token}`).expect(401);
   });
 
   it('reenvio substitui identificador e invalida o desafio anterior', async () => {
@@ -207,17 +202,7 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     expect((await userRepository.findById(account.user.id))!.email_verified_at).toBeNull();
   });
 
-  it('telefone expira em cinco minutos', async () => {
-    const account = await register();
-    await verifyEmail(account);
-    const phone = await send(account.token, 'phone').expect(200);
-    const code = getLastCode();
-    now = new Date(phone.body.data.expires_at);
-    
-    await assertConfirmError(account.token, 'phone', phone.body.data.challenge_id, code, 'VERIFICATION_CODE_EXPIRED');
-  });
-
-  it('não confirma desafio de outra conta nem do outro canal', async () => {
+  it('não confirma desafio de outra conta', async () => {
     const first = await register();
     const code = getLastCode();
     const second = await register();
@@ -226,9 +211,6 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     expect((await challenge(first.user.id)).failed_attempts).toBe(0);
     
     await confirm(first.token, 'email', first.email_verification.challenge_id, code).expect(200);
-    await send(first.token, 'phone').expect(200);
-    
-    await assertConfirmError(first.token, 'phone', first.email_verification.challenge_id, code, 'INVALID_VERIFICATION_CODE');
   });
 
   it('falha de envio explícito preserva o desafio anterior e retorna 503 seguro', async () => {
@@ -255,6 +237,39 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
     
     delivery.fail = false;
     await send(account.token, 'email').expect(200);
+  });
+
+  it('preserva cadastro, falha HTTP, reenvio e confirmação com o adaptador Gmail', async () => {
+    const sendMail = vi.fn().mockRejectedValueOnce(Object.assign(new Error('diagnóstico interno'), { code: 'EAUTH' }))
+      .mockRejectedValueOnce(Object.assign(new Error('falha interna'), { code: 'ETIMEDOUT' }))
+      .mockResolvedValueOnce({ messageId: 'smtp-fixture' });
+    vi.spyOn(nodemailer, 'createTransport').mockReturnValue({ sendMail } as unknown as Transporter);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    configureDelivery(new GmailEmailAdapter({
+      host: 'smtp.gmail.com', port: 587, user: 'sender@example.com', appPassword: 'FAKETESTONLYPASS',
+    }));
+
+    const account = await register();
+    expect(account.email_verification).toEqual({ delivery_status: 'failed', challenge_id: null, expires_at: null });
+    expect(account.user.status).toBe('pending');
+    expect(await challenge(account.user.id)).toBeUndefined();
+    expect(sendMail).toHaveBeenCalledTimes(1);
+
+    const failed = await send(account.token, 'email').expect(503);
+    expect(failed.body.error).toEqual({
+      code: 'VERIFICATION_DELIVERY_FAILED', message: 'Não foi possível enviar o código. Tente novamente.', details: {},
+    });
+    expect(await challenge(account.user.id)).toBeUndefined();
+    expect(sendMail).toHaveBeenCalledTimes(2);
+
+    const sent = await send(account.token, 'email').expect(200);
+    expect(sendMail).toHaveBeenCalledTimes(3);
+    const outgoing = sendMail.mock.calls[2][0];
+    expect(outgoing.to).toBe(account.user.email);
+    const code = outgoing.text.match(/\b\d{6}\b/)?.[0];
+    expect(code).toBeDefined();
+    const confirmed = await confirm(account.token, 'email', sent.body.data.challenge_id, code).expect(200);
+    expect(confirmed.body.data.user.status).toBe('verified');
   });
 
   it('canal confirmado não recebe reenvio e desafio consumido não é reutilizado', async () => {
@@ -292,7 +307,10 @@ describe.skipIf(!connectionString)('verificação com PostgreSQL real e mock loc
       expect((await request(app).post(`/auth/verifications/email/${route}`).expect(401)).body.error.code).toBe('UNAUTHENTICATED');
     }
     
-    await assertSendError(account.token, 'sms', 'VALIDATION_ERROR');
+    for (const channel of ['phone', 'sms']) {
+      await assertSendError(account.token, channel, 'VALIDATION_ERROR');
+      await assertConfirmError(account.token, channel, account.email_verification.challenge_id, '123456', 'VALIDATION_ERROR');
+    }
     
     const invalidDestination = await send(account.token, 'email').send({ email: 'other@example.com' }).expect(400);
     expect(invalidDestination.body.error.code).toBe('VALIDATION_ERROR');

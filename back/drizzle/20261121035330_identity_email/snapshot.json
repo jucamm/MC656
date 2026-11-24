@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "98e75b3c-e5f2-4fed-a0d6-dd097bca9e89",
+  "id": "547c52a2-d6ab-4703-976e-0f3b664439bd",
   "prevIds": [
-    "57346cc0-2011-4207-bc1f-0ec1c4464268"
+    "00000000-0000-0000-0000-000000000000"
   ],
   "ddl": [
     {
@@ -26,8 +26,7 @@
     },
     {
       "values": [
-        "email",
-        "phone"
+        "email"
       ],
       "name": "verification_channel",
       "entityType": "enums",

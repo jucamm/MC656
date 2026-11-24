@@ -44,7 +44,7 @@ describe('FormularioPauta Component', () => {
     await userEvent.click(submitButton);
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'http://localhost:3000/api/pautas',
+      'https://localhost:3000/api/pautas',
       expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,5 +1,7 @@
 # HU01 — Issue 3: cadastro e senhas
 
+> Registro histórico da entrega original. Consulte o [guia vigente](README.md) para o fluxo exclusivo por e-mail.
+
 ## Entrega
 
 `RegistrationService.register(input: unknown)` valida e normaliza os dados,

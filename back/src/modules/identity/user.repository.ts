@@ -8,7 +8,6 @@ import type { UserDto } from './identity.types';
  * Entrada interna de persistência, construída exclusivamente pelo serviço.
  * @property {string} name - Nome validado.
  * @property {string} email - Endereço normalizado para unicidade e login consistentes.
- * @property {string} phone - Celular normalizado com máscara canônica.
  * @property {string} password_hash - Hash Bcrypt; nunca a senha original.
  */
 export interface NewUser { name: string; email: string; password_hash: string }
@@ -104,7 +103,7 @@ export class PostgresUserRepository implements UserRepository {
   }
 
   /**
-   * Busca o estado atual, inclusive após a reciclagem de telefone.
+   * Busca o estado atual para autorizar recursos protegidos.
    * @param {string} id - ID decimal confiável da identidade autenticada.
    * @returns {Promise<UserDto | null>} Projeção segura da conta, sem cache de status.
    * @throws {Error} Falha de banco ou conversão inválida do ID interno.

@@ -1,11 +1,11 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint, bigserial, check, index, integer, pgEnum, pgTable,
-  primaryKey, text, timestamp, unique, uuid, varchar,
+  primaryKey, text, timestamp, unique, uniqueIndex, uuid, varchar,
 } from 'drizzle-orm/pg-core';
 
 /**
- * Estados da conta; a coerência com os dois timestamps é imposta também por check no PostgreSQL.
+ * Estados da conta; a coerência com o timestamp de confirmação é imposta também por check no PostgreSQL.
  */
 export const accountStatus = pgEnum('account_status', ['pending', 'verified']);
 /**
@@ -18,7 +18,7 @@ export const verificationChannel = pgEnum('verification_channel', ['email']);
 export const rateLimitWindow = pgEnum('rate_limit_window', ['hour', 'day']);
 
 /**
- * Schema de identidade: e-mail único, telefone reutilizável e apenas hash de senha.
+ * Schema de identidade: e-mail único e apenas hash de senha.
  * @remarks bigint fica como bigint no ORM; a camada de DTO converte para string decimal.
  */
 export const users = pgTable('users', {
@@ -80,7 +80,7 @@ export const verificationChallenges = pgTable('verification_challenges', {
 
 /**
  * Persistência de cotas por conta, canal e tipo de janela, sem dimensão de IP.
- * @remarks A PK permite quatro combinações por conta. O serviço cria as linhas somente
+ * @remarks A PK permite uma linha por janela para o e-mail de cada conta. O serviço cria as linhas somente
  * após envio aceito e preserva blocked_until mesmo quando a janela diária expira.
  */
 export const rateLimits = pgTable('rate_limits', {
@@ -98,4 +98,47 @@ export const rateLimits = pgTable('rate_limits', {
   // O bloqueio longo pertence somente à linha day. Esses checks asseguram
   // integridade básica, mas os tetos 3/6 e a concorrência são garantidos pelo serviço/locks.
   check('rate_limits_daily_block_check', sql`${table.blocked_until} IS NULL OR ${table.window_type} = 'day'`),
+]);
+
+export const groupRole = pgEnum('group_role', ['ADMIN', 'MEMBER']);
+export const groupDeletionReason = pgEnum('group_deletion_reason', ['ADMIN_DELETION', 'LAST_MEMBER_LEFT']);
+export const groupInvitationStatus = pgEnum('group_invitation_status', ['PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED']);
+
+export const groups = pgTable('groups', {
+  id: uuid('id').primaryKey(),
+  name: varchar('name', { length: 150 }).notNull(),
+  created_by_user_id: bigint('created_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deleted_at: timestamp('deleted_at', { withTimezone: true }),
+  deletion_reason: groupDeletionReason('deletion_reason'),
+}, (table) => [
+  check('groups_name_not_blank_check', sql`${table.name} ~ '[^[:space:]]'`),
+  check('groups_deletion_state_check', sql`(${table.deleted_at} IS NULL) = (${table.deletion_reason} IS NULL)`),
+]);
+
+export const groupMemberships = pgTable('group_memberships', {
+  group_id: uuid('group_id').notNull().references(() => groups.id),
+  user_id: bigint('user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  role: groupRole('role').notNull().default('MEMBER'),
+  joined_at: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.group_id, table.user_id] }),
+  index('group_memberships_user_group_idx').on(table.user_id, table.group_id),
+  index('group_memberships_admin_group_idx').on(table.group_id).where(sql`${table.role} = 'ADMIN'`),
+]);
+
+export const groupInvitations = pgTable('group_invitations', {
+  id: uuid('id').primaryKey(),
+  group_id: uuid('group_id').notNull().references(() => groups.id),
+  invited_user_id: bigint('invited_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  invited_by_user_id: bigint('invited_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  status: groupInvitationStatus('status').notNull().default('PENDING'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolved_at: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => [
+  check('group_invitations_resolution_check', sql`(${table.status} = 'PENDING') = (${table.resolved_at} IS NULL)`),
+  uniqueIndex('group_invitations_pending_group_user_uidx')
+    .on(table.group_id, table.invited_user_id).where(sql`${table.status} = 'PENDING'`),
+  index('group_invitations_recipient_idx').on(table.invited_user_id, table.id),
 ]);
