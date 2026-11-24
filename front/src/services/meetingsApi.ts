@@ -1,6 +1,6 @@
 import type { Page } from '../types/groups';
 import type {
-  CreateMeeting, Meeting, MeetingInvitation, MeetingParticipant, OrganizerTransfer, ReceivedOrganizerTransfer,
+  CreateMeeting, Meeting, MeetingSchedule, UpdateMeetingSchedule, MeetingInvitation, MeetingParticipant, OrganizerTransfer, ReceivedOrganizerTransfer,
 } from '../types/meetings';
 import { authApi } from './authApi';
 
@@ -15,6 +15,12 @@ function write<Result>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: o
 }
 
 export const meetingsApi = {
+  getSchedule: (id: string, signal?: AbortSignal) =>
+    authApi.request<MeetingSchedule>(`/meetings/${id}/schedule`, { signal }),
+  updateSchedule: (id: string, input: UpdateMeetingSchedule) =>
+    write<MeetingSchedule>('PUT', `/meetings/${id}/schedule`, input),
+  cancel: (id: string, version: number) =>
+    write<MeetingSchedule>('POST', `/meetings/${id}/cancel`, { version }),
   list: (cursor?: string, signal?: AbortSignal) => list<Meeting>('/meetings', cursor, signal),
   get: (id: string, signal?: AbortSignal) => authApi.request<Meeting>(`/meetings/${id}`, { signal }),
   create: (input: CreateMeeting) => write<Meeting>('POST', '/meetings', input),

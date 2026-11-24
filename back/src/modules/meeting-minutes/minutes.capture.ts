@@ -27,10 +27,10 @@ export class MinutesCapture {
     if (enabled && (!client || !client.config.operators.has(actor.toString()))) {
       throw new DomainError('MINUTES_FORBIDDEN', 'A captura está restrita a organizadores autorizados no piloto.');
     }
-    if (!current && enabled) throw new DomainError('TRANSCRIPTION_ROOM_UNAVAILABLE', 'Cadastre uma sala remota.');
+    if (!current?.google_meet_url && enabled) throw new DomainError('TRANSCRIPTION_ROOM_UNAVAILABLE', 'Cadastre uma sala remota.');
     let space: string | null = null;
     try {
-      if (current && enabled && client) space = await client.resolveSpace(current.google_meet_url);
+      if (current?.google_meet_url && enabled && client) space = await client.resolveSpace(current.google_meet_url);
     } catch (error) {
       if (error instanceof TranscriptError) throw new DomainError(
         error.retryable ? 'MEET_UNAVAILABLE' : 'TRANSCRIPTION_ROOM_UNAVAILABLE', 'Não foi possível verificar a sala no Meet.',

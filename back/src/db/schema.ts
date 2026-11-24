@@ -193,6 +193,9 @@ export const meetings = pgTable('meetings', {
   subject: varchar('subject', { length: 150 }).notNull(),
   legislative_bill_id: uuid('legislative_bill_id').references(() => legislativeBills.id),
   starts_at: timestamp('starts_at', { withTimezone: true }).notNull(),
+  scheduled_ends_at: timestamp('scheduled_ends_at', { withTimezone: true }),
+  schedule_version: integer('schedule_version').notNull().default(1),
+  cancelled_at: timestamp('cancelled_at', { withTimezone: true }),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   created_by_user_id: bigint('created_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
   organizer_user_id: bigint('organizer_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
@@ -201,6 +204,7 @@ export const meetings = pgTable('meetings', {
   ended_at: timestamp('ended_at', { withTimezone: true }),
   ended_by_user_id: bigint('ended_by_user_id', { mode: 'bigint' }).references(() => users.id),
 }, (table) => [
+  check('meetings_schedule_check', sql`${table.schedule_version} > 0 AND (${table.scheduled_ends_at} IS NULL OR ${table.scheduled_ends_at} > ${table.starts_at}) AND (${table.cancelled_at} IS NULL OR ${table.ended_at} IS NULL)`),
   check('meetings_subject_not_blank_check', sql`${table.subject} ~ '[^[:space:]]'`),
   check('meetings_starts_after_creation_check', sql`${table.starts_at} > ${table.created_at}`),
   check('meetings_group_access_check', sql`${table.access_mode} <> 'group' OR ${table.group_id} IS NOT NULL`),
@@ -298,10 +302,12 @@ export const meetingAgendaItems = pgTable('meeting_agenda_items', {
 export const meetingConferencing = pgTable('meeting_conferencing', {
   meeting_id: uuid('meeting_id').primaryKey().references(() => meetings.id),
   mode: varchar('mode', { length: 7 }).$type<'virtual' | 'hybrid'>().notNull(),
-  google_meet_url: varchar('google_meet_url', { length: 80 }).notNull(),
+  google_meet_url: varchar('google_meet_url', { length: 80 }),
+  provisioning: text('provisioning', { enum: ['manual', 'automatic'] }).notNull().default('manual'),
   transcription_space_name: text('transcription_space_name').unique(),
   transcription_policy_version: varchar('transcription_policy_version', { length: 80 }),
 }, (table) => [
+  check('meeting_provisioning_check', sql`${table.provisioning} IN ('manual','automatic') AND (${table.provisioning} = 'automatic' OR ${table.google_meet_url} IS NOT NULL)`),
   check('meeting_capture_pair_check', sql`(${table.transcription_space_name} IS NULL) = (${table.transcription_policy_version} IS NULL)`),
   check('meeting_conferencing_mode_check', sql`${table.mode} IN ('virtual', 'hybrid')`),
   check('meeting_conferencing_url_check', sql`
@@ -335,6 +341,11 @@ export const meetingMinutes = pgTable('meeting_minutes', {
   conference_name: text('conference_name').unique(),
   source_transcripts: text('source_transcripts').array(),
   source_notes: text('source_notes'),
+  source_transcript_id: uuid('source_transcript_id').references(() => meetingTranscriptSnapshots.id),
+  source_transcript_version: integer('source_transcript_version'),
+  source_content_hash: text('source_content_hash'),
+  pipeline_version: text('pipeline_version'),
+  source_policy_version: text('source_policy_version'),
   generation_status: text('generation_status', { enum: ['queued', 'running', 'ready', 'unavailable', 'failed'] }).notNull(),
   attempt_count: integer('attempt_count').notNull().default(0),
   next_attempt_at: timestamp('next_attempt_at', { withTimezone: true }),
@@ -384,6 +395,7 @@ export const meetingMinuteRevisions = pgTable('meeting_minute_revisions', {
   source_kind: text('source_kind', { enum: ['meet_transcript', 'notes', 'none'] }).notNull(),
   created_by_user_id: bigint('created_by_user_id', { mode: 'bigint' }).references(() => users.id),
   created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  generation_provenance: jsonb('generation_provenance').$type<{ sourceKind: 'notes' | 'meet_transcript'; sourceHash: string; pipelineVersion: string; transcriptId?: string; transcriptVersion?: number; policyVersion?: string }>(),
 }, table => [
   unique('minute_revisions_meeting_id_unique').on(table.meeting_id, table.id),
   check('minute_revision_content_check', sql`
@@ -555,4 +567,75 @@ export const legislativeCompendiumSummaries = pgTable('legislative_compendium_su
     AND (${table.state} = 'ready') = (${table.payload} IS NOT NULL)
     AND (${table.payload} IS NULL) = (${table.generated_at} IS NULL)
   `),
+]);
+
+
+/** One durable Calendar intent per local meeting; I/O runs outside its lease transaction. */
+export const meetingGoogleIntegrations = pgTable('meeting_google_integrations', {
+  meeting_id: uuid('meeting_id').primaryKey().references(() => meetings.id),
+  state: text('state', { enum: ['configuration_pending', 'scheduled', 'provisioning', 'ready', 'failed', 'cancelled'] }).notNull().default('configuration_pending'),
+  agenda_state: text('agenda_state', { enum: ['pending', 'synced', 'failed', 'cancelled'] }).notNull().default('pending'),
+  calendar_id: text('calendar_id'),
+  event_id: text('event_id'),
+  event_etag: text('event_etag'),
+  conference_request_id: uuid('conference_request_id'),
+  desired_version: integer('desired_version').notNull().default(1),
+  applied_version: integer('applied_version').notNull().default(0),
+  link_due_at: timestamp('link_due_at', { withTimezone: true }),
+  next_attempt_at: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+  attempts: integer('attempts').notNull().default(0),
+  lease_token: uuid('lease_token'),
+  lease_until: timestamp('lease_until', { withTimezone: true }),
+  failure_code: text('failure_code'),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  unique('meeting_google_event_unique').on(table.calendar_id, table.event_id),
+  check('meeting_google_state_check', sql`${table.state} IN ('configuration_pending','scheduled','provisioning','ready','failed','cancelled') AND ${table.agenda_state} IN ('pending','synced','failed','cancelled')`),
+  check('meeting_google_versions_check', sql`${table.desired_version} > 0 AND ${table.applied_version} >= 0 AND ${table.applied_version} <= ${table.desired_version} AND ${table.attempts} >= 0`),
+  check('meeting_google_lease_check', sql`(${table.lease_token} IS NULL) = (${table.lease_until} IS NULL)`),
+  index('meeting_google_queue_idx').on(table.next_attempt_at),
+]);
+
+/** Discovery/import state is separate from immutable available snapshots and AI jobs. */
+export const meetingTranscriptImports = pgTable('meeting_transcript_imports', {
+  meeting_id: uuid('meeting_id').primaryKey().references(() => meetings.id),
+  state: text('state', { enum: ['pending', 'processing', 'available', 'unavailable', 'failed'] }).notNull().default('pending'),
+  schedule_version: integer('schedule_version').notNull(),
+  space_name: text('space_name').notNull(),
+  policy_version: text('policy_version').notNull(),
+  conference_name: text('conference_name'),
+  conference_ended_at: timestamp('conference_ended_at', { withTimezone: true }),
+  deadline_at: timestamp('deadline_at', { withTimezone: true }).notNull(),
+  next_attempt_at: timestamp('next_attempt_at', { withTimezone: true }).notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  consecutive_failures: integer('consecutive_failures').notNull().default(0),
+  lease_token: uuid('lease_token'),
+  lease_until: timestamp('lease_until', { withTimezone: true }),
+  failure_code: text('failure_code'),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  check('transcript_import_state_check', sql`${table.state} IN ('pending','processing','available','unavailable','failed') AND ${table.schedule_version} > 0 AND ${table.attempts} >= 0 AND ${table.consecutive_failures} >= 0`),
+  check('transcript_import_lease_check', sql`(${table.lease_token} IS NULL) = (${table.lease_until} IS NULL)`),
+  index('transcript_import_queue_idx').on(table.next_attempt_at),
+]);
+
+export const meetingTranscriptSnapshots = pgTable('meeting_transcript_snapshots', {
+  id: uuid('id').primaryKey(),
+  meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
+  version: integer('version').notNull(),
+  content_hash: text('content_hash').notNull(),
+  normalization_version: text('normalization_version').notNull(),
+  conference_name: text('conference_name').notNull(),
+  provider_transcript_names: text('provider_transcript_names').array().notNull(),
+  conference_ended_at: timestamp('conference_ended_at', { withTimezone: true }).notNull(),
+  policy_version: text('policy_version').notNull(),
+  entries: jsonb('entries').$type<import('../modules/meeting-transcripts/transcript.contract').TranscriptEntry[]>().notNull(),
+  docx_storage_key: text('docx_storage_key').notNull(),
+  docx_hash: text('docx_hash').notNull(),
+  docx_bytes: integer('docx_bytes').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  unique('transcript_snapshot_version_unique').on(table.meeting_id, table.version),
+  unique('transcript_snapshot_hash_unique').on(table.meeting_id, table.content_hash),
+  check('transcript_snapshot_content_check', sql`${table.version} > 0 AND ${table.docx_bytes} > 0 AND jsonb_typeof(${table.entries}) = 'array' AND jsonb_array_length(${table.entries}) > 0 AND cardinality(${table.provider_transcript_names}) > 0`),
 ]);

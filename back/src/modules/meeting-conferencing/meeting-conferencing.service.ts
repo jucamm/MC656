@@ -86,7 +86,7 @@ export class MeetingConferencingService {
       const configuration = await findConferencing(dbTx, meetingId);
       const phase = meetingPhase(scope.meeting, this.clock());
       if (phase === 'ended') throw new DomainError('MEETING_ENDED', 'A reunião foi encerrada.');
-      if (!configuration) {
+      if (!configuration?.google_meet_url) {
         throw new DomainError('CONFERENCING_NOT_CONFIGURED', 'A reunião é presencial ou está sem sala do Meet.');
       }
       if (phase === 'scheduled') throw new DomainError('MEETING_NOT_STARTED', 'A reunião ainda não começou.');
