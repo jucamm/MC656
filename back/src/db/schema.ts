@@ -255,7 +255,10 @@ export const meetingConferencing = pgTable('meeting_conferencing', {
   meeting_id: uuid('meeting_id').primaryKey().references(() => meetings.id),
   mode: varchar('mode', { length: 7 }).$type<'virtual' | 'hybrid'>().notNull(),
   google_meet_url: varchar('google_meet_url', { length: 80 }).notNull(),
+  transcription_space_name: text('transcription_space_name').unique(),
+  transcription_policy_version: varchar('transcription_policy_version', { length: 80 }),
 }, (table) => [
+  check('meeting_capture_pair_check', sql`(${table.transcription_space_name} IS NULL) = (${table.transcription_policy_version} IS NULL)`),
   check('meeting_conferencing_mode_check', sql`${table.mode} IN ('virtual', 'hybrid')`),
   check('meeting_conferencing_url_check', sql`
     ${table.google_meet_url} ~ '^https://meet[.]google[.]com/[a-z]{3}-[a-z]{4}-[a-z]{3}$'
@@ -343,3 +346,11 @@ export const meetingMinuteRevisions = pgTable('meeting_minute_revisions', {
     AND ${table.source_kind} IN ('meet_transcript','notes','none')
   `),
 ]);
+
+
+export const meetingTranscriptionConsents = pgTable('meeting_transcription_consents', {
+  meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
+  user_id: bigint('user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  policy_version: varchar('policy_version', { length: 80 }).notNull(),
+  accepted_at: timestamp('accepted_at', { withTimezone: true }).notNull(),
+}, table => [primaryKey({ columns: [table.meeting_id, table.user_id, table.policy_version] })]);

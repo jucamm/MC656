@@ -12,6 +12,10 @@ const statusByCode = {
   CONFERENCING_NOT_CONFIGURED: 409,
   MEETING_NOT_STARTED: 409,
   MEETING_ENDED: 409,
+  TRANSCRIPTION_CONFIG_LOCKED: 409,
+  TRANSCRIPTION_CONSENT_REQUIRED: 403,
+  TRANSCRIPTION_CONSENT_OUTDATED: 409,
+  MEET_UNAVAILABLE: 503,
 } as const;
 
 const conferencingErrorHandler: ErrorRequestHandler = (error: unknown, request, response, next) => {

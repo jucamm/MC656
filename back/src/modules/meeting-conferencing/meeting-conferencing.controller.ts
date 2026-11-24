@@ -24,7 +24,6 @@ export class MeetingConferencingController {
 
   join: RequestHandler = async (request, response) => {
     const id = validateUuid(request.params.meetingId, 'meetingId');
-    validateJoinConsent(request.body);
-    response.json({ data: await this.service.join(id, actorId(request)) });
+    response.json({ data: await this.service.join(id, actorId(request), validateJoinConsent(request.body)) });
   };
 }
