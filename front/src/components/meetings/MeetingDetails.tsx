@@ -3,6 +3,7 @@ import { meetingsApi } from '../../services/meetingsApi';
 import type { Meeting, MeetingParticipant, OrganizerTransfer } from '../../types/meetings';
 import { buttonStyle, Feedback, inputStyle, primaryStyle } from '../groups/GroupControls';
 import { groupError, useGroupAction } from '../groups/groups-state';
+import { MeetingActionItemsPanel } from '../meeting-action-items/MeetingActionItemsPanel';
 import { MeetingAgendaPanel } from '../meeting-agenda/MeetingAgendaPanel';
 import { MeetingConferencingPanel } from '../meeting-conferencing/MeetingConferencingPanel';
 import { AgendaReviewPanel } from '../meeting-moderation/AgendaReviewPanel';
@@ -81,6 +82,7 @@ export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: 
           </div>
           <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={featureRevision} />
           <MeetingAgendaPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
+          <MeetingActionItemsPanel key={featureRevision} meetingId={id} />
           <AgendaReviewPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           <MeetingMinutesPanel meetingId={id} revision={featureRevision} ReviewPanel={MeetingMinutesReviewPanel} />
           <MeetingModerationPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
