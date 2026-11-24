@@ -60,9 +60,9 @@
       return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
           {/* Barra de Navegação Superior */}
-          <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm">
+          <header className="app-header">
             <div className="flex items-center gap-3">
-              <span className="text-xl font-bold text-indigo-600">MC656</span>
+              <span className="app-brand"><img src="/favicon.svg" alt="" />Unidebates</span>
             </div>
     
             {currentUser && (
@@ -71,7 +71,7 @@
                   <div className="text-sm font-semibold text-gray-800">{currentUser.name}</div>
                   <div className="text-xs text-gray-500">
                     Status:{' '}
-                    <span className={`font-semibold ${currentUser.status === 'verified' ? 'text-green-600' : 'text-amber-600'}`}>
+                    <span className={`font-semibold ${currentUser.status === 'verified' ? 'text-green-800' : 'text-amber-800'}`}>
                       {currentUser.status === 'verified' ? 'Verificado' : 'E-mail pendente'}
                     </span>
                   </div>
@@ -87,7 +87,7 @@
           </header>
     
           {/* Conteúdo Principal */}
-          <main className="flex-1 p-4 sm:p-8">
+          <main className="app-content flex-1 p-4 sm:p-8">
             {currentScreen === 'login' && (
               <LoginForm
                 onSuccess={(user) => {
