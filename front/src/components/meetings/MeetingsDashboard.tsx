@@ -3,6 +3,7 @@ import { meetingsApi } from '../../services/meetingsApi';
 import { buttonStyle, Feedback, PageControls } from '../groups/GroupControls';
 import { useGroupPages } from '../groups/groups-state';
 import { CreateMeetingForm } from './CreateMeetingForm';
+import { CompendiumPanel } from '../legislative-compendia/CompendiumPanel';
 import { MeetingDetails } from './MeetingDetails';
 import { MinutesHistory } from '../meeting-minutes/MeetingMinutesPanel';
 import { MeetingInbox } from './MeetingInbox';
@@ -12,6 +13,7 @@ const views = [
   { id: 'available', label: 'Reuniões disponíveis' },
   { id: 'create', label: 'Nova reunião' },
   { id: 'minutes', label: 'Atas publicadas' },
+  { id: 'compendia', label: 'Compêndios de PLs' },
   { id: 'inbox', label: 'Convites e transferências' },
 ] as const;
 
@@ -51,6 +53,7 @@ export function MeetingsDashboard({ userId, userName, initialMeetingId }: {
         {view === 'create' && <CreateMeetingForm userId={userId} userName={userName}
           onCreated={meeting => openMeeting(meeting.id, 'Reunião criada.')} />}
         {view === 'minutes' && <MinutesHistory open={id => { setSelectedId(id); setView('available'); }} />}
+        {view === 'compendia' && <CompendiumPanel />}
         {view === 'inbox' && <MeetingInbox onAccepted={openMeeting} />}
       </div>
     </section>
