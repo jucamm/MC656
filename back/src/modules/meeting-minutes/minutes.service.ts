@@ -7,6 +7,7 @@ import { type MeetingCursor } from '../meetings/meetings.types';
 import { editorialActions, minutesMissing as missing, requireMinutesManager } from '../meeting-minutes-review/minutes-review.policy';
 import type { MeetTranscriptClient } from './meet-transcript.client';
 import type { TranscriptSourceReader } from '../meeting-transcripts/transcript.contract';
+import { sameTranscriptRef } from '../ai/source-reference';
 import { aiConfiguration } from '../ai/gemini';
 import { revisionDto, type Minutes } from './minutes.types';
 
@@ -124,6 +125,7 @@ export class MinutesService {
     const described = await reader.describe(id);
     if (described.state !== 'available' || !described.ref) throw noTranscript();
     const source = await reader.loadForGeneration(id, described.ref, AbortSignal.timeout(25_000)).catch(() => { throw noTranscript(); });
+    if (!sameTranscriptRef(source.ref, described.ref)) throw noTranscript();
     await read(); // Permission may have changed while loading the private snapshot.
     if (!await reader.isCurrent(described.ref)) throw noTranscript();
     return { items: source.entries.slice(cursor, cursor + limit),

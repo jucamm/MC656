@@ -5,6 +5,7 @@ import { meetingAgendaItems, meetingMinuteRevisions, meetingMinutes, meetings } 
 import { findConferencing } from '../meeting-conferencing/meeting-conferencing.repository';
 import { PostgresMeetingsRepository, type MeetingDatabaseTransaction } from '../meetings/meetings.repository';
 import { TranscriptError } from './meet-transcript.client';
+import { sameTranscriptRef } from '../ai/source-reference';
 import { meetingRedactor } from '../ai/source-minimization';
 import type { AiClient } from '../ai/ai.contract';
 import { minutesPipelineRevision } from '../ai/gemini';
@@ -94,7 +95,7 @@ export class MinutesWorker {
         if (!config?.transcription_space_name || config.transcription_space_name !== job.source_space_name ||
             config.transcription_policy_version !== ref.policyVersion) throw new TranscriptError('SOURCE_CHANGED');
         const source = await reader.loadForGeneration(meeting.id, ref, signal);
-        if (JSON.stringify(source.ref) !== JSON.stringify(ref)) throw new TranscriptError('SOURCE_CHANGED', true);
+        if (!sameTranscriptRef(source.ref, ref)) throw new TranscriptError('SOURCE_CHANGED', true);
         entries = source.entries;
         sourceHash = ref.contentHash;
       } else {

@@ -15,6 +15,8 @@ import { SessionService } from '../../identity/session.service';
 import { migrateIdentityTestDatabase } from '../../identity/tests/postgres-test-utils';
 import { PostgresUserRepository } from '../../identity/user.repository';
 import { composeMeetingServices } from '../../meetings/meetings.composition';
+import { MinutesService } from '../minutes.service';
+import { PostgresMeetingsRepository } from '../../meetings/meetings.repository';
 import { MinutesWorker, transcriptDeadlineMs } from '../minutes.worker';
 
 const connectionString = process.env.HU07_TEST_DATABASE_URL;
@@ -224,6 +226,25 @@ describe.skipIf(!connectionString)('atas persistidas e HTTP com PostgreSQL', () 
     const [row] = await db.select().from(meetingMinutes).where(eq(meetingMinutes.meeting_id, id));
     expect(row.draft_revision_id).toBeNull();
     expect(row.failure_code).toBe('SOURCE_CHANGED');
+  });
+
+  it('lê snapshot privado com IA desligada, sinaliza fonte desatualizada e revalida gestor após I/O', async () => {
+    const { id } = await captured();
+    const reader = await sourceReader(id);
+    const service = new MinutesService(new PostgresMeetingsRepository(db), undefined, clock, reader);
+    expect((await service.review(id, userIds[0])).actions.can_read_transcript).toBe(true);
+    expect((await service.transcript(id, userIds[0], 1, 0)).items[0].text).toContain('discordância');
+    await new MinutesWorker(db, { ai: fixtureAi, transcripts: reader }, clock).runOnce();
+    const described = await reader.describe(id);
+    reader.describe = async () => ({ ...described, ref: { ...described.ref!, version: 2, contentHash: 'newer-source' } });
+    expect((await service.review(id, userIds[0])).ai).toMatchObject({ source_outdated: true });
+    reader.describe = async () => described;
+    const originalLoad = reader.loadForGeneration;
+    reader.loadForGeneration = async (...args) => {
+      await db.update(meetings).set({ organizer_user_id: userIds[1] }).where(eq(meetings.id, id));
+      return originalLoad(...args);
+    };
+    await expect(service.transcript(id, userIds[0], 1, 0)).rejects.toMatchObject({ code: 'MINUTES_FORBIDDEN' });
   });
 
 });
