@@ -1,13 +1,14 @@
 import express, { Router } from 'express';
 import { and, desc, eq, exists, gt, ilike, lt, or } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { legislativeBills as bills } from '../../db/schema';
+import { legislativeBills as bills, legislativeCompendiumSummaries as summaries } from '../../db/schema';
 import { validatePage, validateUuid } from '../groups/groups.validator';
 import { identityErrorHandler } from '../identity/session.middleware';
 import { invalidField } from '../identity/validators/registration.validator';
 import { minutesActor } from '../meeting-minutes/minutes.routes';
 import { castVote, opinion, validateVote } from './compendium-votes';
-import { eligibleMinutes } from './eligible-minutes';
+import { pipelineRevision } from './compendium-synthesis';
+import { eligibleManifests, eligibleMinutes } from './eligible-minutes';
 
 const root = '/legislative-bills';
 const detail = root + '/:billId/compendium';
@@ -50,10 +51,20 @@ export function createCompendiumRouter(db: NodePgDatabase, clock = () => new Dat
     const data = await db.transaction(async tx => {
       const [bill] = await tx.select().from(bills).where(eq(bills.id, id));
       if (!bill) return null;
-      const eligible = eligibleMinutes(tx);
-      const [source] = await tx.select({ id: eligible.meeting_id }).from(eligible).where(eq(eligible.bill_id, id)).limit(1);
-      return { bill, summary: { status: source ? 'unavailable' : 'empty' },
-        opinion: await opinion(tx, id, minutesActor(req), Boolean(source)) };
+      const manifests = eligibleManifests(tx);
+      const [manifest] = await tx.select().from(manifests).where(eq(manifests.bill_id, id));
+      const model = process.env.LEGISLATIVE_SYNTHESIS_MODEL?.trim();
+      const enabled = process.env.LEGISLATIVE_SYNTHESIS_ENABLED === 'true';
+      const [current] = manifest ? await tx.select().from(summaries).where(and(eq(summaries.bill_id, id),
+        eq(summaries.source_hash, manifest.source_hash),
+        model ? eq(summaries.pipeline_version, pipelineRevision + ':' + model) : undefined)) : [];
+      const summary = current?.state === 'ready'
+        ? { status: 'ready', topics: current.payload, generated_at: current.generated_at }
+        : { status: !manifest ? 'empty'
+          : enabled && current?.state !== 'failed'
+            ? 'updating' : 'unavailable', topics: [], generated_at: null };
+      return { bill, summary,
+        opinion: await opinion(tx, id, minutesActor(req), Boolean(manifest)) };
     }, snapshot);
     if (!data) { res.status(404).json(unknownBill); return; }
     res.json({ data });

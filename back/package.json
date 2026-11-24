@@ -36,6 +36,7 @@
     "start": "node dist/server.js",
     "worker:minutes": "node dist/minutes-worker.js",
     "worker:action-item-emails": "node dist/action-item-email-worker.js",
+    "worker:legislative-synthesis": "node dist/legislative-synthesis-worker.js",
     "worker:legislative-sync": "node dist/legislative-sync-worker.js",
     "test": "vitest run",
     "test:watch": "vitest",

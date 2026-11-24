@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  bigint, bigserial, boolean, check, date, foreignKey, index, integer, pgEnum, pgTable,
+  bigint, bigserial, boolean, check, date, foreignKey, index, integer, jsonb, pgEnum, pgTable,
   primaryKey, text, timestamp, unique, uniqueIndex, uuid, varchar,
 } from 'drizzle-orm/pg-core';
 
@@ -524,4 +524,35 @@ export const legislativeBillVotes = pgTable('legislative_bill_votes', {
 }, table => [
   primaryKey({ columns: [table.bill_id, table.user_id] }),
   check('legislative_bill_vote_choice_check', sql`${table.choice} IN ('for','against')`),
+]);
+
+export const legislativeMinuteInsights = pgTable('legislative_minute_insights', {
+  revision_id: uuid('revision_id').notNull().references(() => meetingMinuteRevisions.id),
+  pipeline_version: text('pipeline_version').notNull(),
+  points: jsonb('points').$type<import('../modules/legislative-compendia/compendium-synthesis').Insight[]>().notNull(),
+  generated_at: timestamp('generated_at', { withTimezone: true }).notNull(),
+}, table => [primaryKey({ columns: [table.revision_id, table.pipeline_version] })]);
+
+export const legislativeCompendiumSummaries = pgTable('legislative_compendium_summaries', {
+  bill_id: uuid('bill_id').primaryKey().references(() => legislativeBills.id),
+  state: text('state', { enum: ['queued', 'running', 'ready', 'failed'] }).notNull(),
+  source_hash: text('source_hash').notNull(),
+  pipeline_version: text('pipeline_version').notNull(),
+  payload: jsonb('payload').$type<import('../modules/legislative-compendia/compendium-synthesis').Topic[]>(),
+  generated_at: timestamp('generated_at', { withTimezone: true }),
+  next_attempt_at: timestamp('next_attempt_at', { withTimezone: true }).notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  lease_token: uuid('lease_token'),
+  lease_until: timestamp('lease_until', { withTimezone: true }),
+  failure_code: text('failure_code'),
+}, table => [
+  index('compendium_summary_queue_idx').on(table.next_attempt_at).where(sql`${table.state} = 'queued'`),
+  index('compendium_summary_leases_idx').on(table.lease_until).where(sql`${table.state} = 'running'`),
+  check('compendium_summary_state_check', sql`
+    ${table.state} IN ('queued','running','ready','failed') AND ${table.attempts} >= 0
+    AND (${table.state} = 'running') = (${table.lease_token} IS NOT NULL)
+    AND (${table.lease_token} IS NULL) = (${table.lease_until} IS NULL)
+    AND (${table.state} = 'ready') = (${table.payload} IS NOT NULL)
+    AND (${table.payload} IS NULL) = (${table.generated_at} IS NULL)
+  `),
 ]);

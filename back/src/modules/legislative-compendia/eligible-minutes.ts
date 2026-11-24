@@ -18,3 +18,13 @@ export function eligibleMinutes(db: Pick<NodePgDatabase, 'select'>) {
         eq(events.revision_id, revisions.id), eq(events.action, 'publish'), eq(events.to_visibility, 'published')))),
     )).as('eligible_minutes');
 }
+
+export function eligibleManifests(db: Pick<NodePgDatabase, 'select'>) {
+  const eligible = eligibleMinutes(db);
+  return db.select({
+    bill_id: sql<string>`${eligible.bill_id}`.as('bill_id'),
+    source_hash: sql<string>`encode(sha256(convert_to(string_agg(
+      ${eligible.meeting_id}::text || ':' || ${eligible.revision_id}::text, ',' ORDER BY ${eligible.meeting_id}
+    ), 'UTF8')), 'hex')`.as('source_hash'),
+  }).from(eligible).groupBy(eligible.bill_id).as('eligible_manifests');
+}
