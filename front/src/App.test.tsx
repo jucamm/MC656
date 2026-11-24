@@ -53,3 +53,30 @@ it('mostra a seção de reuniões no dashboard de uma conta verificada', async (
     expect(await screen.findByText('Nenhuma reunião disponível.')).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith('/meetings?limit=20', { signal: expect.any(AbortSignal) });
 });
+
+it('mantém o destino do aviso durante o login e só consulta a reunião após verificar a conta', async () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    const user = {
+        id: '1', name: 'Ana Silva', email: 'ana@example.com', status: 'verified' as const,
+        email_verified_at: '2026-11-21T12:00:00Z', created_at: '2026-11-21T12:00:00Z',
+    };
+    history.replaceState(null, '', '#meeting=' + id);
+    try {
+        vi.spyOn(authApi, 'getToken').mockReturnValue(null);
+        vi.spyOn(authApi, 'login').mockResolvedValue({ user, token: 'session' });
+        const request = vi.spyOn(authApi, 'request').mockImplementation(async path => path === '/meetings/' + id
+            ? { id, subject: 'Reunião do aviso', starts_at: '2036-06-10T12:00:00Z', visibility: 'private',
+                organizer_name: 'Ana', actions: { can_manage: false } } as never
+            : { items: [], next_cursor: null } as never);
+        const browser = userEvent.setup();
+        render(<App />);
+        await browser.type(await screen.findByLabelText('E-mail'), user.email);
+        await browser.type(screen.getByLabelText('Senha'), 'senha-segura');
+        expect(request).not.toHaveBeenCalled();
+        await browser.click(screen.getByRole('button', { name: 'Entrar' }));
+        expect(await screen.findByRole('heading', { name: 'Reunião do aviso' })).toBeVisible();
+        expect(request).toHaveBeenCalledWith('/meetings/' + id, { signal: expect.any(AbortSignal) });
+    } finally {
+        history.replaceState(null, '', '/');
+    }
+});

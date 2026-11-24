@@ -6,6 +6,7 @@ import { authApi } from '../../services/authApi';
 import type { Meeting, MeetingParticipant, OrganizerTransfer } from '../../types/meetings';
 import type { AgendaItem } from '../../types/meetingAgenda';
 import { MeetingsDashboard } from './MeetingsDashboard';
+import { meetingFromNotification } from './meeting-notification-link';
 
 const futureLocal = '2099-06-10T19:30';
 const startsAt = new Date(futureLocal).toISOString();
@@ -350,4 +351,24 @@ it('atualiza a fila de revisão após registrar pauta e reflete a decisão na li
   expect(await screen.findByText('Pauta aprovada.')).toBeInTheDocument();
   expect(await screen.findByText('Aprovada · Ana')).toBeInTheDocument();
   expect(await screen.findByText('Nenhuma pauta pendente.')).toBeInTheDocument();
+});
+
+const fromEmail = '00000000-0000-4000-8000-000000000001';
+
+it('abre uma reunião indicada pelo e-mail somente pelas consultas autenticadas', async () => {
+  const calls = mockApi(({ path }) => path === '/meetings'
+    ? page() : ok({ ...baseMeeting, id: fromEmail, actions: { can_manage: false } }));
+  render(<MeetingsDashboard userId="1" userName="Ana" initialMeetingId={meetingFromNotification('#meeting=' + fromEmail)} />);
+  expect(await screen.findByRole('heading', { name: 'Assembleia' })).toBeVisible();
+  expect(calls.find(call => call.path === '/meetings/' + fromEmail)?.authorization).toBe('Bearer reunioes-test-token');
+  expect(calls.every(call => call.method === 'GET')).toBe(true);
+});
+
+it('ignora fragmentos inválidos e apresenta a recusa da API para reunião restrita', async () => {
+  expect(meetingFromNotification('#meeting=%2Fadmin')).toBeNull();
+  expect(meetingFromNotification('#meeting=00000000-0000-4000-8000-00000000001g')).toBeNull();
+  mockApi(({ path }) => path === '/meetings' ? page() : fail('MEETING_NOT_FOUND', 'Reunião indisponível.', 404));
+  render(<MeetingsDashboard userId="1" userName="Ana" initialMeetingId={fromEmail} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Reunião indisponível.');
+  expect(screen.queryByRole('heading', { name: 'Assembleia' })).not.toBeInTheDocument();
 });

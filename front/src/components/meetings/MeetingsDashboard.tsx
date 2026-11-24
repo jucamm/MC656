@@ -15,9 +15,11 @@ const views = [
   { id: 'inbox', label: 'Convites e transferências' },
 ] as const;
 
-export function MeetingsDashboard({ userId, userName }: { userId: string; userName: string }) {
+export function MeetingsDashboard({ userId, userName, initialMeetingId }: {
+  userId: string; userName: string; initialMeetingId?: string | null;
+}) {
   const [view, setView] = useState<(typeof views)[number]['id']>('available');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialMeetingId ?? null);
   const [notice, setNotice] = useState<string | null>(null);
 
   function openMeeting(id: string, message: string) {

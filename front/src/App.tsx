@@ -6,6 +6,7 @@
     import { VerificationView } from './components/auth/VerificationView';
     import { GroupsDashboard } from './components/groups/GroupsDashboard';
     import { MeetingsDashboard } from './components/meetings/MeetingsDashboard';
+    import { meetingFromNotification } from './components/meetings/meeting-notification-link';
     import Historico from './components/Historico';
     import FormularioPauta from './components/formulario-pauta';
     import './App.css';
@@ -120,7 +121,8 @@
     
             {currentScreen === 'dashboard' && currentUser?.status === 'verified' && (
               <div className="max-w-6xl mx-auto flex flex-col gap-8">
-                <MeetingsDashboard key={`meetings-${currentUser.id}`} userId={currentUser.id} userName={currentUser.name} />
+                <MeetingsDashboard key={`meetings-${currentUser.id}`} userId={currentUser.id} userName={currentUser.name}
+                  initialMeetingId={meetingFromNotification(window.location.hash)} />
                 <GroupsDashboard key={currentUser.id} userId={currentUser.id} />
                 <Historico />
                 <FormularioPauta />
