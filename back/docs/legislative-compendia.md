@@ -6,16 +6,18 @@ A aba **Compêndios de PLs** reúne atas publicadas e opiniões sobre cada proje
 
 1. Em `back/`, use o PostgreSQL da API via `DATABASE_URL` e execute `npm run db:migrate` e `npm run build`. Com a síntese desabilitada, a API já atende a consulta de atas e a votação.
 2. Para testar a síntese externa, use atas sintéticas em homologação. Antes de habilitar atas reais, aprove o tratamento de dados, a retenção do provedor e o uso de texto derivado de transcrições. Revise o conteúdo antes da publicação. O redator automático reduz a exposição de e-mails, telefones, documentos e URLs reconhecíveis, enquanto a revisão editorial trata nomes, endereços e outros dados presentes em texto livre.
-3. No painel da OpenAI Platform, crie um projeto dedicado à síntese, configure o faturamento da API e restrinja os modelos e as permissões da chave do projeto. Configure alertas de consumo e limites operacionais compatíveis com o piloto. Monitore o uso pelo painel e pelos totais de tokens registrados pelo worker. [Chaves de projeto](https://platform.openai.com/api-keys) · [Controles de dados](https://developers.openai.com/api/docs/guides/your-data)
-4. Configure as variáveis do exemplo no ambiente do serviço. Use o gerenciador de segredos da implantação para a chave e restrinja sua leitura ao processo do worker. Para rotacionar, crie uma nova chave, atualize o segredo, reinicie e valide o worker, então revogue a chave anterior.
-5. Em `back/`, execute `npm run worker:legislative-synthesis` como processo supervisionado separado, com saída HTTPS para `api.openai.com` e com o mesmo banco da API. Após publicar uma ata de teste, confira a coleção, os trechos citados e a votação na aba de reuniões. [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+3. Configure o projeto Google AI Studio e o módulo central conforme [Gemini](gemini-integration.md). Defina modelo, limites, faturamento e condições de dados aprovados. Não há modelo de produção homologado por esta entrega.
+4. Use gerenciador de segredos para a chave backend, sem `VITE_*`. API e worker devem usar o mesmo `GEMINI_MODEL`.
+5. Em `back/`, execute `npm run worker:legislative-synthesis` como processo supervisionado separado, com saída HTTPS para `generativelanguage.googleapis.com` e o mesmo banco da API. Após publicar uma ata sintética, confira coleção, citações e votação.
 
 | Variável | Finalidade |
 | --- | --- |
 | `DATABASE_URL` | Conexão PostgreSQL da API e do worker. Exemplo local fictício `postgresql://mc656:senha-exemplo@localhost:5432/mc656_dev`. |
 | `LEGISLATIVE_SYNTHESIS_ENABLED` | `true` habilita o worker. Use o mesmo valor na API para indicar sínteses pendentes na interface. Ausente ou `false` mantém o worker desligado. |
-| `LEGISLATIVE_SYNTHESIS_MODEL` | Snapshot com suporte à Responses API, Structured Outputs e esforço de raciocínio `low`. Configure API e worker com o mesmo modelo. Exemplo para piloto `gpt-5.4-mini-2026-03-17`. A mudança de versão invalida o cache. [Modelo de exemplo](https://developers.openai.com/api/docs/models/gpt-5.4-mini) |
-| `OPENAI_API_KEY` | Chave do projeto, necessária apenas ao worker quando habilitado. Exemplo fictício `chave-ficticia-hu12`. |
+| `AI_ENABLED` | Opt-in do módulo central; ausente/false mantém geração pendente. |
+| `GEMINI_MODEL` | Versão explícita compatível com generateContent/countTokens/JSON Schema, igual na API e no worker. |
+| `GEMINI_API_KEY` | Chave privada do projeto Gemini, necessária ao worker habilitado. |
+| `AI_REQUEST_TIMEOUT_MS`, `AI_MAX_INPUT_TOKENS`, `AI_MAX_OUTPUT_TOKENS` | Limites do módulo central documentados em Gemini. |
 | `HU12_TEST_DATABASE_URL` | Banco descartável e exclusivo da suíte HU12. Exemplo fictício `postgresql://mc656:senha-exemplo@localhost:5432/mc656_hu12_test`. Os testes injetam um provedor simulado. |
 
 ## Operação
@@ -23,8 +25,8 @@ A aba **Compêndios de PLs** reúne atas publicadas e opiniões sobre cada proje
 - A coleção consulta as publicações vigentes no PostgreSQL. O primeiro GET após o commit pode retornar a nova ata, inclusive com o worker desligado. O requisito de uma hora mede o intervalo até ela aparecer na coleção. A geração da síntese tem medição separada.
 - A descoberta roda a cada cinco minutos. O worker divide atas longas em segmentos, usa até 17 chamadas por revisão e valida citações literais em texto minimizado. Processa somente revisões que ainda precisam de uma extração. Agrupa pontos idênticos, conserva posições divergentes e vincula cada ponto às suas revisões de origem.
 - A aplicação revalida elegibilidade no GET, antes de cada chamada externa e antes de gravar resultados. Ocultar uma ata bloqueia sua leitura e invalida a síntese que a usava após o commit. A descoberta seguinte remove extrações sem fonte elegível. Essa remoção depende de um worker em execução. Caso o serviço tenha sido desativado permanentemente, um responsável pelo banco pode descartar os caches derivados das tabelas `legislative_minute_insights` e `legislative_compendium_summaries`.
-- As chamadas usam `store: false` e enviam somente segmentos do corpo publicado. A política de retenção da API e os controles de logs de abuso do provedor continuam aplicáveis. A revogação local é independente de uma requisição que já tenha chegado ao provedor. [Controles de dados](https://developers.openai.com/api/docs/guides/your-data)
-- Falhas transitórias têm até quatro tentativas por revisão, com retentativa progressiva e respeito a `Retry-After` até o teto de 24 h. Falhas definitivas deixam a síntese indisponível e preservam a coleção. Após corrigir a causa, o operador pode refileirar apenas o job com falha, atualizando `state='queued'`, `attempts=0`, `failure_code=NULL` e `next_attempt_at=now()` para o PL afetado. Mudanças de manifesto ou versão também refileiram o trabalho. Logs registram códigos, duração, IDs técnicos e contagens de tokens.
+- As chamadas Gemini enviam somente segmentos minimizados da revisão publicada. JSON Schema e citações são validados localmente. Pipeline `gemini-insights-v2:<modelo>` rejeita cache antigo OpenAI; mudança de modelo invalida extrações. Revogação local não elimina uma requisição já recebida pelo provedor. Veja [dados e operação Gemini](gemini-integration.md).
+- Falhas transitórias têm até quatro tentativas por revisão, com retentativa progressiva e respeito a `Retry-After` limitado a 60 segundos pelo cliente, sob o teto de backoff da fila. Falhas definitivas deixam a síntese indisponível e preservam a coleção. Após corrigir a causa, o operador pode refileirar apenas o job com falha, atualizando `state='queued'`, `attempts=0`, `failure_code=NULL` e `next_attempt_at=now()` para o PL afetado. Mudanças de manifesto ou versão também refileiram o trabalho. Logs registram códigos, duração, IDs técnicos sem conteúdo nem segredos.
 
 ## API e voto
 
@@ -42,6 +44,6 @@ O voto é definitivo por conta e PL. Um PL encerrado pode receber votos enquanto
 
 ## Homologação
 
-- Em `back/`, configure `HU12_TEST_DATABASE_URL` e execute `npm test -- compendium`. A suíte integra publicação da HU08, revogação, incorporação no primeiro GET, conflito de voto e falhas simuladas de IA no PostgreSQL. Em `front/`, execute `npm test -- CompendiumPanel`.
+- Em `back/`, configure `HU12_TEST_DATABASE_URL` e execute `npm test -- compendium`. A suíte integra publicação da HU08, revogação, incorporação no primeiro GET, conflito de voto e falhas simuladas de IA no PostgreSQL. Em `front/`, execute `npx --no-install vitest run src/components/legislative-compendia`.
 - No piloto, meça o intervalo entre a confirmação da publicação e o primeiro GET da coleção que inclui a nova ata. Refaça o teste com o worker desligado e registre o prazo com carga representativa.
 - Revise atas sintéticas em português com opiniões opostas, posição ambígua, repetição, falta de conclusão e instruções inseridas no texto. Confira a fidelidade das citações e das posições, registre recusas, volume de tokens, custo e latência p95 antes de habilitar o serviço com dados reais.
