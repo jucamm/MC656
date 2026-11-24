@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { groups, meetingMinuteRevisions, meetingMinutes, meetings } from '../../db/schema';
 import { DomainError } from '../../errors/domain.error';
 import type { PageInput } from '../groups/groups.types';
@@ -62,7 +62,7 @@ export class MinutesService {
         .innerJoin(meetingMinuteRevisions, and(eq(meetingMinuteRevisions.meeting_id, meetings.id),
           eq(meetingMinuteRevisions.id, meetingMinutes.published_revision_id)))
         .leftJoin(groups, eq(groups.id, meetings.group_id))
-        .where(and(visibleTo(db, actor), eq(meetingMinutes.visibility, 'published'), after ?
+        .where(and(visibleTo(db, actor), isNotNull(meetings.ended_at), eq(meetingMinutes.visibility, 'published'), after ?
           sql`(${meetingMinutes.published_at}, ${meetings.id}) < (${after.startsAt}::timestamptz, ${after.id}::uuid)` : undefined))
         .orderBy(desc(meetingMinutes.published_at), desc(meetings.id)).limit(page.limit + 1);
       const items = rows.slice(0, page.limit).map(row => ({

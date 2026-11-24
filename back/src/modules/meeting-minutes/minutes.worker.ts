@@ -90,6 +90,9 @@ export class MinutesWorker {
       const missed = deadline && finished >= deadline ? current.sla_missed_at ?? finished : current.sla_missed_at;
       const clear = { lease_until: null, lease_token: null, sla_missed_at: missed };
       if (!active) failure = new TranscriptError('GROUP_UNAVAILABLE', true);
+      if (job.source_kind === 'meet_transcript' && deadline && finished >= deadline && job.failure_code !== 'MANUAL_RETRY') {
+        failure = new TranscriptError('SLA_EXCEEDED');
+      }
       if (failure) {
         const delay = Math.max(failure.retryAfterMs, Math.min(15 * 60_000, 30_000 * 2 ** Math.min(job.attempt_count, 10)));
         const retryAt = new Date(finished.getTime() + delay);
@@ -97,7 +100,8 @@ export class MinutesWorker {
         await db.update(meetingMinutes).set({
           ...clear, next_attempt_at: retry ? retryAt : null,
           generation_status: retry ? 'queued' : 'failed',
-          failure_code: !retry && failure.retryable && deadline && missed ? 'SLA_EXCEEDED' : failure.code,
+          failure_code: retry && job.failure_code === 'MANUAL_RETRY' ? 'MANUAL_RETRY' :
+            !retry && failure.retryable && deadline && missed ? 'SLA_EXCEEDED' : failure.code,
         }).where(eq(meetingMinutes.meeting_id, meeting.id));
         return;
       }
