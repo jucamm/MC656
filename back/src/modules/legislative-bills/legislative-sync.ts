@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { and, asc, eq, exists, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { legislativeBills as bills, legislativeSourceSync as sources, meetings } from '../../db/schema';
@@ -10,7 +10,7 @@ const retryInterval = 15 * 60_000;
 
 export class LegislativeSync {
   constructor(private readonly db: NodePgDatabase, private readonly adapters: LegislativeSource[],
-    private readonly clock = () => new Date(), private readonly jitter = () => Math.floor(Math.random() * 60_000),
+    private readonly clock = () => new Date(), private readonly jitter = () => randomInt(60_000),
     private readonly report: (entry: { house: string; code: string; count?: number }) => void = () => {}) {}
 
   async initialize() {

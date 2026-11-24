@@ -38,7 +38,7 @@ export function LegislativeBillPicker({ userId, chosen, select, clear, revision 
   const [uf, setUf] = useState(() => {
     try {
       const stored = localStorage.getItem(storageKey);
-      return stored && ufs.includes(stored) ? stored : '';
+      return ufs.find(candidate => candidate === stored) ?? '';
     } catch { return ''; }
   });
   const [response, setResponse] = useState<{ key: string; data: LegislativeSuggestions | null }>();
@@ -58,12 +58,15 @@ export function LegislativeBillPicker({ userId, chosen, select, clear, revision 
   }, [uf, key]);
 
   const updateUf = (value: string) => {
-    setUf(value);
+    const nextUf = value === '' ? '' : ufs.find(candidate => candidate === value);
+    if (nextUf === undefined) return;
+
+    setUf(nextUf);
     setSearch(undefined);
     setHouse('SF');
     if (chosen && chosen.house_key !== 'SF' && chosen.house_key !== 'CD') clear();
     try {
-      if (value) localStorage.setItem(storageKey, value);
+      if (nextUf) localStorage.setItem(storageKey, nextUf);
       else localStorage.removeItem(storageKey);
     } catch { /* A escolha continua disponível no formulário. */ }
   };
