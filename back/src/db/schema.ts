@@ -147,9 +147,51 @@ export const meetingAccessMode = pgEnum('meeting_access_mode', ['public', 'group
 export const meetingParticipantOrigin = pgEnum('meeting_participant_origin', ['creator', 'group', 'invitation']);
 export const meetingParticipantStatus = pgEnum('meeting_participant_status', ['confirmed', 'pending', 'declined']);
 
+export const legislativeBills = pgTable('legislative_bills', {
+  id: uuid('id').primaryKey(),
+  house_key: varchar('house_key', { length: 12 }).notNull(),
+  uf: varchar('uf', { length: 2 }),
+  external_id: varchar('external_id', { length: 120 }).notNull(),
+  kind: varchar('kind', { length: 8 }).notNull(),
+  number: integer('number').notNull(),
+  year: integer('year').notNull(),
+  label: varchar('label', { length: 150 }).notNull(),
+  abstract: text('abstract').notNull(),
+  official_url: text('official_url').notNull(),
+  status: text('status', { enum: ['in_progress', 'closed', 'unknown'] }).notNull(),
+  status_label: varchar('status_label', { length: 240 }).notNull(),
+  source_updated_at: timestamp('source_updated_at', { withTimezone: true }),
+  verified_at: timestamp('verified_at', { withTimezone: true }).notNull(),
+}, table => [
+  unique('legislative_bills_source_unique').on(table.house_key, table.external_id),
+  index('legislative_bills_offer_idx').on(table.house_key, table.status, table.verified_at),
+  check('legislative_bills_state_check', sql`
+    ${table.kind} = 'PL' AND ${table.status} IN ('in_progress','closed','unknown')
+    AND ${table.number} > 0 AND ${table.year} BETWEEN 1800 AND 9999
+    AND ${table.official_url} LIKE 'https://%'
+    AND (CASE WHEN ${table.house_key} IN ('CD','SF') THEN ${table.uf} IS NULL
+      WHEN ${table.house_key} = 'CLDF' THEN ${table.uf} IS NOT NULL AND ${table.uf} = 'DF'
+      ELSE ${table.uf} IN ('AC','AL','AP','AM','BA','CE','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO')
+        AND ${table.uf} IS NOT NULL AND ${table.house_key} = 'AL-' || ${table.uf} END)
+  `),
+]);
+
+export const legislativeSourceSync = pgTable('legislative_source_sync', {
+  house_key: varchar('house_key', { length: 12 }).primaryKey(),
+  last_attempt_at: timestamp('last_attempt_at', { withTimezone: true }),
+  last_success_at: timestamp('last_success_at', { withTimezone: true }),
+  next_attempt_at: timestamp('next_attempt_at', { withTimezone: true }).notNull(),
+  lease_token: uuid('lease_token'),
+  lease_until: timestamp('lease_until', { withTimezone: true }),
+  failure_code: varchar('failure_code', { length: 40 }),
+}, table => [
+  check('legislative_source_lease_check', sql`(${table.lease_token} IS NULL) = (${table.lease_until} IS NULL)`),
+]);
+
 export const meetings = pgTable('meetings', {
   id: uuid('id').primaryKey(),
   subject: varchar('subject', { length: 150 }).notNull(),
+  legislative_bill_id: uuid('legislative_bill_id').references(() => legislativeBills.id),
   starts_at: timestamp('starts_at', { withTimezone: true }).notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   created_by_user_id: bigint('created_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
@@ -166,6 +208,7 @@ export const meetings = pgTable('meetings', {
     (${table.ended_at} IS NULL) = (${table.ended_by_user_id} IS NULL)
     AND (${table.ended_at} IS NULL OR ${table.ended_at} >= ${table.starts_at})
   `),
+  index('meetings_legislative_bill_idx').on(table.legislative_bill_id).where(sql`${table.legislative_bill_id} IS NOT NULL`),
   index('meetings_starts_at_id_idx').on(table.starts_at, table.id),
   index('meetings_group_id_idx').on(table.group_id),
 ]);
