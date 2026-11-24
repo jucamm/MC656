@@ -103,4 +103,20 @@ As rotas usam as mesmas sessões verificadas por e-mail, envelope HTTP e políti
 
 A captura ativada exige `accepted_transcription: true` e `transcription_policy_version` no ingresso. O consentimento de áudio e vídeo permanece obrigatório. A aplicação condiciona a liberação local do link ao aceite e a conta anfitriã configura o consentimento no Google Meet para o acesso direto.
 
-As revisões são inseridas no histórico com ID próprio. A fila gera a primeira revisão e avança `version` na mesma transação. A HU08 deverá usar a versão da ata e o ID da revisão para proteger a edição e a publicação contra alterações concorrentes. A HU07 entrega as projeções de leitura, o rascunho e o acesso à fonte. Consulte as [instruções do piloto](../../README.md#piloto-de-transcrição-do-google-meet).
+As revisões são inseridas no histórico com ID próprio. A fila gera a primeira revisão e avança `version` na mesma transação. A HU08 usa a versão da ata e o ID da revisão para proteger a edição e a publicação contra alterações concorrentes. A HU07 entrega as projeções de leitura, o rascunho e o acesso à fonte. Consulte as [instruções do piloto](meetings-hu07-atas.md#piloto-de-transcrição-do-google-meet).
+
+### Revisão e moderação de atas (HU08)
+
+As mutações abaixo usam o prefixo `/meetings/:meetingId/minutes`, exigem sessão verificada, papel efetivo e encerramento local da reunião. O corpo é estrito e `expected_version` é o inteiro retornado pelo último GET ou pela última mutação editorial.
+
+| Rota | Corpo | Sucesso |
+|---|---|---|
+| `PUT /draft` | `{ expected_version, base_revision_id, title, body }` | **200** com nova revisão pendente. A base é o rascunho atual ou a versão publicada quando não há rascunho. |
+| `POST /publish` | `{ expected_version, revision_id }` | **200** com publicação da revisão pendente indicada ou republicação explícita da última revisão publicada de uma ata oculta. |
+| `POST /reject` | `{ expected_version, revision_id }` | **200** com o rascunho indicado rejeitado. |
+| `POST /hide` | `{ expected_version, revision_id }` | **200** com a publicação indicada oculta. |
+| `POST /delete` | `{ expected_version }` | **204** após exclusão lógica terminal da ata e interrupção do lease de geração. |
+
+O GET de revisão e as respostas editoriais **200** retornam o mesmo DTO. As flags novas em `actions` são `can_edit`, `can_publish`, `can_republish`, `can_reject`, `can_hide` e `can_delete`. `can_publish` autoriza promover o rascunho pendente. `can_republish` autoriza tornar visível a versão publicada anterior de uma ata oculta.
+
+Uma versão desatualizada retorna **409** `MINUTES_VERSION_CONFLICT`. Ação incompatível com o estado ou revisão indicada retorna **409** `MINUTES_INVALID_TRANSITION`. Antes do fim local, o gestor recebe **409** `MEETING_NOT_ENDED`. Conta sem papel em reunião visível recebe **403** `MINUTES_FORBIDDEN`. Fora da audiência ou após exclusão da ata, o recurso fica indisponível com **404** `MINUTES_NOT_FOUND`. O título aceita até 150 caracteres e o texto até 32.000 após trim. As ações editoriais nunca alteram a transcrição de origem nem o prazo de geração.

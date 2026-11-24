@@ -1,6 +1,6 @@
 ## Atas de reuniões (HU07)
 
-A partir de `back/`, rode `npm run db:migrate` e `npm run build`. Inicie `npm start` e, em outro processo supervisionado com a mesma `DATABASE_URL`, execute `npm run worker:minutes`. A geração por notas funciona com `MEET_TRANSCRIPTION_ENABLED=false`. Encerre uma reunião na plataforma, abra **Ata da reunião** com uma conta gestora, informe as notas e acompanhe a fila. A leitura de atas publicadas já está disponível para o público da reunião. A aprovação e publicação pelo painel serão entregues na HU08.
+A partir de `back/`, rode `npm run db:migrate` e `npm run build`. Inicie `npm start` e, em outro processo supervisionado com a mesma `DATABASE_URL`, execute `npm run worker:minutes`. A geração por notas funciona com `MEET_TRANSCRIPTION_ENABLED=false`. Encerre uma reunião na plataforma, abra **Ata da reunião** com uma conta gestora, informe as notas e acompanhe a fila. A leitura de atas publicadas já está disponível para o público da reunião. A aprovação e a publicação pelo painel seguem o [fluxo de revisão da HU08](meetings-hu08-revisao-atas.md).
 
 ### Piloto de transcrição do Google Meet
 
