@@ -5,7 +5,10 @@ import type { PageInput } from '../groups/groups.types';
 import { visibleTo, type MeetingDatabaseTransaction, type PostgresMeetingsRepository } from '../meetings/meetings.repository';
 import { type MeetingCursor } from '../meetings/meetings.types';
 import { editorialActions, minutesMissing as missing, requireMinutesManager } from '../meeting-minutes-review/minutes-review.policy';
-import { TranscriptError, type MeetTranscriptClient } from './meet-transcript.client';
+import type { MeetTranscriptClient } from './meet-transcript.client';
+import type { TranscriptSourceReader } from '../meeting-transcripts/transcript.contract';
+import { sameTranscriptRef } from '../ai/source-reference';
+import { aiConfiguration } from '../ai/gemini';
 import { revisionDto, type Minutes } from './minutes.types';
 
 const readOnly = { isolationLevel: 'repeatable read', accessMode: 'read only' } as const;
@@ -26,7 +29,11 @@ async function revision(db: MeetingDatabaseTransaction, meetingId: string, id: s
 }
 
 const recoverable = new Set(['MEET_UNAVAILABLE', 'MEET_WAITING_ARTIFACT', 'SLA_EXCEEDED',
-  'MEET_ACCESS_DENIED', 'MEET_NOT_CONFIGURED', 'GROUP_UNAVAILABLE', 'GENERATION_FAILED']);
+  'MEET_ACCESS_DENIED', 'MEET_NOT_CONFIGURED', 'GROUP_UNAVAILABLE', 'GENERATION_FAILED',
+  'AI_PROVIDER_UNREACHABLE', 'AI_PROVIDER_HTTP_400', 'AI_PROVIDER_HTTP_401', 'AI_PROVIDER_HTTP_403', 'AI_PROVIDER_HTTP_404',
+  'AI_PROVIDER_HTTP_408', 'AI_PROVIDER_HTTP_429', 'AI_PROVIDER_HTTP_500', 'AI_PROVIDER_HTTP_502',
+  'AI_PROVIDER_HTTP_503', 'AI_PROVIDER_HTTP_504',
+  'AI_CONFIGURATION_PENDING', 'AI_ATTEMPT_LIMIT', 'SOURCE_CHANGED', 'TRANSCRIPT_PENDING', 'TRANSCRIPT_UNAVAILABLE']);
 
 export async function describeMinutesReview(db: MeetingDatabaseTransaction, id: string, row?: Minutes) {
   const hasDraft = !!(row?.draft_revision_id || row?.published_revision_id);
@@ -39,6 +46,7 @@ export async function describeMinutesReview(db: MeetingDatabaseTransaction, id: 
     deadline_at: row?.deadline_at?.toISOString() ?? null,
     transcript_ready_at: row?.transcript_ready_at?.toISOString() ?? null,
     sla_missed_at: row?.sla_missed_at?.toISOString() ?? null, failure_code: row?.failure_code ?? null,
+    ai: { configuration: aiConfiguration(), reason: aiConfiguration() === 'pending' ? 'AI_CONFIGURATION_PENDING' : undefined },
     actions: {
       ...editorialActions(row),
       can_add_notes: !busy && !hasDraft, can_retry: !busy && !hasDraft && recoverable.has(row?.failure_code ?? ''),
@@ -49,7 +57,8 @@ export async function describeMinutesReview(db: MeetingDatabaseTransaction, id: 
 
 export class MinutesService {
   constructor(private readonly meetings: PostgresMeetingsRepository,
-    private readonly client?: MeetTranscriptClient, private readonly clock = () => new Date()) {}
+    _legacyClient?: MeetTranscriptClient, private readonly clock = () => new Date(),
+    private readonly transcripts?: TranscriptSourceReader) {}
 
   published(id: string, actor: bigint) {
     return this.meetings.transaction(async (tx, db) => {
@@ -87,12 +96,22 @@ export class MinutesService {
     }, readOnly);
   }
 
-  review(id: string, actor: bigint) {
-    return this.meetings.transaction(async (tx, db) => {
+  async review(id: string, actor: bigint) {
+    const result = await this.meetings.transaction(async (tx, db) => {
       requireMinutesManager(await tx.readScope(id, actor));
       const row = await load(db, id);
-      return describeMinutesReview(db, id, row);
+      return { review: await describeMinutesReview(db, id, row), row };
     }, readOnly);
+    if (this.transcripts) {
+      const description = await this.transcripts.describe(id);
+      result.review.actions.can_read_transcript = description.state === 'available';
+      const row = result.row;
+      const sourceOutdated = row?.source_kind === 'meet_transcript' && !!(row.draft_revision_id || row.published_revision_id) &&
+        (description.state !== 'available' || !description.ref || description.ref.contentHash !== row.source_content_hash ||
+          description.ref.version !== row.source_transcript_version);
+      return { ...result.review, ai: { ...result.review.ai, source_outdated: Boolean(sourceOutdated) } };
+    }
+    return result.review;
   }
 
   async transcript(id: string, actor: bigint, limit: number, cursor: number) {
@@ -100,21 +119,17 @@ export class MinutesService {
       requireMinutesManager(await tx.readScope(id, actor));
       return load(db, id);
     }, readOnly);
-    const row = await read();
-    if (!this.client || !row?.conference_name || !row.source_transcripts?.length) throw noTranscript();
-    try {
-      const entries = await this.client.entries(row.conference_name, row.source_transcripts);
-      const updated = await read();
-      if (updated?.conference_name !== row.conference_name) throw noTranscript();
-      return { items: entries.slice(cursor, cursor + limit),
-        next_cursor: cursor + limit < entries.length ? id + ':' + (cursor + limit) : null };
-    } catch (error) {
-      if (error instanceof TranscriptError) {
-        if (error.retryable) throw new DomainError('MEET_UNAVAILABLE', 'O Meet está temporariamente indisponível.');
-        throw noTranscript();
-      }
-      throw error;
-    }
+    await read();
+    const reader = this.transcripts;
+    if (!reader) throw noTranscript();
+    const described = await reader.describe(id);
+    if (described.state !== 'available' || !described.ref) throw noTranscript();
+    const source = await reader.loadForGeneration(id, described.ref, AbortSignal.timeout(25_000)).catch(() => { throw noTranscript(); });
+    if (!sameTranscriptRef(source.ref, described.ref)) throw noTranscript();
+    await read(); // Permission may have changed while loading the private snapshot.
+    if (!await reader.isCurrent(described.ref)) throw noTranscript();
+    return { items: source.entries.slice(cursor, cursor + limit),
+      next_cursor: cursor + limit < source.entries.length ? id + ':' + (cursor + limit) : null };
   }
 
   queue(id: string, actor: bigint, notes?: string) {
@@ -128,7 +143,9 @@ export class MinutesService {
         generation_status: 'queued' as const, next_attempt_at: this.clock(),
         failure_code: notes === undefined ? 'MANUAL_RETRY' : null,
         source_kind: notes === undefined ? row!.source_kind : 'notes' as const,
-        source_notes: notes ?? row?.source_notes ?? null,
+        source_notes: notes ?? row?.source_notes ?? null, attempt_count: 0,
+        source_content_hash: null, pipeline_version: null, source_transcript_id: null,
+        source_transcript_version: null, source_policy_version: null,
       };
       await db.insert(meetingMinutes).values({ meeting_id: id, ...changes })
         .onConflictDoUpdate({ target: meetingMinutes.meeting_id, set: changes });

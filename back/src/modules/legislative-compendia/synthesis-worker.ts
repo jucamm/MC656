@@ -1,3 +1,4 @@
+import { meetingRedactor } from '../ai/source-minimization';
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, exists, gt, lte, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -64,7 +65,12 @@ export class LegislativeSynthesisWorker {
           and(eq(summaries.state, 'running'), lte(summaries.lease_until, now))),
       )).orderBy(asc(summaries.next_attempt_at), asc(summaries.bill_id)).limit(1).for('update', { skipLocked: true });
       if (!candidate) return null;
-      const [job] = await tx.update(summaries).set({ state: 'running', lease_token: randomUUID(),
+      if (candidate.attempts >= maxAttempts) {
+        await tx.update(summaries).set({ state: 'failed', failure_code: 'AI_ATTEMPT_LIMIT',
+          lease_token: null, lease_until: null }).where(eq(summaries.bill_id, candidate.bill_id));
+        return null;
+      }
+      const [job] = await tx.update(summaries).set({ state: 'running', attempts: candidate.attempts + 1, lease_token: randomUUID(),
         lease_until: new Date(now.getTime() + leaseMs) }).where(eq(summaries.bill_id, candidate.bill_id)).returning();
       return job;
     });
@@ -82,16 +88,19 @@ export class LegislativeSynthesisWorker {
     const eligible = eligibleMinutes(this.db);
     const version = and(eq(insights.revision_id, eligible.revision_id), eq(insights.pipeline_version, this.pipeline));
     const missing = notExists(this.db.select({ id: insights.revision_id }).from(insights).where(version));
-    const [source] = await this.db.select({ id: eligible.revision_id, body: eligible.body }).from(eligible)
+    const [source] = await this.db.select({ id: eligible.revision_id, meetingId: eligible.meeting_id, body: eligible.body }).from(eligible)
       .where(and(eq(eligible.bill_id, job.bill_id), missing, this.manifestMatches(job),
         exists(this.db.select({ id: summaries.bill_id }).from(summaries).where(this.owned(job, this.clock())))))
       .orderBy(asc(eligible.meeting_id)).limit(1);
     if (source) {
       const points: Insight[] = [];
       const deadline = AbortSignal.timeout(8 * 60_000);
-      for (const segment of segments(source.body)) {
+      const redact = await meetingRedactor(this.db, source.meetingId);
+      for (const segment of segments(redact(source.body))) {
         if (!(await this.allowed(job, source.id))) throw new SynthesisError('SOURCE_CHANGED', true);
-        points.push(...validateInsights(await this.extract(segment, deadline), segment));
+        const extracted = validateInsights(await this.extract(segment, deadline), segment);
+        if (extracted.some(point => redact(point.argument) !== point.argument)) throw new SynthesisError('UNSUPPORTED_OUTPUT');
+        points.push(...extracted);
       }
       await this.db.transaction(async tx => {
         const now = this.clock();
@@ -123,10 +132,10 @@ export class LegislativeSynthesisWorker {
       await this.process(job);
     } catch (error) {
       const failure = error instanceof SynthesisError ? error : new SynthesisError('SYNTHESIS_FAILED', true);
-      const attempts = job.attempts + 1;
+      const attempts = job.attempts;
       const now = this.clock();
       const retry = failure.retryable && attempts < maxAttempts;
-      const delay = Math.max(30_000 * 2 ** job.attempts, failure.retryMs);
+      const delay = Math.max(30_000 * 2 ** Math.max(0, job.attempts - 1), failure.retryMs) + Math.floor(Math.random() * 1000);
       await this.db.update(summaries).set({ state: retry ? 'queued' : 'failed', attempts, failure_code: failure.code,
         next_attempt_at: new Date(now.getTime() + Math.min(delay, 24 * 60 * 60_000)),
         lease_token: null, lease_until: null }).where(this.owned(job, now));

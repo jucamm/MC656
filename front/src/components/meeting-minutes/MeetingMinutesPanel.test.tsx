@@ -40,3 +40,17 @@ it('lista atas publicadas e permite abrir a reunião correspondente', async () =
   await userEvent.click(await screen.findByRole('button', { name: 'Ata de Assembleia' }));
   expect(open).toHaveBeenCalledWith('reuniao');
 });
+
+it('mostra configuração pendente e preserva o envio de notas', async () => {
+  vi.spyOn(meetingMinutesApi, 'published').mockRejectedValue({ code: 'MINUTES_NOT_FOUND' });
+  vi.spyOn(meetingMinutesApi, 'review').mockResolvedValue({
+    version: 1, generation_status: 'unavailable', visibility: 'unpublished', draft_status: null,
+    draft: null, published: null, deadline_at: null, transcript_ready_at: null, sla_missed_at: null, failure_code: null,
+    ai: { configuration: 'pending', reason: 'AI_CONFIGURATION_PENDING' },
+    actions: { can_add_notes: true, can_retry: false, can_read_transcript: false, can_edit: false,
+      can_publish: false, can_republish: false, can_reject: false, can_hide: false, can_delete: false },
+  });
+  render(<MeetingMinutesPanel meetingId="reuniao" revision={0} />);
+  expect(await screen.findByText(/Configuração da IA pendente/)).toBeVisible();
+  expect(screen.getByRole('textbox', { name: 'Notas da reunião' })).toBeEnabled();
+});

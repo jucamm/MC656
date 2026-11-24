@@ -31,7 +31,7 @@ const segmentSize = 4_000;
 const maxPoints = 8;
 const maxArgument = 350;
 const maxQuote = 350;
-export const pipelineRevision = 'v1';
+export const pipelineRevision = 'gemini-insights-v2';
 
 export function minimize(text: string) {
   return text

@@ -3,7 +3,7 @@ import { setTimeout as wait } from 'node:timers/promises';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { pipelineRevision } from './modules/legislative-compendia/compendium-synthesis';
-import { openAiInsights } from './modules/legislative-compendia/openai-insights';
+import { GeminiClient, readAiConfig } from './modules/ai/gemini';
 import { discoveryMs, LegislativeSynthesisWorker } from './modules/legislative-compendia/synthesis-worker';
 
 async function main() {
@@ -11,15 +11,14 @@ async function main() {
     console.info('Síntese de compêndios desabilitada.');
     return;
   }
-  const { DATABASE_URL, OPENAI_API_KEY, LEGISLATIVE_SYNTHESIS_MODEL } = process.env;
-  if (!DATABASE_URL || !OPENAI_API_KEY?.trim() || !LEGISLATIVE_SYNTHESIS_MODEL?.trim()) {
-    throw new Error('Configuração de síntese incompleta.');
-  }
-  const pool = new Pool({ connectionString: DATABASE_URL });
+  const config = readAiConfig();
+  if (!config) { console.info('Configuração da IA pendente.'); return; }
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória.');
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const ai = new GeminiClient(config);
   const worker = new LegislativeSynthesisWorker(drizzle({ client: pool }),
-    openAiInsights(OPENAI_API_KEY.trim(), LEGISLATIVE_SYNTHESIS_MODEL.trim(), undefined,
-      usage => console.info(JSON.stringify({ code: 'SYNTHESIS_USAGE', ...usage }))),
-    pipelineRevision + ':' + LEGISLATIVE_SYNTHESIS_MODEL.trim(), undefined, event => console.info(JSON.stringify(event)));
+    (segment, signal) => ai.extractInsights(segment, signal),
+    pipelineRevision + ':' + config.model, undefined, event => console.info(JSON.stringify(event)));
   let stopping = false;
   const stop = () => { stopping = true; };
   process.once('SIGINT', stop);

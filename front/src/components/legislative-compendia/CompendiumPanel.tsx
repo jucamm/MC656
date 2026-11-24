@@ -108,6 +108,7 @@ function Summary({ summary, open }: { summary: Compendium['summary']; open: (sou
   return (
     <section aria-labelledby="compendium-summary" className="space-y-2">
       <h4 id="compendium-summary" className="font-semibold">Síntese das discussões por IA</h4>
+      {summary.reason === 'AI_CONFIGURATION_PENDING' && summary.status !== 'empty' && <p>Configuração da IA pendente.</p>}
       {summary.status !== 'ready' ? <p>{summaryStatus[summary.status]}</p> : (
         <>
           {summary.generated_at && <p className="text-sm text-slate-600">Gerada em {formatMeetingTime(summary.generated_at)}.</p>}
