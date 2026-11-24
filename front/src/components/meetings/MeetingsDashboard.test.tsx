@@ -413,3 +413,44 @@ it('carrega as três origens por UF, associa o PL e mantém o formulário se a f
     expect(localStorage.getItem('mc656:legislative-uf:1')).toBe('AC');
   } finally { localStorage.removeItem('mc656:legislative-uf:1'); }
 });
+
+it('ignora UFs inválidas do armazenamento e do formulário, aceita uma UF válida e permite limpar a escolha', async () => {
+  const browser = userEvent.setup();
+  const key = 'mc656:legislative-uf:1';
+  const invalid = 'XX';
+  localStorage.setItem(key, invalid);
+  const calls = mockApi(({ path }) => {
+    if (path.endsWith('/suggestions')) {
+      const section = { items: [], status: 'empty', last_success_at: null, official_url: null };
+      return ok({ senate: section, chamber: section, regional: section });
+    }
+    return page();
+  });
+  const suggestions = () => calls.filter(call => call.path.endsWith('/suggestions'));
+  try {
+    dashboard();
+    await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    const uf = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Sua unidade federativa' });
+    expect(uf).toHaveValue('');
+    expect(suggestions().at(-1)?.query.get('uf')).toBeNull();
+
+    await browser.selectOptions(uf, 'DF');
+    expect(localStorage.getItem(key)).toBe('DF');
+    expect(suggestions().at(-1)?.query.get('uf')).toBe('DF');
+
+    uf.add(new Option(invalid, invalid));
+    fireEvent.change(uf, { target: { value: invalid } });
+    expect(uf).toHaveValue('DF');
+    expect(localStorage.getItem(key)).toBe('DF');
+    expect(suggestions().every(call => call.query.get('uf') !== invalid)).toBe(true);
+
+    await browser.click(screen.getByRole('button', { name: 'Reuniões disponíveis' }));
+    await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    const restored = screen.getByRole('combobox', { name: 'Sua unidade federativa' });
+    expect(restored).toHaveValue('DF');
+    await browser.selectOptions(restored, '');
+    expect(restored).toHaveValue('');
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(suggestions().at(-1)?.query.get('uf')).toBeNull();
+  } finally { localStorage.removeItem(key); }
+});

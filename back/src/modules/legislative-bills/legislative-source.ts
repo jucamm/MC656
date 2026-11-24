@@ -36,7 +36,7 @@ export function normalize(
   if (num > 2147483647 || yr < 1800 || yr > 9999 || typeof abstract !== 'string' || !abstract.trim() ||
       abstract.length > 20_000 || abstract.includes('\u0000')) throw new SourceError('INVALID_RESPONSE');
   const state = typeof statusLabel === 'string' ? statusLabel.replaceAll('\u0000', '').trim() : '';
-  const sourceTime = typeof updated === 'string' && /(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(updated) ? Date.parse(updated) : NaN;
+  const sourceTime = typeof updated === 'string' && /(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(updated) ? Date.parse(updated) : Number.NaN;
   return { house_key: house, uf, external_id: id, kind: 'PL', number: num, year: yr, label: `PL ${num}/${yr} — ${houseName}`,
     abstract: abstract.trim(), official_url: officialUrl, status,
     status_label: [...(state || (status === 'in_progress' ? 'Em tramitação' : status === 'closed' ? 'Tramitação encerrada' : 'Situação não confirmada'))].slice(0, 240).join(''),
