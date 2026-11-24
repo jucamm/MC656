@@ -372,3 +372,44 @@ it('ignora fragmentos inválidos e apresenta a recusa da API para reunião restr
   expect(await screen.findByRole('alert')).toHaveTextContent('Reunião indisponível.');
   expect(screen.queryByRole('heading', { name: 'Assembleia' })).not.toBeInTheDocument();
 });
+
+it('carrega as três origens por UF, associa o PL e mantém o formulário se a fonte alterar o estado', async () => {
+  const bill = { id: 'pl-1', house_key: 'AL-AC', label: 'PL 10/2036 — Assembleia do Acre', abstract: 'Ementa de teste',
+    status_label: 'Em tramitação', official_url: 'https://sapl.al.ac.leg.br/materia/34', verified_at: new Date().toISOString() };
+  const section = (items: unknown[], status = 'fresh') => ({ items, status, last_success_at: new Date().toISOString(), official_url: bill.official_url });
+  const calls = mockApi(({ path, method, query }) => {
+    if (path === '/groups') return page();
+    if (path.endsWith('/suggestions')) return ok({
+      senate: section([{ ...bill, id: 'sf', house_key: 'SF', label: 'PL 1/2036 — Senado' }]),
+      chamber: section([{ ...bill, id: 'cd', house_key: 'CD', label: 'PL 2/2036 — Câmara' }]),
+      regional: query.get('uf') === 'AC' ? section([bill]) : section([], 'needs_uf'),
+    });
+    if (path === '/meetings' && method === 'POST') return fail('LEGISLATIVE_BILL_UNAVAILABLE', 'Atualize as sugestões.', 422);
+    return page();
+  });
+  const browser = userEvent.setup();
+  localStorage.removeItem('mc656:legislative-uf:1');
+  try {
+    dashboard();
+    await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    const subject = screen.getByRole('textbox', { name: 'Assunto' });
+    fireEvent.change(subject, { target: { value: 'Assunto livre' } });
+    await browser.selectOptions(screen.getByLabelText('Sua unidade federativa'), 'AC');
+    expect(await screen.findByRole('button', { name: 'PL 1/2036 — Senado' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'PL 2/2036 — Câmara' })).toBeVisible();
+    const choice = await screen.findByRole('button', { name: bill.label });
+    choice.focus();
+    await browser.keyboard('{Enter}');
+    expect(subject).toHaveValue(bill.label);
+    expect(subject).toHaveAttribute('readonly');
+    const date = screen.getByLabelText('Data e horário de início');
+    fireEvent.change(date, { target: { value: futureLocal } });
+    await browser.click(screen.getByRole('button', { name: 'Criar reunião' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Atualize as sugestões.');
+    expect(calls.find(call => call.method === 'POST')?.body).toMatchObject({ legislative_bill_id: bill.id, subject: bill.label });
+    expect(date).toHaveValue(futureLocal);
+    await browser.click(screen.getByRole('button', { name: 'Usar assunto livre' }));
+    expect(subject).toHaveValue('Assunto livre');
+    expect(localStorage.getItem('mc656:legislative-uf:1')).toBe('AC');
+  } finally { localStorage.removeItem('mc656:legislative-uf:1'); }
+});

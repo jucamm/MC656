@@ -4,6 +4,7 @@ import { groupErrors } from '../groups/groups.errors';
 export const meetingErrors = {
   FORBIDDEN: groupErrors.FORBIDDEN,
   GROUP_NOT_FOUND: groupErrors.GROUP_NOT_FOUND,
+  LEGISLATIVE_BILL_UNAVAILABLE: { status: 422, message: 'Projeto de lei indisponível para novas reuniões. Atualize as sugestões.' },
   MEETING_NOT_FOUND: { status: 404, message: 'Reunião indisponível.' },
   MEETING_MANAGEMENT_FORBIDDEN: { status: 403, message: 'Apenas o organizador pode consultar os participantes da reunião.' },
   MEETING_ORGANIZER_REQUIRED: { status: 403, message: 'Apenas o organizador vigente pode realizar esta ação.' },

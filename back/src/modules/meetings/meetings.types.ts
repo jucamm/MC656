@@ -7,6 +7,7 @@ export type Participant = typeof meetingParticipants.$inferInsert;
 
 export interface CreateMeetingInput {
   subject: string;
+  legislativeBillId?: string;
   startsAt: Date;
   groupId: string | null;
   accessMode: MeetingAccessMode;
@@ -21,6 +22,7 @@ export interface MeetingCursor {
 
 export interface MeetingDto {
   id: string;
+  legislative_bill_id: string | null;
   subject: string;
   starts_at: string;
   visibility: 'public' | 'private';

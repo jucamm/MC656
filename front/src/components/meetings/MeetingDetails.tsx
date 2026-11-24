@@ -1,3 +1,4 @@
+import { MeetingLegislativeBill } from '../legislative-bills/MeetingLegislativeBill';
 import { useEffect, useState } from 'react';
 import { meetingsApi } from '../../services/meetingsApi';
 import type { Meeting, MeetingParticipant, OrganizerTransfer } from '../../types/meetings';
@@ -81,6 +82,7 @@ export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: 
             <p className="break-words text-sm text-slate-700">Organizador <strong>{meeting.organizer_name}</strong></p>
           </div>
           <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={featureRevision} />
+          {meeting.legislative_bill_id && <MeetingLegislativeBill key={meeting.legislative_bill_id} id={meeting.legislative_bill_id} />}
           <MeetingAgendaPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           <MeetingActionItemsPanel key={featureRevision} meetingId={id} />
           <AgendaReviewPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />

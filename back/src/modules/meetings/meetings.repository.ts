@@ -1,7 +1,7 @@
 import { and, eq, exists, gt, inArray, isNull, not, or, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { alias } from 'drizzle-orm/pg-core';
-import { groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../db/schema';
+import { groupMemberships, groups, legislativeBills, meetingOrganizerTransfers, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../db/schema';
 import { lockGroup } from '../groups/groups.repository';
 import type { PageInput } from '../groups/groups.types';
 import type { InvitationDecision, MeetingCursor, MeetingScope, OrganizerTransfer, Participant, TransferResolution } from './meetings.types';
@@ -72,6 +72,12 @@ export class MeetingTransaction {
     if (!emails.length) return [];
     const rows = await this.db.select({ id: users.id }).from(users).where(inArray(users.email, emails));
     return rows.map(row => row.id);
+  }
+
+  async lockLegislativeBill(id: string) {
+    const [row] = await this.db.select({ label: legislativeBills.label, status: legislativeBills.status, verified_at: legislativeBills.verified_at })
+      .from(legislativeBills).where(eq(legislativeBills.id, id)).for('share');
+    return row;
   }
 
   async insertMeeting(meeting: typeof meetings.$inferInsert, participants: Participant[]) {
@@ -250,6 +256,7 @@ export class PostgresMeetingsRepository {
   private meetingsForActor(actorId: bigint) {
     return this.db.select({
       id: meetings.id, subject: meetings.subject, starts_at: meetings.starts_at, access_mode: meetings.access_mode,
+      legislative_bill_id: meetings.legislative_bill_id,
       organizer_name: users.name, canManage: sql<boolean>`${meetings.organizer_user_id} = ${actorId}`,
       cursorStartsAt: sql<string>`to_char(${meetings.starts_at} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
     }).from(meetings)

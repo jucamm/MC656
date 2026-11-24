@@ -1,3 +1,4 @@
+import { createLegislativeRouter } from '../legislative-bills/legislative.routes';
 import { createActionItemsRouter } from '../meeting-action-items/action-items.routes';
 import { MeetingActionItemsService } from '../meeting-action-items/action-items.service';
 import { createMinutesReviewRouter } from '../meeting-minutes-review/minutes-review.routes';
@@ -26,6 +27,7 @@ export function composeMeetingServices(db: NodePgDatabase, clock = () => new Dat
   return {
     meetings: new MeetingsService(repository, clock),
     meetingExtensionRouters: [
+      createLegislativeRouter(db, clock),
       createMeetingAgendaRouter(new MeetingAgendaService(repository, clock)),
       createActionItemsRouter(new MeetingActionItemsService(repository, clock)),
       createMeetingConferencingRouter(new MeetingConferencingService(repository, clock, capture)),

@@ -1,5 +1,5 @@
 import { setTimeout as wait } from 'node:timers/promises';
-import type { BillStatus, OfficialBill } from './legislative.types';
+import { freshnessMs, type BillStatus, type OfficialBill } from './legislative.types';
 
 export class SourceError extends Error {
   constructor(readonly code: string, readonly retryMs = 0) { super(code); }
@@ -61,12 +61,17 @@ export function sourceClient(base: string, fetcher = fetch, pause = wait) {
     const requestSignal = signal ? AbortSignal.any([timeout, signal]) : timeout;
     let response: Response;
     try {
-      response = await fetcher(url, { ...init, redirect: 'error', signal: requestSignal,
+      response = await fetcher(url, { ...init, redirect: 'error', cache: 'no-cache', signal: requestSignal,
         headers: { Accept: 'application/json', ...init?.headers } });
     } catch { throw new SourceError('SOURCE_UNREACHABLE'); }
     if (!response.ok) {
       await response.body?.cancel();
       throw new SourceError('HTTP_' + response.status, retryDelay(response.headers.get('retry-after')));
+    }
+    const age = Number(response.headers.get('age') ?? 0) * 1000;
+    if (age > freshnessMs) {
+      await response.body?.cancel();
+      throw new SourceError('SOURCE_CACHE_STALE');
     }
     if (!response.headers.get('content-type')?.includes('application/json') || !response.body) {
       await response.body?.cancel();

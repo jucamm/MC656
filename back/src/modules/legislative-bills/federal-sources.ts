@@ -51,9 +51,11 @@ export function chamberSource(fetcher?: typeof fetch): LegislativeSource {
   const read = sourceClient(chamberBase, fetcher);
   return { key: 'CD', async collect(known, now, signal) {
     const newIds = new Set<string>();
-    for (let page = 1; page <= 2; page++) {
-      const body = record(await read(`/proposicoes?siglaTipo=PL&ano=${now.getUTCFullYear()}&codSituacao=903&itens=10&ordenarPor=id&ordem=DESC&pagina=${page}`, signal));
-      for (const raw of list(body.dados)) {
+    for (let page = 1; page <= 4; page++) {
+      const body = record(await read(`/proposicoes?siglaTipo=PL&ano=${now.getUTCFullYear()}&itens=25&ordenarPor=id&ordem=DESC&pagina=${page}`, signal));
+      // Amostrar páginas distintas evita limitar a descoberta aos PLs recém-protocolados,
+      // cujos detalhes ainda podem não conter situação de tramitação.
+      for (const raw of list(body.dados).slice(0, 5)) {
         const row = record(raw);
         if (row.siglaTipo !== 'PL') throw new SourceError('INVALID_RESPONSE');
         const id = numericId(row.id);

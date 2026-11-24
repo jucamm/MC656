@@ -4,6 +4,7 @@ export type MeetingAccess =
 
 export interface CreateMeeting {
   subject: string;
+  legislative_bill_id?: string;
   starts_at: string;
   group_id?: string;
   access: MeetingAccess;
@@ -13,6 +14,7 @@ export interface CreateMeeting {
 
 export interface Meeting {
   id: string;
+  legislative_bill_id?: string | null;
   subject: string;
   starts_at: string;
   visibility: MeetingAccess['visibility'];

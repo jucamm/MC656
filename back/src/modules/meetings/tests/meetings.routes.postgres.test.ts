@@ -123,7 +123,7 @@ describe.skipIf(!connectionString)('rotas de reuniões com PostgreSQL', () => {
     expect(result.headers.location).toBe(`/meetings/${id}`);
     expect(result.headers['access-control-expose-headers']).toContain('Location');
     expect(result.body).toEqual({
-      data: { id, subject: 'Assembleia', starts_at: '2028-02-29T11:00:00.000Z', visibility: 'private',
+      data: { id, subject: 'Assembleia', legislative_bill_id: null, starts_at: '2028-02-29T11:00:00.000Z', visibility: 'private',
         organizer_name: 'Convidado', actions: { can_manage: true } },
     });
     const [stored] = await db.select().from(meetings).where(eq(meetings.id, id));

@@ -1,3 +1,4 @@
+import { billIsSelectable } from '../legislative-bills/legislative.types';
 import { randomUUID } from 'node:crypto';
 import { requireActiveGroupMember, requireGroupAdministrator } from '../groups/group-access';
 import type { PageDto, PageInput } from '../groups/groups.types';
@@ -9,12 +10,12 @@ import type {
   MeetingModeratorsDto, MeetingParticipantDto, OrganizerTransfer, OrganizerTransferDto, Participant, ReceivedOrganizerTransferDto, TransferResolution,
 } from './meetings.types';
 
-function toMeetingDto(row: Pick<Meeting, 'id' | 'subject' | 'starts_at' | 'access_mode'> & {
+function toMeetingDto(row: Pick<Meeting, 'id' | 'subject' | 'starts_at' | 'access_mode' | 'legislative_bill_id'> & {
   organizer_name: string;
   canManage: boolean;
 }): MeetingDto {
   return {
-    id: row.id, subject: row.subject, starts_at: row.starts_at.toISOString(),
+    id: row.id, subject: row.subject, legislative_bill_id: row.legislative_bill_id, starts_at: row.starts_at.toISOString(),
     visibility: row.access_mode === 'public' ? 'public' : 'private',
     organizer_name: row.organizer_name, actions: { can_manage: row.canManage },
   };
@@ -53,7 +54,9 @@ export class MeetingsService {
         throw meetingError('MEETING_PARTICIPANT_NOT_ELIGIBLE');
       }
 
+      const bill = input.legislativeBillId ? await tx.lockLegislativeBill(input.legislativeBillId) : null;
       const now = this.clock();
+      if (input.legislativeBillId && (!bill || !billIsSelectable(bill, now))) throw meetingError('LEGISLATIVE_BILL_UNAVAILABLE');
       if (input.startsAt <= now) invalidField('starts_at', 'Informe um horário de início no futuro.');
       const meetingId = randomUUID();
       const participants: Participant[] = [{
@@ -67,7 +70,7 @@ export class MeetingsService {
         });
       }
       return tx.insertMeeting({
-        id: meetingId, subject: input.subject, starts_at: input.startsAt, group_id: input.groupId,
+        id: meetingId, subject: bill?.label ?? input.subject, legislative_bill_id: input.legislativeBillId, starts_at: input.startsAt, group_id: input.groupId,
         access_mode: input.accessMode, created_by_user_id: actor.id, organizer_user_id: actor.id, created_at: now,
       }, participants);
     });

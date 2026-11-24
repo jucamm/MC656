@@ -47,9 +47,10 @@ function readList(input: unknown, field: string): unknown[] {
 }
 
 export function validateCreateMeeting(input: unknown): CreateMeetingInput {
-  const body = readObject(input, 'body', ['subject', 'starts_at', 'access', 'group_id', 'participant_ids', 'participant_emails']);
+  const body = readObject(input, 'body', ['subject', 'legislative_bill_id', 'starts_at', 'access', 'group_id', 'participant_ids', 'participant_emails']);
+  const bill = body.legislative_bill_id === undefined ? undefined : validateUuid(body.legislative_bill_id, 'legislative_bill_id');
   const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
-  if (!subject || [...subject].length > 150 || subject.includes('\u0000')) {
+  if ((!subject && !bill) || [...subject].length > 150 || subject.includes('\u0000')) {
     invalidField('subject', 'Informe um assunto válido de até 150 caracteres.');
   }
   const groupId = body.group_id === undefined ? null : validateUuid(body.group_id, 'group_id');
@@ -61,6 +62,7 @@ export function validateCreateMeeting(input: unknown): CreateMeetingInput {
   }
   return {
     subject,
+    ...(bill ? { legislativeBillId: bill } : {}),
     groupId,
     startsAt: validateStartsAt(body.starts_at),
     accessMode: validateAccess(body.access, groupId),
