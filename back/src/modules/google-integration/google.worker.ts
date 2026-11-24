@@ -45,7 +45,10 @@ export class GoogleIntegrationWorker {
           sql`NOT (${blockedParticipant(this.db, meetingParticipants.user_id)})`,
           sql`(${meetingParticipants.origin} = 'invitation' OR ${meetings.group_id} IS NULL OR EXISTS
             (SELECT 1 FROM ${groupMemberships} WHERE ${groupMemberships.group_id} = ${meetings.group_id} AND ${groupMemberships.user_id} = ${meetingParticipants.user_id}))`));
-      const attendees = [...new Set(recipients.filter(row => eligibleEmail(row.email, this.config.domains)).map(row => row.email.toLowerCase()))].sort().map(email => ({ email }));
+      const compareEmails = (left: string, right: string) => left.localeCompare(right, 'en');
+      const emails = [...new Set(recipients.filter(row => eligibleEmail(row.email, this.config.domains)).map(row => row.email.toLowerCase()))]
+        .sort(compareEmails);
+      const attendees = emails.map(email => ({ email }));
       const desired = { summary: source.meeting.subject, start: { dateTime: source.meeting.starts_at.toISOString() },
         end: { dateTime: source.meeting.scheduled_ends_at.toISOString() }, attendees,
         extendedProperties: { private: { unidebatesMeetingId: job.meeting_id, unidebatesVersion: String(job.desired_version) } },
@@ -59,9 +62,10 @@ export class GoogleIntegrationWorker {
           if (event.extendedProperties?.private?.unidebatesMeetingId !== job.meeting_id) throw new GoogleError('GOOGLE_EVENT_BINDING_CONFLICT');
         }
       }
+      const eventEmails = (event.attendees ?? []).map(attendee => attendee.email.toLowerCase()).sort(compareEmails);
       const sameAgenda = event.summary === desired.summary && event.start?.dateTime && +new Date(event.start.dateTime) === +source.meeting.starts_at &&
         event.end?.dateTime && +new Date(event.end.dateTime) === +source.meeting.scheduled_ends_at &&
-        JSON.stringify((event.attendees ?? []).map(a => a.email.toLowerCase()).sort()) === JSON.stringify(attendees.map(a => a.email));
+        JSON.stringify(eventEmails) === JSON.stringify(emails);
       if (!sameAgenda && job.event_etag && job.applied_version === job.desired_version && job.event_etag !== event.etag) throw new GoogleError('GOOGLE_EVENT_CONFLICT');
       if (!sameAgenda || event.extendedProperties?.private?.unidebatesVersion !== String(job.desired_version)) event = await this.calendar.patch(id, desired, event.etag);
       let url = meetingUrl(event); let space: string | null = null;

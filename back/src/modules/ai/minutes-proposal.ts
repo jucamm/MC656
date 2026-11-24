@@ -4,19 +4,25 @@ import { minimize, segments, SynthesisError } from '../legislative-compendia/com
 export type Claim = { text: string; segmentId: string; quote: string };
 const sections = ['summary', 'discussion', 'decisions', 'pending'] as const;
 export type Proposal = Record<typeof sections[number], Claim[]>;
+
+function hasExactKeys(value: object, expected: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  return keys.length === expected.length && expected.every(key => keys.includes(key));
+}
+
 export function proposalSegments(entries: { id: string; text: string }[]): AiSegment[] {
   const result = entries.flatMap((entry, index) => segments(entry.text).map((text, part) => ({ id: 's' + index + 'p' + part, text })));
   if (!result.length || result.length > 256) throw new SynthesisError('AI_INPUT_LIMIT');
   return result;
 }
 export function validateProposal(raw: unknown, source: AiSegment[]): Proposal {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).sort().join() !== [...sections].sort().join()) throw new SynthesisError('AI_INVALID_OUTPUT');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !hasExactKeys(raw, sections)) throw new SynthesisError('AI_INVALID_OUTPUT');
   const output = {} as Proposal;
   for (const key of sections) {
     const claims: unknown = (raw as Record<string, unknown>)[key];
     if (!Array.isArray(claims) || claims.length > 16) throw new SynthesisError('AI_INVALID_OUTPUT');
     output[key] = claims.map((value: unknown) => {
-      if (!value || typeof value !== 'object' || Object.keys(value).sort().join() !== 'quote,segmentId,text') throw new SynthesisError('AI_INVALID_OUTPUT');
+      if (!value || typeof value !== 'object' || !hasExactKeys(value, ['quote', 'segmentId', 'text'])) throw new SynthesisError('AI_INVALID_OUTPUT');
       const item = value as Claim;
       const segment = source.find(entry => entry.id === item.segmentId);
       if (typeof item.text !== 'string' || !item.text.trim() || item.text.length > 500 || minimize(item.text) !== item.text ||

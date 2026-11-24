@@ -29,7 +29,7 @@ export function MeetingSchedulePanel({ meetingId, onChanged }: { meetingId: stri
       <p>Horários no fuso {Intl.DateTimeFormat().resolvedOptions().timeZone}. Informe o fim para sincronizar a agenda central.</p>
       <label className="block">Início da reunião<input type="datetime-local" className={inputStyle} required value={start} disabled={busy} onChange={event => setStart(event.target.value)} /></label>
       <label className="block">Fim previsto<input type="datetime-local" className={inputStyle} required value={end} disabled={busy} onChange={event => setEnd(event.target.value)} /></label>
-      <button className={buttonStyle} disabled={busy}>Salvar agenda</button>
+      <button type="submit" className={buttonStyle} disabled={busy}>Salvar agenda</button>
     </form>}
     {schedule?.actions.can_cancel && <button type="button" className={buttonStyle} disabled={busy} onClick={() => void cancel()}>Cancelar reunião</button>}
   </div>;

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { meetingAgendaItems, meetingMinuteRevisions, meetingMinutes, meetings, meetingTranscriptSnapshots } from '../../db/schema';
@@ -167,7 +167,7 @@ export class MinutesWorker {
         failure = new TranscriptError('SLA_EXCEEDED');
       }
       if (failure) {
-        const delay = Math.max(failure.retryAfterMs, Math.min(15 * 60_000, 30_000 * 2 ** Math.min(job.attempt_count, 10))) + Math.floor(Math.random() * 1000);
+        const delay = Math.max(failure.retryAfterMs, Math.min(15 * 60_000, 30_000 * 2 ** Math.min(job.attempt_count, 10))) + randomInt(1000);
         const retryAt = new Date(finished.getTime() + delay);
         const waiting = failure.code === 'TRANSCRIPT_PENDING' && job.failure_code !== 'MANUAL_RETRY';
         const retry = failure.retryable && (waiting || job.attempt_count < maxAttempts) && (job.failure_code === 'MANUAL_RETRY' || !deadline || retryAt < deadline);

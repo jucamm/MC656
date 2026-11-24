@@ -1,5 +1,5 @@
 import { meetingRedactor } from '../ai/source-minimization';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { and, asc, eq, exists, gt, lte, notExists, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { legislativeCompendiumSummaries as summaries, legislativeMinuteInsights as insights } from '../../db/schema';
@@ -135,7 +135,7 @@ export class LegislativeSynthesisWorker {
       const attempts = job.attempts;
       const now = this.clock();
       const retry = failure.retryable && attempts < maxAttempts;
-      const delay = Math.max(30_000 * 2 ** Math.max(0, job.attempts - 1), failure.retryMs) + Math.floor(Math.random() * 1000);
+      const delay = Math.max(30_000 * 2 ** Math.max(0, job.attempts - 1), failure.retryMs) + randomInt(1000);
       await this.db.update(summaries).set({ state: retry ? 'queued' : 'failed', attempts, failure_code: failure.code,
         next_attempt_at: new Date(now.getTime() + Math.min(delay, 24 * 60 * 60_000)),
         lease_token: null, lease_until: null }).where(this.owned(job, now));
