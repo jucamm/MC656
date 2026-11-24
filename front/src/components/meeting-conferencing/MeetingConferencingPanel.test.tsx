@@ -127,3 +127,20 @@ it('conserva a interface e permite tentar novamente após falha de rede', async 
   await browser.click(screen.getByRole('button', { name: 'Atualizar videoconferência' }));
   expect(await screen.findByRole('checkbox')).toBeVisible();
 });
+
+it('exige o aceite específico da versão da política para liberar a reunião com transcrição', async () => {
+  const transcription = { policy_version: 'v1', notice: 'Aviso sobre uso da transcrição.', available: true, can_configure: false };
+  const calls = mockFetch(call => response(call.method === 'GET' ? { ...open, transcription } : { join_url: meetUrl }));
+  const browser = userEvent.setup();
+  render(<MeetingConferencingPanel meetingId="encontro" />);
+  await browser.click(await screen.findByRole('checkbox', { name: /Aceito usar áudio e vídeo/ }));
+  const join = screen.getByRole('button', { name: 'Liberar link do Meet' });
+  expect(join).toBeDisabled();
+  expect(calls.every(call => call.method !== 'POST')).toBe(true);
+  await browser.click(screen.getByRole('checkbox', { name: /Aceito a transcrição.*Aviso sobre uso/ }));
+  await browser.click(join);
+  expect(await screen.findByRole('link', { name: 'Abrir Google Meet' })).toHaveAttribute('href', meetUrl);
+  expect(calls.at(-1)?.body).toEqual({
+    accepted_audio_video: true, accepted_transcription: true, transcription_policy_version: 'v1',
+  });
+});
