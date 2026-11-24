@@ -1,3 +1,4 @@
+import { createCompendiumRouter } from '../legislative-compendia/compendium.routes';
 import { createLegislativeRouter } from '../legislative-bills/legislative.routes';
 import { createActionItemsRouter } from '../meeting-action-items/action-items.routes';
 import { MeetingActionItemsService } from '../meeting-action-items/action-items.service';
@@ -27,6 +28,7 @@ export function composeMeetingServices(db: NodePgDatabase, clock = () => new Dat
   return {
     meetings: new MeetingsService(repository, clock),
     meetingExtensionRouters: [
+      createCompendiumRouter(db),
       createLegislativeRouter(db, clock),
       createMeetingAgendaRouter(new MeetingAgendaService(repository, clock)),
       createActionItemsRouter(new MeetingActionItemsService(repository, clock)),
