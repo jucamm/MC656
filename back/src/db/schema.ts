@@ -279,3 +279,67 @@ export const meetingPolls = pgTable('meeting_polls', {
   index('meeting_polls_meeting_id_idx').on(table.meeting_id, table.id),
   uniqueIndex('meeting_polls_one_open_idx').on(table.meeting_id).where(sql`${table.closed_at} IS NULL`),
 ]);
+
+export const meetingMinutes = pgTable('meeting_minutes', {
+  meeting_id: uuid('meeting_id').primaryKey().references(() => meetings.id),
+  source_kind: text('source_kind', { enum: ['meet_transcript', 'notes', 'none'] }).notNull(),
+  source_space_name: text('source_space_name').unique(),
+  conference_name: text('conference_name').unique(),
+  source_transcripts: text('source_transcripts').array(),
+  source_notes: text('source_notes'),
+  generation_status: text('generation_status', { enum: ['queued', 'running', 'ready', 'unavailable', 'failed'] }).notNull(),
+  attempt_count: integer('attempt_count').notNull().default(0),
+  next_attempt_at: timestamp('next_attempt_at', { withTimezone: true }),
+  lease_token: uuid('lease_token'),
+  lease_until: timestamp('lease_until', { withTimezone: true }),
+  deadline_at: timestamp('deadline_at', { withTimezone: true }),
+  transcript_ready_at: timestamp('transcript_ready_at', { withTimezone: true }),
+  sla_missed_at: timestamp('sla_missed_at', { withTimezone: true }),
+  failure_code: text('failure_code'),
+  version: integer('version').notNull().default(1),
+  visibility: text('visibility', { enum: ['unpublished', 'published', 'hidden', 'deleted'] }).notNull().default('unpublished'),
+  draft_revision_id: uuid('draft_revision_id'),
+  draft_status: text('draft_status', { enum: ['pending', 'rejected'] }),
+  published_revision_id: uuid('published_revision_id'),
+  published_at: timestamp('published_at', { withTimezone: true }),
+  deleted_at: timestamp('deleted_at', { withTimezone: true }),
+}, (table): import('drizzle-orm/pg-core').PgTableExtraConfigValue[] => [
+  foreignKey({ name: 'minutes_draft_revision_fk', columns: [table.meeting_id, table.draft_revision_id],
+    foreignColumns: [meetingMinuteRevisions.meeting_id, meetingMinuteRevisions.id] }),
+  foreignKey({ name: 'minutes_published_revision_fk', columns: [table.meeting_id, table.published_revision_id],
+    foreignColumns: [meetingMinuteRevisions.meeting_id, meetingMinuteRevisions.id] }),
+  check('minutes_state_check', sql`
+    ${table.version} > 0 AND ${table.attempt_count} >= 0
+    AND ${table.source_kind} IN ('meet_transcript','notes','none')
+    AND ${table.generation_status} IN ('queued','running','ready','unavailable','failed')
+    AND ${table.visibility} IN ('unpublished','published','hidden','deleted')
+    AND (${table.draft_status} IS NULL OR ${table.draft_status} IN ('pending','rejected'))
+    AND (${table.draft_revision_id} IS NULL) = (${table.draft_status} IS NULL)
+    AND (${table.published_revision_id} IS NULL) = (${table.published_at} IS NULL)
+    AND (${table.visibility} NOT IN ('published','hidden') OR ${table.published_revision_id} IS NOT NULL)
+    AND (${table.visibility} = 'deleted') = (${table.deleted_at} IS NOT NULL)
+    AND (${table.lease_token} IS NULL) = (${table.lease_until} IS NULL)
+    AND (${table.visibility} = 'deleted' OR (${table.generation_status} = 'running') = (${table.lease_token} IS NOT NULL))
+    AND (${table.generation_status} <> 'queued' OR ${table.next_attempt_at} IS NOT NULL)
+  `),
+  index('minutes_pending_idx').on(table.next_attempt_at).where(sql`${table.generation_status} = 'queued'`),
+  index('minutes_leases_idx').on(table.lease_until).where(sql`${table.generation_status} = 'running'`),
+  index('minutes_published_idx').on(table.published_at.desc(), table.meeting_id.desc())
+    .where(sql`${table.visibility} = 'published'`),
+]);
+
+export const meetingMinuteRevisions = pgTable('meeting_minute_revisions', {
+  id: uuid('id').primaryKey(),
+  meeting_id: uuid('meeting_id').notNull().references(() => meetingMinutes.meeting_id),
+  title: varchar('title', { length: 150 }).notNull(),
+  body: text('body').notNull(),
+  source_kind: text('source_kind', { enum: ['meet_transcript', 'notes', 'none'] }).notNull(),
+  created_by_user_id: bigint('created_by_user_id', { mode: 'bigint' }).references(() => users.id),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  unique('minute_revisions_meeting_id_unique').on(table.meeting_id, table.id),
+  check('minute_revision_content_check', sql`
+    char_length(${table.body}) BETWEEN 1 AND 32000 AND ${table.title} ~ '[^[:space:]]'
+    AND ${table.source_kind} IN ('meet_transcript','notes','none')
+  `),
+]);
