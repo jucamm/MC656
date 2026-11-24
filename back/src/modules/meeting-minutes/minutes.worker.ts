@@ -15,6 +15,7 @@ import type { TranscriptRef, TranscriptSourceReader } from '../meeting-transcrip
 
 export const transcriptDeadlineMs = 24 * 60 * 60 * 1000;
 const leaseMs = 10 * 60 * 1000;
+const maxAttempts = 4;
 
 type Dependencies = { ai?: AiClient; transcripts?: TranscriptSourceReader; pipeline?: string };
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -48,6 +49,12 @@ export class MinutesWorker {
       )).orderBy(asc(meetingMinutes.next_attempt_at), asc(meetingMinutes.meeting_id)).limit(1)
         .for('update', { skipLocked: true });
       if (!candidate) return null;
+      if (candidate.attempt_count >= maxAttempts) {
+        await tx.update(meetingMinutes).set({ generation_status: 'failed', failure_code: 'AI_ATTEMPT_LIMIT',
+          lease_token: null, lease_until: null, next_attempt_at: null })
+          .where(eq(meetingMinutes.meeting_id, candidate.meeting_id));
+        return null;
+      }
       const [job] = await tx.update(meetingMinutes).set({
         generation_status: 'running', attempt_count: candidate.attempt_count + 1,
         lease_token: randomUUID(), lease_until: new Date(now.getTime() + leaseMs),
@@ -161,7 +168,7 @@ export class MinutesWorker {
         const delay = Math.max(failure.retryAfterMs, Math.min(15 * 60_000, 30_000 * 2 ** Math.min(job.attempt_count, 10))) + Math.floor(Math.random() * 1000);
         const retryAt = new Date(finished.getTime() + delay);
         const waiting = failure.code === 'TRANSCRIPT_PENDING' && job.failure_code !== 'MANUAL_RETRY';
-        const retry = failure.retryable && (waiting || job.attempt_count < 4) && (job.failure_code === 'MANUAL_RETRY' || !deadline || retryAt < deadline);
+        const retry = failure.retryable && (waiting || job.attempt_count < maxAttempts) && (job.failure_code === 'MANUAL_RETRY' || !deadline || retryAt < deadline);
         await db.update(meetingMinutes).set({
           ...clear, next_attempt_at: retry ? retryAt : null,
           attempt_count: waiting ? Math.max(0, job.attempt_count - 1) : job.attempt_count,

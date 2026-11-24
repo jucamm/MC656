@@ -65,7 +65,12 @@ export class LegislativeSynthesisWorker {
           and(eq(summaries.state, 'running'), lte(summaries.lease_until, now))),
       )).orderBy(asc(summaries.next_attempt_at), asc(summaries.bill_id)).limit(1).for('update', { skipLocked: true });
       if (!candidate) return null;
-      const [job] = await tx.update(summaries).set({ state: 'running', lease_token: randomUUID(),
+      if (candidate.attempts >= maxAttempts) {
+        await tx.update(summaries).set({ state: 'failed', failure_code: 'AI_ATTEMPT_LIMIT',
+          lease_token: null, lease_until: null }).where(eq(summaries.bill_id, candidate.bill_id));
+        return null;
+      }
+      const [job] = await tx.update(summaries).set({ state: 'running', attempts: candidate.attempts + 1, lease_token: randomUUID(),
         lease_until: new Date(now.getTime() + leaseMs) }).where(eq(summaries.bill_id, candidate.bill_id)).returning();
       return job;
     });
@@ -127,10 +132,10 @@ export class LegislativeSynthesisWorker {
       await this.process(job);
     } catch (error) {
       const failure = error instanceof SynthesisError ? error : new SynthesisError('SYNTHESIS_FAILED', true);
-      const attempts = job.attempts + 1;
+      const attempts = job.attempts;
       const now = this.clock();
       const retry = failure.retryable && attempts < maxAttempts;
-      const delay = Math.max(30_000 * 2 ** job.attempts, failure.retryMs) + Math.floor(Math.random() * 1000);
+      const delay = Math.max(30_000 * 2 ** Math.max(0, job.attempts - 1), failure.retryMs) + Math.floor(Math.random() * 1000);
       await this.db.update(summaries).set({ state: retry ? 'queued' : 'failed', attempts, failure_code: failure.code,
         next_attempt_at: new Date(now.getTime() + Math.min(delay, 24 * 60 * 60_000)),
         lease_token: null, lease_until: null }).where(this.owned(job, now));

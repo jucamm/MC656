@@ -247,4 +247,20 @@ describe.skipIf(!connectionString)('atas persistidas e HTTP com PostgreSQL', () 
     await expect(service.transcript(id, userIds[0], 1, 0)).rejects.toMatchObject({ code: 'MINUTES_FORBIDDEN' });
   });
 
+  it('limita chamadas mesmo após quatro quedas com lease expirado', async () => {
+    const { id, starts, url } = await create(); now = starts;
+    await call('post', url + '/end').expect(204);
+    await call('post', url + '/minutes/notes').send({ notes: 'Registro de teste.' }).expect(202);
+    await db.update(meetingMinutes).set({ generation_status: 'running', attempt_count: 4,
+      lease_token: randomUUID(), lease_until: new Date(now.getTime() - 1) }).where(eq(meetingMinutes.meeting_id, id));
+    let calls = 0;
+    const ai = { ...fixtureAi, async generateMinutes(input: Parameters<typeof fixtureAi.generateMinutes>[0]) {
+      calls++; return fixtureAi.generateMinutes(input, AbortSignal.timeout(1000));
+    } };
+    expect(await new MinutesWorker(db, { ai }, clock).runOnce()).toBe(false);
+    expect(calls).toBe(0);
+    const [row] = await db.select().from(meetingMinutes).where(eq(meetingMinutes.meeting_id, id));
+    expect(row).toMatchObject({ generation_status: 'failed', failure_code: 'AI_ATTEMPT_LIMIT', attempt_count: 4 });
+  });
+
 });
