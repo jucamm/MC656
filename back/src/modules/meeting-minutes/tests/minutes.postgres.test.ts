@@ -226,6 +226,8 @@ describe.skipIf(!connectionString)('atas persistidas e HTTP com PostgreSQL', () 
     const [row] = await db.select().from(meetingMinutes).where(eq(meetingMinutes.meeting_id, id));
     expect(row.draft_revision_id).toBeNull();
     expect(row.failure_code).toBe('SOURCE_CHANGED');
+    await db.update(meetingMinutes).set({ generation_status: 'failed', next_attempt_at: null })
+      .where(eq(meetingMinutes.meeting_id, id));
   });
 
   it('lê snapshot privado com IA desligada, sinaliza fonte desatualizada e revalida gestor após I/O', async () => {
