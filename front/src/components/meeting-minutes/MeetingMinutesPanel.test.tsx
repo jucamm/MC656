@@ -12,7 +12,8 @@ it('mantém notas após falha e confirma somente depois da resposta', async () =
   vi.spyOn(meetingMinutesApi, 'review').mockResolvedValue({
     version: 1, generation_status: 'unavailable', visibility: 'unpublished', draft_status: null,
     draft: null, published: null, deadline_at: null, transcript_ready_at: null, sla_missed_at: null, failure_code: null,
-    actions: { can_add_notes: true, can_retry: false, can_read_transcript: false },
+    actions: { can_add_notes: true, can_retry: false, can_read_transcript: false, can_edit: false,
+      can_publish: false, can_republish: false, can_reject: false, can_hide: false, can_delete: false },
   });
   const notes = vi.spyOn(meetingMinutesApi, 'notes').mockRejectedValueOnce({ code: 'FAILED', message: 'Tente novamente.' })
     .mockResolvedValueOnce(undefined);
