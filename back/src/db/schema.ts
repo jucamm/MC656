@@ -515,3 +515,13 @@ export const actionItemEmailJobs = pgTable('action_item_email_jobs', {
     AND (${table.status} <> 'sent' OR ${table.dispatch_started_at} IS NOT NULL)
   `),
 ]);
+
+export const legislativeBillVotes = pgTable('legislative_bill_votes', {
+  bill_id: uuid('bill_id').notNull().references(() => legislativeBills.id),
+  user_id: bigint('user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  choice: text('choice', { enum: ['for', 'against'] }).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  primaryKey({ columns: [table.bill_id, table.user_id] }),
+  check('legislative_bill_vote_choice_check', sql`${table.choice} IN ('for','against')`),
+]);

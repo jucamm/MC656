@@ -1,10 +1,12 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { and, desc, eq, exists, gt, ilike, lt, or } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { legislativeBills as bills } from '../../db/schema';
 import { validatePage, validateUuid } from '../groups/groups.validator';
 import { identityErrorHandler } from '../identity/session.middleware';
 import { invalidField } from '../identity/validators/registration.validator';
+import { minutesActor } from '../meeting-minutes/minutes.routes';
+import { castVote, opinion, validateVote } from './compendium-votes';
 import { eligibleMinutes } from './eligible-minutes';
 
 const root = '/legislative-bills';
@@ -25,7 +27,7 @@ function minuteCursor(value: unknown, field: string) {
   return { publishedAt, id: validateUuid(value.slice(25), field) };
 }
 
-export function createCompendiumRouter(db: NodePgDatabase) {
+export function createCompendiumRouter(db: NodePgDatabase, clock = () => new Date()) {
   const router = Router();
   router.get(root + '/compendia', async (req, res) => {
     const { q, ...pageQuery } = req.query;
@@ -50,7 +52,8 @@ export function createCompendiumRouter(db: NodePgDatabase) {
       if (!bill) return null;
       const eligible = eligibleMinutes(tx);
       const [source] = await tx.select({ id: eligible.meeting_id }).from(eligible).where(eq(eligible.bill_id, id)).limit(1);
-      return { bill, summary: { status: source ? 'unavailable' : 'empty' } };
+      return { bill, summary: { status: source ? 'unavailable' : 'empty' },
+        opinion: await opinion(tx, id, minutesActor(req), Boolean(source)) };
     }, snapshot);
     if (!data) { res.status(404).json(unknownBill); return; }
     res.json({ data });
@@ -87,6 +90,22 @@ export function createCompendiumRouter(db: NodePgDatabase) {
     }).from(eligible).where(and(eq(eligible.bill_id, id), eq(eligible.meeting_id, meeting)));
     if (!data) { res.status(404).json(error('LEGISLATIVE_MINUTE_NOT_FOUND', 'Ata indisponível no compêndio.')); return; }
     res.json({ data });
+  });
+
+  router.put(detail + '/vote', express.json({ limit: '1kb' }), async (req, res) => {
+    const id = validateUuid(req.params.billId, 'billId');
+    const choice = validateVote(req.body);
+    const result = await castVote(db, id, minutesActor(req), choice, clock());
+    if (result === 'missing') { res.status(404).json(unknownBill); return; }
+    if (result === 'conflict') {
+      res.status(409).json(error('LEGISLATIVE_VOTE_ALREADY_CAST', 'O voto neste PL já foi registrado.'));
+      return;
+    }
+    if (result === 'empty') {
+      res.status(409).json(error('LEGISLATIVE_COMPENDIUM_EMPTY', 'Nenhuma ata pública elegível para este PL.'));
+      return;
+    }
+    res.status(result === 'created' ? 201 : 200).json({ data: { own_choice: choice } });
   });
 
   router.use(identityErrorHandler);

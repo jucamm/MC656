@@ -28,7 +28,7 @@ export function composeMeetingServices(db: NodePgDatabase, clock = () => new Dat
   return {
     meetings: new MeetingsService(repository, clock),
     meetingExtensionRouters: [
-      createCompendiumRouter(db),
+      createCompendiumRouter(db, clock),
       createLegislativeRouter(db, clock),
       createMeetingAgendaRouter(new MeetingAgendaService(repository, clock)),
       createActionItemsRouter(new MeetingActionItemsService(repository, clock)),
