@@ -6,6 +6,9 @@ type GroupError = { code: string; message: string };
 export function groupError(error: unknown): GroupError {
   if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' &&
       'message' in error && typeof error.message === 'string') {
+    if (['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'INVALID_RESPONSE'].includes(error.code)) {
+      return { code: 'REQUEST_FAILED', message: 'Não foi possível confirmar a operação. Atualize a lista antes de tentar novamente.' };
+    }
     if (['UNAUTHENTICATED', 'SESSION_EXPIRED', 'SESSION_REVOKED'].includes(error.code)) {
       return { code: error.code, message: 'Sua sessão terminou. Saia da conta e entre novamente.' };
     }

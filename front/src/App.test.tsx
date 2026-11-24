@@ -31,6 +31,7 @@ it('mantém a conta criada e permite reenviar o código quando a entrega inicial
     await browser.type(screen.getByLabelText('Nome Completo'), user.name);
     await browser.type(screen.getByLabelText('E-mail'), user.email);
     await browser.type(screen.getByLabelText('Senha'), 'senha-segura');
+    await browser.type(screen.getByLabelText('Confirmar senha'), 'senha-segura');
     await browser.click(screen.getByRole('button', { name: 'Cadastrar' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('O envio do código falhou');
@@ -51,6 +52,9 @@ it('mostra a seção de reuniões no dashboard de uma conta verificada', async (
 
     expect(await screen.findByRole('heading', { name: 'Reuniões' })).toBeInTheDocument();
     expect(await screen.findByText('Nenhuma reunião disponível.')).toBeInTheDocument();
+    expect(screen.getByText('Unidebates')).toBeInTheDocument();
+    expect(screen.queryByText('Histórico de Pautas')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cadastrar Pauta')).not.toBeInTheDocument();
     expect(request).toHaveBeenCalledWith('/meetings?limit=20', { signal: expect.any(AbortSignal) });
 });
 
