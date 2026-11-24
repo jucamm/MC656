@@ -1,8 +1,16 @@
+import { MeetingLegislativeBill } from '../legislative-bills/MeetingLegislativeBill';
 import { useEffect, useState } from 'react';
 import { meetingsApi } from '../../services/meetingsApi';
 import type { Meeting, MeetingParticipant, OrganizerTransfer } from '../../types/meetings';
 import { buttonStyle, Feedback, inputStyle, primaryStyle } from '../groups/GroupControls';
 import { groupError, useGroupAction } from '../groups/groups-state';
+import { MeetingActionItemsPanel } from '../meeting-action-items/MeetingActionItemsPanel';
+import { MeetingAgendaPanel } from '../meeting-agenda/MeetingAgendaPanel';
+import { MeetingConferencingPanel } from '../meeting-conferencing/MeetingConferencingPanel';
+import { AgendaReviewPanel } from '../meeting-moderation/AgendaReviewPanel';
+import { MeetingMinutesReviewPanel } from '../meeting-minutes-review/MeetingMinutesReviewPanel';
+import { MeetingMinutesPanel } from '../meeting-minutes/MeetingMinutesPanel';
+import { MeetingModerationPanel } from '../meeting-moderation/MeetingModerationPanel';
 import { formatMeetingTime, localTimeZone } from './meeting-time';
 
 const statusLabels = { confirmed: 'Confirmado', pending: 'Aguardando aceite', declined: 'Recusado' };
@@ -32,11 +40,13 @@ async function loadMeeting(id: string, signal: AbortSignal): Promise<DetailResul
 
 export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: string; onChanged: () => void }) {
   const [revision, setRevision] = useState(0);
+  const [featureRevision, setFeatureRevision] = useState(0);
   const [result, setResult] = useState<{ revision: number; data?: DetailResult; error?: string } | null>(null);
   const refresh = () => {
     setRevision(value => value + 1);
     onChanged();
   };
+  const refreshFeatures = () => setFeatureRevision(value => value + 1);
   const action = useGroupAction(code => {
     if (['MEETING_STARTED', 'MEETING_ORGANIZER_REQUIRED', 'MEETING_NOT_FOUND', 'ORGANIZER_TRANSFER_NOT_FOUND',
       'ORGANIZER_TRANSFER_RESOLVED', 'ORGANIZER_TRANSFER_ALREADY_PENDING', 'ORGANIZER_TRANSFER_RECIPIENT_NOT_ELIGIBLE',
@@ -71,6 +81,13 @@ export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: 
             <p className="text-sm text-slate-600">{meeting.visibility === 'public' ? 'Reunião pública' : 'Reunião privada'}</p>
             <p className="break-words text-sm text-slate-700">Organizador <strong>{meeting.organizer_name}</strong></p>
           </div>
+          <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={featureRevision} />
+          {meeting.legislative_bill_id && <MeetingLegislativeBill key={meeting.legislative_bill_id} id={meeting.legislative_bill_id} />}
+          <MeetingAgendaPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
+          <MeetingActionItemsPanel key={featureRevision} meetingId={id} />
+          <AgendaReviewPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
+          <MeetingMinutesPanel meetingId={id} revision={featureRevision} ReviewPanel={MeetingMinutesReviewPanel} />
+          <MeetingModerationPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           {management && (
             <MeetingManagement key={revision} userId={userId} data={management} busy={action.busy}
               startsAt={meeting.starts_at}

@@ -4,6 +4,7 @@ export type MeetingAccess =
 
 export interface CreateMeeting {
   subject: string;
+  legislative_bill_id?: string;
   starts_at: string;
   group_id?: string;
   access: MeetingAccess;
@@ -13,11 +14,15 @@ export interface CreateMeeting {
 
 export interface Meeting {
   id: string;
+  legislative_bill_id?: string | null;
   subject: string;
   starts_at: string;
   visibility: MeetingAccess['visibility'];
   organizer_name: string;
-  actions: { can_manage: boolean };
+  scheduled_ends_at?: string | null;
+  schedule_version?: number;
+  cancelled_at?: string | null;
+  actions: { can_manage: boolean; can_reschedule?: boolean; can_cancel?: boolean };
 }
 
 export interface MeetingParticipant {
@@ -49,4 +54,17 @@ export interface ReceivedOrganizerTransfer extends OrganizerTransfer {
   subject: string;
   starts_at: string;
   requested_by_user_name: string;
+}
+
+export interface MeetingSchedule {
+  starts_at: string;
+  scheduled_ends_at: string | null;
+  version: number;
+  cancelled_at: string | null;
+  actions: { can_reschedule: boolean; can_cancel: boolean };
+}
+export interface UpdateMeetingSchedule {
+  starts_at: string;
+  scheduled_ends_at: string;
+  version: number;
 }

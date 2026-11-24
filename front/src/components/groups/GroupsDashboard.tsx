@@ -78,8 +78,8 @@ function ActiveGroups({ userId, selectedId, onSelect, onClosed }: {
               <li key={group.id}>
                 <button type="button" aria-pressed={selectedId === group.id} onClick={() => onSelect(group.id)}
                   className={`w-full space-y-2 rounded-xl border p-3 text-left focus-visible:outline-2 focus-visible:outline-indigo-600 ${selectedId === group.id
-                    ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
-                  <span className="block break-words font-semibold">{group.name}</span>
+                    ? 'border-indigo-700 border-l-4 bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                  <span className="block break-words font-semibold">{selectedId === group.id && <span aria-hidden="true">✓ </span>}{group.name}</span>
                   <GroupRoleLabel role={group.my_role} />
                 </button>
               </li>

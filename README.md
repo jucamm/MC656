@@ -112,7 +112,13 @@ npm run build
 npm run lint
 ```
 
+Para executar a integração da HU09 com PostgreSQL descartável, siga o [guia de encaminhamentos](back/docs/meeting-action-items-contracts.md#execução-local-e-testes).
+
 ---
+
+## Catálogo legislativo
+
+O catálogo da HU11 usa fontes oficiais abertas e uma conexão PostgreSQL. Em `back/`, execute `npm run db:migrate` e `npm run build`. Com a mesma `DATABASE_URL` da API, inicie um processo separado com `LEGISLATIVE_SYNC_ENABLED=true npm run worker:legislative-sync`. O sincronizador fica desabilitado por padrão e não requer chave. Para conferir as UFs disponíveis, a atualização e os testes locais, consulte o [guia de fontes legislativas](back/docs/legislative-sources.md).
 
 ## Pipeline de Integração Contínua (CI)
 

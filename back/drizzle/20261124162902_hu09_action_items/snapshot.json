@@ -1,0 +1,4128 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "748aba2f-1d89-405d-a842-f48eba06d6bb",
+  "prevIds": [
+    "b7a62853-c49a-4a85-9c72-97f8863de69e"
+  ],
+  "ddl": [
+    {
+      "values": [
+        "pending",
+        "verified"
+      ],
+      "name": "account_status",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "ADMIN_DELETION",
+        "LAST_MEMBER_LEFT"
+      ],
+      "name": "group_deletion_reason",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "PENDING",
+        "ACCEPTED",
+        "DECLINED",
+        "CANCELLED"
+      ],
+      "name": "group_invitation_status",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "ADMIN",
+        "MEMBER"
+      ],
+      "name": "group_role",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "public",
+        "group",
+        "selected"
+      ],
+      "name": "meeting_access_mode",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "pending",
+        "accepted",
+        "declined",
+        "cancelled"
+      ],
+      "name": "meeting_organizer_transfer_status",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "creator",
+        "group",
+        "invitation"
+      ],
+      "name": "meeting_participant_origin",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "confirmed",
+        "pending",
+        "declined"
+      ],
+      "name": "meeting_participant_status",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "hour",
+        "day"
+      ],
+      "name": "rate_limit_window",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "email"
+      ],
+      "name": "verification_channel",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "authentication_sessions",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "group_invitations",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "group_memberships",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "groups",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_action_assignments",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_action_items",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_agenda_items",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_conferencing",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_minute_events",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_minute_revisions",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_minutes",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_organizer_transfers",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_participants",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_participation_blocks",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_polls",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meeting_transcription_consents",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "meetings",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "rate_limits",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "users",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "verification_challenges",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "type": "varchar(64)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "token_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_activity_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "expires_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "revoked_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "invited_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "invited_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "type": "group_invitation_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'PENDING'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "resolved_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "type": "group_role",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'MEMBER'",
+      "generated": null,
+      "identity": null,
+      "name": "role",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "joined_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "varchar(150)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "group_deletion_reason",
+      "typeSchema": "public",
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deletion_reason",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "action_item_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "proposed_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "name": "state",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "proposed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "responded_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "withdrawn_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "agenda_item_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "poll_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "varchar(500)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "date",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "due_on",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "due_revision",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'open'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "closed_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "closed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "proposed_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "varchar(150)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "subject",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "varchar(4000)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "context",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "name": "review_status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "reviewed_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "reviewed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "type": "varchar(7)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "mode",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "type": "varchar(80)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "google_meet_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "transcription_space_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "type": "varchar(80)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "transcription_policy_version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "actor_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "action",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "revision_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "from_visibility",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "to_visibility",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "resulting_version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "type": "varchar(150)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "body",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_space_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "conference_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_transcripts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_notes",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "generation_status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "attempt_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "next_attempt_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "lease_token",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "lease_until",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deadline_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "transcript_ready_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sla_missed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "failure_code",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'unpublished'",
+      "generated": null,
+      "identity": null,
+      "name": "visibility",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "draft_revision_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "draft_status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "published_revision_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "published_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "requested_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recipient_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "type": "meeting_organizer_transfer_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "requested_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "resolved_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "type": "meeting_participant_origin",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "origin",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "type": "meeting_participant_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_moderator",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "resolved_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "blocked_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "blocked_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "type": "varchar(150)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "question",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "opened_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "opened_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "closed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "closed_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "meeting_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_transcription_consents"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_transcription_consents"
+    },
+    {
+      "type": "varchar(80)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "policy_version",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_transcription_consents"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "accepted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meeting_transcription_consents"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "varchar(150)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "subject",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "starts_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "organizer_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "meeting_access_mode",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "access_mode",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ended_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "ended_by_user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "type": "verification_channel",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "type": "rate_limit_window",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "window_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "window_started_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "window_expires_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "request_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "blocked_until",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "type": "bigserial",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "varchar(150)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "varchar(254)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "email",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "password_hash",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "account_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "email_verified_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "verification_channel",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "varchar(64)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "code_hmac",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "failed_attempts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issued_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "expires_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "consumed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "revoked_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "authentication_sessions_user_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "invited_user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"status\" = 'PENDING'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "group_invitations_pending_group_user_uidx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "invited_user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "group_invitations_recipient_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "group_memberships_user_group_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"role\" = 'ADMIN'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "group_memberships_admin_group_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "action_item_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "action_assignments_history_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "action_item_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"state\" IN ('pending','accepted')",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "action_assignments_active_unique",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "meeting_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "action_items_meeting_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "meeting_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meeting_agenda_items_meeting_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "next_attempt_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"generation_status\" = 'queued'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "minutes_pending_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "lease_until",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"generation_status\" = 'running'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "minutes_leases_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "published_at",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "meeting_id",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"visibility\" = 'published'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "minutes_published_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "meeting_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"status\" = 'pending'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meeting_organizer_transfers_pending_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "recipient_user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"status\" = 'pending'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meeting_organizer_transfers_recipient_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "meeting_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meeting_participants_user_meeting_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "meeting_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meeting_polls_meeting_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "meeting_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"closed_at\" IS NULL",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meeting_polls_one_open_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "starts_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meetings_starts_at_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "group_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "meetings_group_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "authentication_sessions_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "group_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "groups",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_invitations_group_id_groups_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "invited_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_invitations_invited_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "invited_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_invitations_invited_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "group_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "groups",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_memberships_group_id_groups_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "group_memberships_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "created_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "groups_created_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "action_item_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_action_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_action_assignments_RZguiZXAcfO8_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_action_assignments_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "proposed_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_action_assignments_proposed_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_action_items_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "created_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_action_items_created_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "closed_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_action_items_closed_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "agenda_item_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_agenda_items",
+      "columnsTo": [
+        "meeting_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "action_items_agenda_scope_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "poll_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_polls",
+      "columnsTo": [
+        "meeting_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "action_items_poll_scope_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_agenda_items_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "proposed_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_agenda_items_proposed_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "reviewed_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_agenda_items_reviewed_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_conferencing_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_minutes",
+      "columnsTo": [
+        "meeting_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_minute_events_3mhBWvDIlAtq_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "actor_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_minute_events_actor_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "revision_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_minute_revisions",
+      "columnsTo": [
+        "meeting_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "minute_events_revision_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_minutes",
+      "columnsTo": [
+        "meeting_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_minute_revisions_lGSsRgc5Zapr_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "created_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_minute_revisions_created_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_minutes_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "draft_revision_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_minute_revisions",
+      "columnsTo": [
+        "meeting_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "minutes_draft_revision_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "published_revision_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_minute_revisions",
+      "columnsTo": [
+        "meeting_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "minutes_published_revision_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_organizer_transfers_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "requested_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_organizer_transfers_requested_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "recipient_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_participants",
+      "columnsTo": [
+        "meeting_id",
+        "user_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_organizer_transfers_recipient_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_participants_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_participants_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "blocked_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_participation_blocks_blocked_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meeting_participants",
+      "columnsTo": [
+        "meeting_id",
+        "user_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_participation_blocks_target_fk",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_polls_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "opened_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_polls_opened_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "closed_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_polls_closed_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "meeting_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_transcription_consents_meeting_id_meetings_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_transcription_consents"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meeting_transcription_consents_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meeting_transcription_consents"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "created_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meetings_created_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "organizer_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meetings_organizer_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "group_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "groups",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meetings_group_id_groups_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "ended_by_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "meetings_ended_by_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "rate_limits_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "verification_challenges_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "columns": [
+        "group_id",
+        "user_id"
+      ],
+      "nameExplicit": false,
+      "name": "group_memberships_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "group_memberships"
+    },
+    {
+      "columns": [
+        "meeting_id",
+        "user_id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_participants_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "columns": [
+        "meeting_id",
+        "user_id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_participation_blocks_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "columns": [
+        "meeting_id",
+        "user_id",
+        "policy_version"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_transcription_consents_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "meeting_transcription_consents"
+    },
+    {
+      "columns": [
+        "user_id",
+        "channel",
+        "window_type"
+      ],
+      "nameExplicit": false,
+      "name": "rate_limits_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "authentication_sessions_pkey",
+      "schema": "public",
+      "table": "authentication_sessions",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "group_invitations_pkey",
+      "schema": "public",
+      "table": "group_invitations",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "groups_pkey",
+      "schema": "public",
+      "table": "groups",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_action_assignments_pkey",
+      "schema": "public",
+      "table": "meeting_action_assignments",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_action_items_pkey",
+      "schema": "public",
+      "table": "meeting_action_items",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_agenda_items_pkey",
+      "schema": "public",
+      "table": "meeting_agenda_items",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "meeting_id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_conferencing_pkey",
+      "schema": "public",
+      "table": "meeting_conferencing",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_minute_events_pkey",
+      "schema": "public",
+      "table": "meeting_minute_events",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_minute_revisions_pkey",
+      "schema": "public",
+      "table": "meeting_minute_revisions",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "meeting_id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_minutes_pkey",
+      "schema": "public",
+      "table": "meeting_minutes",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_organizer_transfers_pkey",
+      "schema": "public",
+      "table": "meeting_organizer_transfers",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meeting_polls_pkey",
+      "schema": "public",
+      "table": "meeting_polls",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "meetings_pkey",
+      "schema": "public",
+      "table": "meetings",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "users_pkey",
+      "schema": "public",
+      "table": "users",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "verification_challenges_pkey",
+      "schema": "public",
+      "table": "verification_challenges",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "action_item_agenda_scope_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "resulting_version"
+      ],
+      "nullsNotDistinct": false,
+      "name": "minute_events_version_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "minute_revisions_meeting_id_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "meeting_id",
+        "id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "action_item_polls_scope_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "user_id",
+        "channel"
+      ],
+      "nullsNotDistinct": false,
+      "name": "verification_challenges_user_channel_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "token_hash"
+      ],
+      "nullsNotDistinct": false,
+      "name": "authentication_sessions_token_hash_key",
+      "schema": "public",
+      "table": "authentication_sessions",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "transcription_space_name"
+      ],
+      "nullsNotDistinct": false,
+      "name": "meeting_conferencing_transcription_space_name_key",
+      "schema": "public",
+      "table": "meeting_conferencing",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "source_space_name"
+      ],
+      "nullsNotDistinct": false,
+      "name": "meeting_minutes_source_space_name_key",
+      "schema": "public",
+      "table": "meeting_minutes",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "conference_name"
+      ],
+      "nullsNotDistinct": false,
+      "name": "meeting_minutes_conference_name_key",
+      "schema": "public",
+      "table": "meeting_minutes",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "email"
+      ],
+      "nullsNotDistinct": false,
+      "name": "users_email_key",
+      "schema": "public",
+      "table": "users",
+      "entityType": "uniques"
+    },
+    {
+      "value": "\"expires_at\" > \"last_activity_at\"",
+      "name": "authentication_sessions_expiry_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "authentication_sessions"
+    },
+    {
+      "value": "(\"status\" = 'PENDING') = (\"resolved_at\" IS NULL)",
+      "name": "group_invitations_resolution_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "group_invitations"
+    },
+    {
+      "value": "\"name\" ~ '[^[:space:]]'",
+      "name": "groups_name_not_blank_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "value": "(\"deleted_at\" IS NULL) = (\"deletion_reason\" IS NULL)",
+      "name": "groups_deletion_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "groups"
+    },
+    {
+      "value": "\n    \"state\" IN ('pending','accepted','declined','withdrawn')\n    AND (\"state\" = 'pending') = (\"responded_at\" IS NULL)\n    AND (\"state\" = 'withdrawn') = (\"withdrawn_at\" IS NOT NULL)\n    AND (\"responded_at\" IS NULL OR \"responded_at\" >= \"proposed_at\")\n    AND (\"withdrawn_at\" IS NULL OR \"withdrawn_at\" >= \"responded_at\")\n  ",
+      "name": "action_assignments_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_action_assignments"
+    },
+    {
+      "value": "\n    (\"agenda_item_id\" IS NULL) <> (\"poll_id\" IS NULL)\n    AND \"description\" ~ '[^[:space:]]' AND \"version\" >= \"due_revision\" AND \"due_revision\" > 0\n    AND \"status\" IN ('open','completed','cancelled')\n    AND (\"closed_by_user_id\" IS NULL) = (\"closed_at\" IS NULL)\n    AND (\"status\" = 'open') = (\"closed_at\" IS NULL)\n    AND \"updated_at\" >= \"created_at\"\n    AND (\"closed_at\" IS NULL OR \"closed_at\" BETWEEN \"created_at\" AND \"updated_at\")\n  ",
+      "name": "action_items_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_action_items"
+    },
+    {
+      "value": "\"subject\" ~ '[^[:space:]]' AND \"context\" ~ '[^[:space:]]'",
+      "name": "meeting_agenda_items_text_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "value": "\n    (\"review_status\" = 'pending' AND \"reviewed_by_user_id\" IS NULL AND \"reviewed_at\" IS NULL)\n    OR (\"review_status\" IN ('approved', 'rejected') AND \"reviewed_by_user_id\" IS NOT NULL\n      AND \"reviewed_at\" IS NOT NULL AND \"reviewed_at\" >= \"created_at\")\n  ",
+      "name": "meeting_agenda_items_review_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_agenda_items"
+    },
+    {
+      "value": "(\"transcription_space_name\" IS NULL) = (\"transcription_policy_version\" IS NULL)",
+      "name": "meeting_capture_pair_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "value": "\"mode\" IN ('virtual', 'hybrid')",
+      "name": "meeting_conferencing_mode_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "value": "\n    \"google_meet_url\" ~ '^https://meet[.]google[.]com/[a-z]{3}-[a-z]{4}-[a-z]{3}$'\n  ",
+      "name": "meeting_conferencing_url_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_conferencing"
+    },
+    {
+      "value": "\n    \"resulting_version\" > 1\n    AND \"action\" IN ('edit','publish','reject','hide','delete')\n    AND \"from_visibility\" IN ('unpublished','published','hidden')\n    AND \"to_visibility\" IN ('unpublished','published','hidden','deleted')\n    AND (\"revision_id\" IS NULL) = (\"action\" = 'delete')\n  ",
+      "name": "minute_events_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_minute_events"
+    },
+    {
+      "value": "\n    char_length(\"body\") BETWEEN 1 AND 32000 AND \"title\" ~ '[^[:space:]]'\n    AND \"source_kind\" IN ('meet_transcript','notes','none')\n  ",
+      "name": "minute_revision_content_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_minute_revisions"
+    },
+    {
+      "value": "\n    \"version\" > 0 AND \"attempt_count\" >= 0\n    AND \"source_kind\" IN ('meet_transcript','notes','none')\n    AND \"generation_status\" IN ('queued','running','ready','unavailable','failed')\n    AND \"visibility\" IN ('unpublished','published','hidden','deleted')\n    AND (\"draft_status\" IS NULL OR \"draft_status\" IN ('pending','rejected'))\n    AND (\"draft_revision_id\" IS NULL) = (\"draft_status\" IS NULL)\n    AND (\"published_revision_id\" IS NULL) = (\"published_at\" IS NULL)\n    AND (\"visibility\" NOT IN ('published','hidden') OR \"published_revision_id\" IS NOT NULL)\n    AND (\"visibility\" = 'deleted') = (\"deleted_at\" IS NOT NULL)\n    AND (\"lease_token\" IS NULL) = (\"lease_until\" IS NULL)\n    AND (\"visibility\" = 'deleted' OR (\"generation_status\" = 'running') = (\"lease_token\" IS NOT NULL))\n    AND (\"generation_status\" <> 'queued' OR \"next_attempt_at\" IS NOT NULL)\n  ",
+      "name": "minutes_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_minutes"
+    },
+    {
+      "value": "\"requested_by_user_id\" <> \"recipient_user_id\"",
+      "name": "meeting_organizer_transfers_distinct_users_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "value": "\n    (\"status\" = 'pending') = (\"resolved_at\" IS NULL)\n    AND (\"resolved_at\" IS NULL OR \"resolved_at\" >= \"requested_at\")\n  ",
+      "name": "meeting_organizer_transfers_resolution_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_organizer_transfers"
+    },
+    {
+      "value": "\"origin\" = 'invitation' OR \"status\" = 'confirmed'",
+      "name": "meeting_participants_origin_status_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "value": "NOT \"is_moderator\" OR \"status\" = 'confirmed'",
+      "name": "meeting_participants_moderator_confirmed_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "value": "\n    (\"resolved_at\" IS NOT NULL) = (\"origin\" = 'invitation' AND \"status\" <> 'pending')\n    AND (\"resolved_at\" IS NULL OR \"resolved_at\" >= \"created_at\")\n  ",
+      "name": "meeting_participants_resolution_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_participants"
+    },
+    {
+      "value": "\"user_id\" <> \"blocked_by_user_id\"",
+      "name": "meeting_participation_blocks_actor_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_participation_blocks"
+    },
+    {
+      "value": "\"question\" ~ '[^[:space:]]'",
+      "name": "meeting_polls_question_not_blank_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "value": "\n    (\"closed_at\" IS NULL) = (\"closed_by_user_id\" IS NULL)\n    AND (\"closed_at\" IS NULL OR \"closed_at\" >= \"opened_at\")\n  ",
+      "name": "meeting_polls_close_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meeting_polls"
+    },
+    {
+      "value": "\"subject\" ~ '[^[:space:]]'",
+      "name": "meetings_subject_not_blank_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "value": "\"starts_at\" > \"created_at\"",
+      "name": "meetings_starts_after_creation_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "value": "\"access_mode\" <> 'group' OR \"group_id\" IS NOT NULL",
+      "name": "meetings_group_access_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "value": "\n    (\"ended_at\" IS NULL) = (\"ended_by_user_id\" IS NULL)\n    AND (\"ended_at\" IS NULL OR \"ended_at\" >= \"starts_at\")\n  ",
+      "name": "meetings_end_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "meetings"
+    },
+    {
+      "value": "\"request_count\" >= 0",
+      "name": "rate_limits_count_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "value": "\"window_expires_at\" > \"window_started_at\"",
+      "name": "rate_limits_window_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "value": "\"blocked_until\" IS NULL OR \"window_type\" = 'day'",
+      "name": "rate_limits_daily_block_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "rate_limits"
+    },
+    {
+      "value": "\n    (\"status\" = 'verified') = (\"email_verified_at\" IS NOT NULL)\n  ",
+      "name": "users_verification_status_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "users"
+    },
+    {
+      "value": "\"failed_attempts\" BETWEEN 0 AND 3",
+      "name": "verification_challenges_attempts_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "verification_challenges"
+    },
+    {
+      "value": "\"expires_at\" > \"issued_at\"",
+      "name": "verification_challenges_expiry_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "verification_challenges"
+    }
+  ],
+  "renames": []
+}

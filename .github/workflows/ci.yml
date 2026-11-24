@@ -1,9 +1,9 @@
 name: Pipeline de CI
 
 on:
-  # roda quando abre ou atualiza PR nas branches develop ou main
+  # Inclui PRs empilhados sobre uma branch de funcionalidade.
   pull_request:
-    branches: [ develop, main ]
+    branches: [ develop, main, "feature/hu*" ]
   # roda quando merge/push é feito direto em develop ou main
   push:
     branches: [ develop, main ]
@@ -56,9 +56,30 @@ jobs:
             if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$postgres_id")" == healthy ]]; then
               port_mapping=$(docker port "$postgres_id" 5432/tcp)
               db_url="postgresql://mc656:$postgres_password@127.0.0.1:${port_mapping##*:}/mc656_test"
+              # Use bancos distintos nas suítes de workers que dependem de isolamento.
+              docker exec "$postgres_id" createdb -U mc656 mc656_hu08_test
+              docker exec "$postgres_id" createdb -U mc656 mc656_hu10_test
+              hu10_db_url="${db_url%/*}/mc656_hu10_test"
+              docker exec "$postgres_id" createdb -U mc656 mc656_hu11_test
+              hu11_db_url="${db_url%/*}/mc656_hu11_test"
+              docker exec "$postgres_id" createdb -U mc656 mc656_hu12_test
+              hu12_db_url="${db_url%/*}/mc656_hu12_test"
+              docker exec "$postgres_id" createdb -U mc656 mc656_meet_test
+              meet_db_url="${db_url%/*}/mc656_meet_test"
+              hu08_db_url="${db_url%/*}/mc656_hu08_test"
               HU01_TEST_DATABASE_URL="$db_url" \
                 HU02_TEST_DATABASE_URL="$db_url" \
                 HU03_TEST_DATABASE_URL="$db_url" \
+                HU04_TEST_DATABASE_URL="$db_url" \
+                HU05_TEST_DATABASE_URL="$db_url" \
+                HU06_TEST_DATABASE_URL="$db_url" \
+                HU07_TEST_DATABASE_URL="$db_url" \
+                HU09_TEST_DATABASE_URL="$db_url" \
+                HU10_TEST_DATABASE_URL="$hu10_db_url" \
+                HU11_TEST_DATABASE_URL="$hu11_db_url" \
+                HU12_TEST_DATABASE_URL="$hu12_db_url" \
+                MEET_TEST_DATABASE_URL="$meet_db_url" \
+                HU08_TEST_DATABASE_URL="$hu08_db_url" \
                 npm run test:coverage
               exit 0
             fi

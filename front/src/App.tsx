@@ -4,10 +4,8 @@
     import { LoginForm } from './components/auth/LoginForm';
     import { RegisterForm } from './components/auth/RegisterForm';
     import { VerificationView } from './components/auth/VerificationView';
-    import { GroupsDashboard } from './components/groups/GroupsDashboard';
-    import { MeetingsDashboard } from './components/meetings/MeetingsDashboard';
-    import Historico from './components/Historico';
-    import FormularioPauta from './components/formulario-pauta';
+    import { WorkspaceTabs } from './components/WorkspaceTabs';
+    import { meetingFromNotification } from './components/meetings/meeting-notification-link';
     import './App.css';
     
     type Screen = 'login' | 'register' | 'verification' | 'dashboard';
@@ -59,18 +57,18 @@
       return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
           {/* Barra de Navegação Superior */}
-          <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm">
+          <header className="app-header">
             <div className="flex items-center gap-3">
-              <span className="text-xl font-bold text-indigo-600">MC656</span>
+              <span className="app-brand"><img src="/favicon.svg" alt="" />Unidebates</span>
             </div>
     
             {currentUser && (
-              <div className="flex items-center gap-4">
-                <div className="text-right">
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1 break-words text-right">
                   <div className="text-sm font-semibold text-gray-800">{currentUser.name}</div>
                   <div className="text-xs text-gray-500">
                     Status:{' '}
-                    <span className={`font-semibold ${currentUser.status === 'verified' ? 'text-green-600' : 'text-amber-600'}`}>
+                    <span className={`font-semibold ${currentUser.status === 'verified' ? 'text-green-800' : 'text-amber-800'}`}>
                       {currentUser.status === 'verified' ? 'Verificado' : 'E-mail pendente'}
                     </span>
                   </div>
@@ -86,7 +84,7 @@
           </header>
     
           {/* Conteúdo Principal */}
-          <main className="flex-1 p-4 sm:p-8">
+          <main className="app-content flex-1 p-4 sm:p-8">
             {currentScreen === 'login' && (
               <LoginForm
                 onSuccess={(user) => {
@@ -119,12 +117,8 @@
             )}
     
             {currentScreen === 'dashboard' && currentUser?.status === 'verified' && (
-              <div className="max-w-6xl mx-auto flex flex-col gap-8">
-                <MeetingsDashboard key={`meetings-${currentUser.id}`} userId={currentUser.id} userName={currentUser.name} />
-                <GroupsDashboard key={currentUser.id} userId={currentUser.id} />
-                <Historico />
-                <FormularioPauta />
-              </div>
+              <WorkspaceTabs key={currentUser.id} userId={currentUser.id} userName={currentUser.name}
+                initialMeetingId={meetingFromNotification(window.location.hash)} />
             )}
           </main>
         </div>

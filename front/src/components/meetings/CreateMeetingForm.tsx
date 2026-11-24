@@ -1,3 +1,5 @@
+import { LegislativeBillPicker } from '../legislative-bills/LegislativeBillPicker';
+import type { LegislativeBill } from '../../services/legislativeBillsApi';
 import { useCallback, useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { groupsApi } from '../../services/groupsApi';
@@ -19,7 +21,11 @@ export function CreateMeetingForm({ userId, userName, onCreated }: {
   userId: string; userName: string; onCreated: (meeting: Meeting) => void;
 }) {
   const formId = useId();
-  const [subject, setSubject] = useState('');
+  const [freeSubject, setSubject] = useState('');
+  const [bill, setBill] = useState<LegislativeBill | null>(null);
+  const [showBillPicker, setShowBillPicker] = useState(false);
+  const [catalogRevision, setCatalogRevision] = useState(0);
+  const subject = bill?.label ?? freeSubject;
   const [startsAt, setStartsAt] = useState('');
   const [groupId, setGroupId] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -59,13 +65,15 @@ export function CreateMeetingForm({ userId, userName, onCreated }: {
     setBusy(true);
     try {
       const meeting = await meetingsApi.create({
-        subject: subject.trim(), starts_at: start.toISOString(), group_id: groupId || undefined,
+        subject: subject.trim(), legislative_bill_id: bill?.id, starts_at: start.toISOString(), group_id: groupId || undefined,
         access: visibility === 'private' && groupId ? { visibility, audience } : { visibility },
         participant_ids: selected, participant_emails: recipients,
       });
       onCreated(meeting);
     } catch (cause) {
-      setError(groupError(cause).message);
+      const failure = groupError(cause);
+      setError(failure.message);
+      if (failure.code === 'LEGISLATIVE_BILL_UNAVAILABLE') setCatalogRevision(value => value + 1);
       if (cause && typeof cause === 'object') setFields((cause as ApiError).details?.fields ?? {});
     } finally {
       setBusy(false);
@@ -82,9 +90,20 @@ export function CreateMeetingForm({ userId, userName, onCreated }: {
       <fieldset disabled={busy} className="min-w-0 space-y-4">
         <div>
           <label htmlFor={`${formId}-subject-input`} className="block text-sm font-semibold">Assunto</label>
-          <input id={`${formId}-subject-input`} className={inputStyle} value={subject} required
+          <input id={`${formId}-subject-input`} className={inputStyle} value={subject} required readOnly={bill !== null}
             onChange={event => setSubject(event.target.value)} {...fieldProps('subject')} />
           <FieldError id={`${formId}-subject`} message={fields.subject} />
+        </div>
+        <div className="space-y-2">
+          <button type="button" className={buttonStyle} aria-expanded={showBillPicker}
+            aria-controls={`${formId}-bill-picker`} onClick={() => setShowBillPicker(open => !open)}>
+            {showBillPicker ? 'Ocultar opções de projetos de lei' : bill ? 'Alterar projeto de lei' : 'Associar projeto de lei'}
+          </button>
+          {bill && !showBillPicker && <p className="break-words text-sm text-slate-600">Projeto associado: {bill.label}</p>}
+          <div id={`${formId}-bill-picker`} hidden={!showBillPicker}>
+            {showBillPicker && <LegislativeBillPicker userId={userId} chosen={bill} select={setBill}
+              clear={() => setBill(null)} revision={catalogRevision} />}
+          </div>
         </div>
         <div>
           <label htmlFor={`${formId}-starts_at-input`} className="block text-sm font-semibold">Data e horário de início</label>

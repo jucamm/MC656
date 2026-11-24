@@ -5,7 +5,7 @@ import { identityErrorHandler, requireAuthentication, requireVerifiedAccount } f
 import type { IdentityOnboardingServices } from './modules/identity/identity.controller';
 import { createIdentityRouter } from './modules/identity/identity.routes';
 import type { SessionService } from './modules/identity/session.service';
-import express, { type Express } from 'express';
+import express, { type Express, type Router } from 'express';
 
 import { errorHandlerMiddleware } from './middlewares/error-handler.middleware';
 import { DecisionProcessController } from './modules/decision-process/decision-process.controller';
@@ -25,12 +25,15 @@ import type { MeetingsService } from './modules/meetings/meetings.service';
  * @property {DecisionProcessGroupAccess | undefined} decisionProcessGroupAccess - Autorização dos processos decisórios.
  * @property {GroupsHttpServices | undefined} groups - Serviços de grupos e convites.
  * @property {MeetingsService | undefined} meetings - Serviço de reuniões e seus convites.
+ * @property {Router[] | undefined} meetingExtensionRouters - Rotas de recursos de reunião atrás do mesmo gate.
  */
 export interface AppOptions {
   trustedOrigin?: string;
+  googleCallbackRouter?: Router;
   decisionProcessGroupAccess?: DecisionProcessGroupAccess;
   groups?: GroupsHttpServices;
   meetings?: MeetingsService;
+  meetingExtensionRouters?: Router[];
 }
 
 /**
@@ -54,8 +57,9 @@ export function createApp(
   // WARNING: A ordem faz parte da política de segurança. Preflight deve responder
   // sem Bearer; handlers /auth resolvem suas próprias exigências antes do gate de
   // verified, para permitir que pending confirme canais e encerre sua sessão.
-  if (options.meetings) application.use(['/meetings', '/meeting-invitations', '/meeting-organizer-transfers'], meetingsNoStore);
+  if (options.meetings || options.meetingExtensionRouters?.length) application.use(['/meetings', '/meeting-minutes', '/meeting-invitations', '/meeting-organizer-transfers', '/legislative-bills'], meetingsNoStore);
   application.use(trustedOriginCors(readTrustedOrigin(options.trustedOrigin)));
+  if (options.googleCallbackRouter) application.use(options.googleCallbackRouter);
   if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions, identityOnboarding));
   // Gate global: nenhum router registrado abaixo fica público ou depende de headers mockados.
   application.use(identitySessions ? requireAuthentication(identitySessions) : (_request, _response, _next) => {
@@ -67,6 +71,7 @@ export function createApp(
   application.use(identityErrorHandler);
   if (options.groups) application.use(createGroupsRouter(options.groups));
   if (options.meetings) application.use(createMeetingsRouter(options.meetings));
+  for (const router of options.meetingExtensionRouters ?? []) application.use(router);
   application.use(express.json());
   // NOTE: Novos routers de negócio devem ser montados aqui, depois do gate;
   // mover uma leitura para cima dele reintroduziria acesso anônimo/parcial.

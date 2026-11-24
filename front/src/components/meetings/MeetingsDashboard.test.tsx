@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { authApi } from '../../services/authApi';
 import type { Meeting, MeetingParticipant, OrganizerTransfer } from '../../types/meetings';
+import type { AgendaItem } from '../../types/meetingAgenda';
 import { MeetingsDashboard } from './MeetingsDashboard';
+import { meetingFromNotification } from './meeting-notification-link';
 
 const futureLocal = '2099-06-10T19:30';
 const startsAt = new Date(futureLocal).toISOString();
@@ -37,7 +39,7 @@ function fail(code: string, message: string, status: number, fields?: Record<str
 
 type Call = { method: string; path: string; query: URLSearchParams; body: unknown; authorization: string | null };
 
-function mockApi(route: (call: Call) => Response) {
+function mockApi(route: (call: Call) => Response, mockExtensions = true) {
   const calls: Call[] = [];
   vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input);
@@ -49,6 +51,18 @@ function mockApi(route: (call: Call) => Response) {
       authorization: new Headers(init?.headers).get('Authorization'),
     };
     calls.push(call);
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/agenda-items')) {
+      return ok({ items: [], next_cursor: null, actions: { can_submit: false, can_review: false } });
+    }
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/conferencing')) {
+      return ok({ mode: 'in_person', actions: { can_join: false, can_configure: false } });
+    }
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/moderation')) {
+      return ok({ phase: 'scheduled', actions: { can_moderate: false, can_end: false, can_manage_polls: false }, targets: [] });
+    }
+    if (mockExtensions && call.method === 'GET' && call.path.endsWith('/polls')) return page();
+    if (call.path.endsWith('/action-items')) return fail('ACTION_ITEM_NOT_FOUND', 'Encaminhamento indisponível.', 404);
+    if (/\/minutes(?:\/review)?$/.test(call.path)) return fail('MINUTES_NOT_FOUND', 'Ata indisponível.', 404);
     return route(call);
   }));
   return calls;
@@ -75,7 +89,7 @@ it('valida data futura, seleciona integrantes e preserva o formulário quando o 
     if (path === '/groups/admin/members') return page([{ user_id: '1', name: 'Ana' }, { user_id: '2', name: 'Bia' }]);
     if (path === '/meetings' && method === 'POST') {
       creationCount++;
-      return creationCount === 1 ? fail('VALIDATION_ERROR', 'Revise os convidados.', 400, { participant_emails: 'E-mail recusado.' })
+      return creationCount === 1 ? fail('VALIDATION_ERROR', 'Informe um e-mail válido.', 400, { participant_emails: 'Informe um e-mail válido.' })
         : ok(baseMeeting, 201);
     }
     if (path === '/meetings') return page(creationCount > 1 ? [baseMeeting] : []);
@@ -108,8 +122,8 @@ it('valida data futura, seleciona integrantes e preserva o formulário quando o 
   await browser.click(await screen.findByRole('checkbox', { name: 'Bia' }));
   await browser.type(email, ' CONVIDADO@EXAMPLE.COM ');
   await browser.click(submit);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Revise os convidados.');
-  expect(email).toHaveAccessibleDescription(expect.stringContaining('E-mail recusado.'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Informe um e-mail válido.');
+  expect(email).toHaveAccessibleDescription(expect.stringContaining('Informe um e-mail válido.'));
   expect(subject).toHaveValue(' Assembleia ');
   expect(date).toHaveValue(futureLocal);
   expect(screen.getByRole('checkbox', { name: 'Bia' })).toBeChecked();
@@ -245,4 +259,206 @@ it('recarrega a reunião e remove os controles quando a organização muda duran
   expect(await screen.findByRole('alert')).toHaveTextContent('Apenas o organizador vigente');
   expect(await screen.findByText('Bia')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Salvar moderadores' })).not.toBeInTheDocument();
+});
+
+
+it('atualiza pautas e ingresso após encerrar a reunião no painel de moderação', async () => {
+  let ended = false;
+  const joinUrl = 'https://meet.google.com/abc-defg-hij';
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const calls = mockApi(({ method, path }) => {
+    if (path === '/meetings') return page([baseMeeting]);
+    if (path === '/meetings/reuniao') return ok({ ...baseMeeting, actions: { can_manage: false } });
+    if (path.endsWith('/moderation')) return ok({
+      phase: ended ? 'ended' : 'in_progress',
+      actions: { can_moderate: !ended, can_end: !ended, can_manage_polls: !ended },
+      targets: [],
+    });
+    if (path.endsWith('/polls')) return page();
+    if (path.endsWith('/agenda-items')) return ok({
+      items: [], next_cursor: null, actions: { can_submit: !ended, can_review: !ended },
+    });
+    if (path.endsWith('/conferencing')) return ok({
+      mode: 'hybrid', actions: { can_configure: false, can_join: !ended },
+    });
+    if (method === 'POST' && path.endsWith('/conferencing/join')) return ok({ join_url: joinUrl });
+    if (method === 'POST' && path.endsWith('/end')) {
+      ended = true;
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(path);
+  }, false);
+
+  try {
+    const browser = userEvent.setup();
+    dashboard();
+    await browser.click(await screen.findByRole('button', { name: /Assembleia/ }));
+    await browser.click(await screen.findByRole('checkbox', { name: 'Aceito usar áudio e vídeo no Google Meet' }));
+    await browser.click(screen.getByRole('button', { name: 'Liberar link do Meet' }));
+    expect(await screen.findByRole('link', { name: 'Abrir Google Meet' })).toHaveAttribute('href', joinUrl);
+    expect(screen.getByRole('button', { name: 'Registrar pauta' })).toBeInTheDocument();
+
+    await browser.click(await screen.findByRole('button', { name: 'Encerrar na plataforma' }));
+    expect(await screen.findByText('Situação da reunião: Encerrada')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Registrar pauta' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Abrir Google Meet' })).not.toBeInTheDocument();
+    expect(calls.filter(call => call.path.endsWith('/agenda-items')).length).toBeGreaterThan(1);
+    expect(calls.filter(call => call.path.endsWith('/conferencing')).length).toBeGreaterThan(1);
+  } finally {
+    confirm.mockRestore();
+  }
+});
+
+it('atualiza a fila de revisão após registrar pauta e reflete a decisão na lista', async () => {
+  let item: AgendaItem = {
+    id: 'pauta-integracao', meeting_id: 'reuniao', subject: 'Orçamento anual',
+    context: 'Debater os custos', proposed_by_user_id: '1', proposer_name: 'Ana',
+    created_at: '2099-05-01T11:00:00Z', review_status: 'pending',
+    reviewed_by_user_id: null, reviewed_at: null,
+  };
+  let created = false;
+  mockApi(({ method, path, query }) => {
+    if (path === '/meetings') return page([baseMeeting]);
+    if (path === '/meetings/reuniao') return ok({ ...baseMeeting, actions: { can_manage: false } });
+    if (path.endsWith('/moderation')) return ok({
+      phase: 'scheduled', actions: { can_moderate: true, can_end: false, can_manage_polls: false }, targets: [],
+    });
+    if (path.endsWith('/polls')) return page();
+    if (path.endsWith('/conferencing')) return ok({ mode: 'in_person', actions: { can_configure: false, can_join: false } });
+    if (path.endsWith('/agenda-items') && method === 'GET') return ok({
+      items: created && (!query.has('review_status') || item.review_status === 'pending') ? [item] : [],
+      next_cursor: null, actions: { can_submit: true, can_review: true },
+    });
+    if (path.endsWith('/agenda-items') && method === 'POST') {
+      created = true;
+      return ok(item, 201);
+    }
+    if (path.endsWith('/pauta-integracao/review')) {
+      item = { ...item, review_status: 'approved', reviewed_by_user_id: '1', reviewed_at: '2099-05-01T11:00:00Z' };
+      return ok(item);
+    }
+    throw new Error(path);
+  }, false);
+
+  const browser = userEvent.setup();
+  dashboard();
+  await browser.click(await screen.findByRole('button', { name: /Assembleia/ }));
+  expect(await screen.findByText('Nenhuma pauta pendente.')).toBeInTheDocument();
+  await browser.type(await screen.findByRole('textbox', { name: 'Assunto da pauta' }), item.subject);
+  await browser.type(screen.getByRole('textbox', { name: 'Contexto da pauta' }), item.context);
+  await browser.click(screen.getByRole('button', { name: 'Registrar pauta' }));
+  await browser.click(await screen.findByRole('button', { name: 'Aprovar pauta Orçamento anual' }));
+  expect(await screen.findByText('Pauta aprovada.')).toBeInTheDocument();
+  expect(await screen.findByText('Aprovada · Ana')).toBeInTheDocument();
+  expect(await screen.findByText('Nenhuma pauta pendente.')).toBeInTheDocument();
+});
+
+const fromEmail = '00000000-0000-4000-8000-000000000001';
+
+it('abre uma reunião indicada pelo e-mail somente pelas consultas autenticadas', async () => {
+  const calls = mockApi(({ path }) => path === '/meetings'
+    ? page() : ok({ ...baseMeeting, id: fromEmail, actions: { can_manage: false } }));
+  render(<MeetingsDashboard userId="1" userName="Ana" initialMeetingId={meetingFromNotification('#meeting=' + fromEmail)} />);
+  expect(await screen.findByRole('heading', { name: 'Assembleia' })).toBeVisible();
+  expect(calls.find(call => call.path === '/meetings/' + fromEmail)?.authorization).toBe('Bearer reunioes-test-token');
+  expect(calls.every(call => call.method === 'GET')).toBe(true);
+});
+
+it('ignora fragmentos inválidos e apresenta a recusa da API para reunião restrita', async () => {
+  expect(meetingFromNotification('#meeting=%2Fadmin')).toBeNull();
+  expect(meetingFromNotification('#meeting=00000000-0000-4000-8000-00000000001g')).toBeNull();
+  mockApi(({ path }) => path === '/meetings' ? page() : fail('MEETING_NOT_FOUND', 'Reunião indisponível.', 404));
+  render(<MeetingsDashboard userId="1" userName="Ana" initialMeetingId={fromEmail} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Reunião indisponível.');
+  expect(screen.queryByRole('heading', { name: 'Assembleia' })).not.toBeInTheDocument();
+});
+
+it('carrega as três origens por UF, associa o PL e mantém o formulário se a fonte alterar o estado', async () => {
+  const bill = { id: 'pl-1', house_key: 'AL-AC', label: 'PL 10/2036 — Assembleia do Acre', abstract: 'Ementa de teste',
+    status_label: 'Em tramitação', official_url: 'https://sapl.al.ac.leg.br/materia/34', verified_at: new Date().toISOString() };
+  const section = (items: unknown[], status = 'fresh') => ({ items, status, last_success_at: new Date().toISOString(), official_url: bill.official_url });
+  const calls = mockApi(({ path, method, query }) => {
+    if (path === '/groups') return page();
+    if (path.endsWith('/suggestions')) return ok({
+      senate: section([{ ...bill, id: 'sf', house_key: 'SF', label: 'PL 1/2036 — Senado' }]),
+      chamber: section([{ ...bill, id: 'cd', house_key: 'CD', label: 'PL 2/2036 — Câmara' }]),
+      regional: query.get('uf') === 'AC' ? section([bill]) : section([], 'needs_uf'),
+    });
+    if (path === '/meetings' && method === 'POST') return fail('LEGISLATIVE_BILL_UNAVAILABLE', 'Projeto de lei indisponível para novas reuniões. Atualize as sugestões.', 422);
+    return page();
+  });
+  const browser = userEvent.setup();
+  localStorage.removeItem('mc656:legislative-uf:1');
+  try {
+    dashboard();
+    await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    const subject = screen.getByRole('textbox', { name: 'Assunto' });
+    fireEvent.change(subject, { target: { value: 'Assunto livre' } });
+    expect(screen.queryByLabelText('Sua unidade federativa')).not.toBeInTheDocument();
+    expect(calls.some(call => call.path.endsWith('/suggestions'))).toBe(false);
+    await browser.click(screen.getByRole('button', { name: 'Associar projeto de lei' }));
+    await browser.selectOptions(screen.getByLabelText('Sua unidade federativa'), 'AC');
+    expect(await screen.findByRole('button', { name: 'PL 1/2036 — Senado' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'PL 2/2036 — Câmara' })).toBeVisible();
+    const choice = await screen.findByRole('button', { name: bill.label });
+    choice.focus();
+    await browser.keyboard('{Enter}');
+    expect(subject).toHaveValue(bill.label);
+    expect(subject).toHaveAttribute('readonly');
+    await browser.click(screen.getByRole('button', { name: 'Ocultar opções de projetos de lei' }));
+    expect(screen.getByText('Projeto associado: ' + bill.label)).toBeVisible();
+    const date = screen.getByLabelText('Data e horário de início');
+    fireEvent.change(date, { target: { value: futureLocal } });
+    await browser.click(screen.getByRole('button', { name: 'Criar reunião' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Projeto de lei indisponível para novas reuniões. Atualize as sugestões.');
+    expect(calls.find(call => call.method === 'POST')?.body).toMatchObject({ legislative_bill_id: bill.id, subject: bill.label });
+    expect(date).toHaveValue(futureLocal);
+    await browser.click(screen.getByRole('button', { name: 'Alterar projeto de lei' }));
+    await browser.click(screen.getByRole('button', { name: 'Usar assunto livre' }));
+    expect(subject).toHaveValue('Assunto livre');
+    expect(localStorage.getItem('mc656:legislative-uf:1')).toBe('AC');
+  } finally { localStorage.removeItem('mc656:legislative-uf:1'); }
+});
+
+it('ignora UFs inválidas do armazenamento e do formulário, aceita uma UF válida e permite limpar a escolha', async () => {
+  const browser = userEvent.setup();
+  const key = 'mc656:legislative-uf:1';
+  const invalid = 'XX';
+  localStorage.setItem(key, invalid);
+  const calls = mockApi(({ path }) => {
+    if (path.endsWith('/suggestions')) {
+      const section = { items: [], status: 'empty', last_success_at: null, official_url: null };
+      return ok({ senate: section, chamber: section, regional: section });
+    }
+    return page();
+  });
+  const suggestions = () => calls.filter(call => call.path.endsWith('/suggestions'));
+  try {
+    dashboard();
+    await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    await browser.click(screen.getByRole('button', { name: 'Associar projeto de lei' }));
+    const uf = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Sua unidade federativa' });
+    expect(uf).toHaveValue('');
+    expect(suggestions().at(-1)?.query.get('uf')).toBeNull();
+
+    await browser.selectOptions(uf, 'DF');
+    expect(localStorage.getItem(key)).toBe('DF');
+    expect(suggestions().at(-1)?.query.get('uf')).toBe('DF');
+
+    uf.add(new Option(invalid, invalid));
+    fireEvent.change(uf, { target: { value: invalid } });
+    expect(uf).toHaveValue('DF');
+    expect(localStorage.getItem(key)).toBe('DF');
+    expect(suggestions().every(call => call.query.get('uf') !== invalid)).toBe(true);
+
+    await browser.click(screen.getByRole('button', { name: 'Reuniões disponíveis' }));
+    await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    await browser.click(screen.getByRole('button', { name: 'Associar projeto de lei' }));
+    const restored = screen.getByRole('combobox', { name: 'Sua unidade federativa' });
+    expect(restored).toHaveValue('DF');
+    await browser.selectOptions(restored, '');
+    expect(restored).toHaveValue('');
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(suggestions().at(-1)?.query.get('uf')).toBeNull();
+  } finally { localStorage.removeItem(key); }
 });
