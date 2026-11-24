@@ -6,9 +6,11 @@ export type OfficialBill = Omit<LegislativeBill, 'id' | 'verified_at'>;
 export type BillStatus = LegislativeBill['status'];
 export const ufs = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'] as const;
 
+export type KnownBill = Pick<OfficialBill, 'external_id' | 'number' | 'year'>;
+
 export interface LegislativeSource {
   key: string;
-  collect: (knownIds: string[], now: Date, signal?: AbortSignal) => Promise<OfficialBill[]>;
+  collect: (knownBills: KnownBill[], now: Date, signal?: AbortSignal) => Promise<OfficialBill[]>;
 }
 
 export function billIsSelectable(bill: Pick<LegislativeBill, 'status' | 'verified_at'>, now: Date) {

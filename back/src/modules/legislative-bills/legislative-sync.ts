@@ -38,11 +38,11 @@ export class LegislativeSync {
     const adapter = this.adapters.find(source => source.key === picked.house_key)!;
 
     try {
-      const known = await this.db.select({ id: bills.external_id }).from(bills).where(and(eq(bills.house_key, adapter.key),
+      const known = await this.db.select({ external_id: bills.external_id, number: bills.number, year: bills.year }).from(bills).where(and(eq(bills.house_key, adapter.key),
         or(eq(bills.status, 'in_progress'), exists(this.db.select({ id: meetings.id }).from(meetings)
           .where(eq(meetings.legislative_bill_id, bills.id)))),
       )).orderBy(asc(bills.verified_at), asc(bills.external_id)).limit(120);
-      const found = await adapter.collect(known.map(row => row.id), started, AbortSignal.timeout(4 * 60_000));
+      const found = await adapter.collect(known, started, AbortSignal.timeout(4 * 60_000));
       await this.db.transaction(async tx => {
         const [current] = await tx.select().from(sources).where(eq(sources.house_key, adapter.key)).for('update');
         const finished = this.clock();

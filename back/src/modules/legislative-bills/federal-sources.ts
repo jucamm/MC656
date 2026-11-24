@@ -18,9 +18,13 @@ export function senateSource(fetcher?: typeof fetch): LegislativeSource {
   const read = sourceClient(senateBase, fetcher);
   return { key: 'SF', async collect(known, _now, signal) {
     const found = list(await read('/processo?sigla=PL&casa=SF&tramitando=S&numdias=7', signal))
-      .map(normalizeSenate).sort((a, b) => Number(b.external_id) - Number(a.external_id));
+      .filter(raw => {
+        const label = record(raw).identificacao;
+        // A busca por sigla também inclui documentos de substitutivo da Câmara.
+        return !(typeof label === 'string' && /^PL [1-9]\d*\/\d{4} \(Substitutivo-CD\)$/.test(label));
+      }).map(normalizeSenate).sort((a, b) => Number(b.external_id) - Number(a.external_id));
     const result = new Map(found.slice(0, 60).map(bill => [bill.external_id, bill]));
-    for (const id of known) {
+    for (const { external_id: id } of known) {
       if (result.has(id)) continue;
       const bill = await knownBill(async () => normalizeSenate(await read('/processo/' + numericId(id), signal)));
       if (bill) {
@@ -48,7 +52,7 @@ export function chamberSource(fetcher?: typeof fetch): LegislativeSource {
   return { key: 'CD', async collect(known, now, signal) {
     const newIds = new Set<string>();
     for (let page = 1; page <= 2; page++) {
-      const body = record(await read(`/proposicoes?siglaTipo=PL&ano=${now.getUTCFullYear()}&itens=10&ordenarPor=id&ordem=DESC&pagina=${page}`, signal));
+      const body = record(await read(`/proposicoes?siglaTipo=PL&ano=${now.getUTCFullYear()}&codSituacao=903&itens=10&ordenarPor=id&ordem=DESC&pagina=${page}`, signal));
       for (const raw of list(body.dados)) {
         const row = record(raw);
         if (row.siglaTipo !== 'PL') throw new SourceError('INVALID_RESPONSE');
@@ -59,7 +63,7 @@ export function chamberSource(fetcher?: typeof fetch): LegislativeSource {
       if (!list(body.links).some(link => record(link).rel === 'next')) break;
     }
     const result: OfficialBill[] = [];
-    for (const id of new Set([...known, ...newIds])) {
+    for (const id of new Set([...known.map(bill => bill.external_id), ...newIds])) {
       const bill = await knownBill(async () => {
         const row = record(record(await read('/proposicoes/' + numericId(id), signal)).dados);
         if (numericId(row.id) !== id || row.siglaTipo !== 'PL') throw new SourceError('INVALID_RESPONSE');
