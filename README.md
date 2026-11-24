@@ -112,6 +112,8 @@ npm run build
 npm run lint
 ```
 
+Para executar a integração da HU09 com PostgreSQL descartável, siga o [guia de encaminhamentos](back/docs/meeting-action-items-contracts.md#execução-local-e-testes).
+
 ---
 
 ## Pipeline de Integração Contínua (CI)

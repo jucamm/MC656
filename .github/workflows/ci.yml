@@ -66,6 +66,7 @@ jobs:
                 HU05_TEST_DATABASE_URL="$db_url" \
                 HU06_TEST_DATABASE_URL="$db_url" \
                 HU07_TEST_DATABASE_URL="$db_url" \
+                HU09_TEST_DATABASE_URL="$db_url" \
                 HU08_TEST_DATABASE_URL="$hu08_db_url" \
                 npm run test:coverage
               exit 0
