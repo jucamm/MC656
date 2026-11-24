@@ -1,3 +1,5 @@
+import { createActionItemsRouter } from '../meeting-action-items/action-items.routes';
+import { MeetingActionItemsService } from '../meeting-action-items/action-items.service';
 import { createMinutesReviewRouter } from '../meeting-minutes-review/minutes-review.routes';
 import { MinutesReviewService } from '../meeting-minutes-review/minutes-review.service';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -25,6 +27,7 @@ export function composeMeetingServices(db: NodePgDatabase, clock = () => new Dat
     meetings: new MeetingsService(repository, clock),
     meetingExtensionRouters: [
       createMeetingAgendaRouter(new MeetingAgendaService(repository, clock)),
+      createActionItemsRouter(new MeetingActionItemsService(repository, clock)),
       createMeetingConferencingRouter(new MeetingConferencingService(repository, clock, capture)),
       createMeetingModerationRouter(new MeetingModerationService(repository, clock)),
       createMinutesRouter(new MinutesService(repository, client, clock), new MinutesCapture(repository, client, clock)),

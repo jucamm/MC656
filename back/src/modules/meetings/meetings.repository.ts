@@ -1,4 +1,4 @@
-import { and, eq, exists, gt, inArray, isNull, not, or, sql } from 'drizzle-orm';
+import { and, eq, exists, gt, inArray, isNull, not, or, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { alias } from 'drizzle-orm/pg-core';
 import { groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../db/schema';
@@ -16,7 +16,7 @@ function invitationsFor(userId: bigint) {
   return and(eq(meetingParticipants.user_id, userId), eq(meetingParticipants.origin, 'invitation'));
 }
 
-function hasGroupMembership(db: DatabaseQueries, userId: bigint | typeof meetingParticipants.user_id) {
+function hasGroupMembership(db: DatabaseQueries, userId: bigint | SQL | typeof meetingParticipants.user_id) {
   return exists(db.select({ one: sql`1` }).from(groupMemberships).where(and(
     eq(groupMemberships.group_id, meetings.group_id),
     eq(groupMemberships.user_id, userId),
@@ -35,7 +35,7 @@ function eligibleParticipant(db: DatabaseQueries) {
     confirmedParticipantWithAccess(hasGroupMembership(db, meetingParticipants.user_id)));
 }
 
-function blockedParticipant(db: DatabaseQueries, actorId: bigint | typeof meetingParticipants.user_id) {
+export function blockedParticipant(db: DatabaseQueries, actorId: bigint | SQL | typeof meetingParticipants.user_id) {
   return exists(db.select({ one: sql`1` }).from(meetingParticipationBlocks).where(and(
     eq(meetingParticipationBlocks.meeting_id, meetings.id),
     eq(meetingParticipationBlocks.user_id, actorId),
@@ -46,7 +46,7 @@ function participantCanBeSelected(db: DatabaseQueries) {
   return and(eligibleParticipant(db), not(blockedParticipant(db, meetingParticipants.user_id)));
 }
 
-export function visibleTo(db: DatabaseQueries, actorId: bigint) {
+export function visibleTo(db: DatabaseQueries, actorId: bigint | SQL) {
   const member = hasGroupMembership(db, actorId);
   const participant = exists(db.select({ one: sql`1` }).from(meetingParticipants).where(and(
     eq(meetingParticipants.meeting_id, meetings.id),
