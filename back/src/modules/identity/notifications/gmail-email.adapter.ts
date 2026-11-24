@@ -1,4 +1,5 @@
-import nodemailer, { type Transporter } from 'nodemailer';
+import type { Transporter } from 'nodemailer';
+import { createGmailTransport } from './gmail-smtp.transport';
 import type { GmailSmtpConfig } from './gmail-smtp.config';
 import type { VerificationDelivery, VerificationMessage } from './verification-delivery';
 import { VerificationDeliveryError } from './verification-delivery';
@@ -25,20 +26,10 @@ export class GmailEmailAdapter implements VerificationDelivery {
   private readonly sender: string;
   private readonly transporter: Transporter;
 
-  constructor({ host, port, user, appPassword }: GmailSmtpConfig) {
-    this.sender = user;
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: false,
-      requireTLS: true,
-      tls: { rejectUnauthorized: true },
-      auth: { user, pass: appPassword },
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000,
-      logger: false,
-      debug: false,
+  constructor(config: GmailSmtpConfig) {
+    this.sender = config.user;
+    this.transporter = createGmailTransport(config, {
+      connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 15_000,
     });
   }
 

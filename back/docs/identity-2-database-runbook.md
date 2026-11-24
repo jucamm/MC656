@@ -18,7 +18,7 @@ npm run build
 npm start
 ```
 
-A migration inicial consolidada cria as tabelas de identidade com o enum `verification_channel` restrito a `email`. Em `users`, o PostgreSQL exige que `status = 'verified'` corresponda à presença de `email_verified_at`. A migration da HU02 acrescenta grupos, vínculos e convites. O Drizzle registra a aplicação em `drizzle.__drizzle_migrations`. Repetir `npm run db:migrate` sobre a base atual mantém os dados.
+A migration inicial consolidada cria as tabelas de identidade com o enum `verification_channel` restrito a `email`. Em `users`, o PostgreSQL exige que `status = 'verified'` corresponda à presença de `email_verified_at`. A migration da HU02 acrescenta grupos, vínculos e convites. As migrations da HU03 acrescentam reuniões, participantes e pedidos de transferência de organização. O Drizzle registra a aplicação em `drizzle.__drizzle_migrations`. Repetir `npm run db:migrate` sobre a base atual mantém os dados.
 
 ## Reconstruir uma base local antiga
 
@@ -40,9 +40,10 @@ Crie um banco dedicado. Ajuste a URL para os dados da sua instalação local.
 createdb mc656_test
 export HU01_TEST_DATABASE_URL='postgresql://localhost/mc656_test'
 export HU02_TEST_DATABASE_URL="$HU01_TEST_DATABASE_URL"
+export HU03_TEST_DATABASE_URL="$HU01_TEST_DATABASE_URL"
 npm run test:coverage
 ```
 
-As suítes PostgreSQL aplicam as migrations e removem as fixtures que criarem. `HU01_TEST_DATABASE_URL` habilita as suítes de identidade. `HU02_TEST_DATABASE_URL` habilita as de grupos, convites e integração com processos decisórios. A execução local pode compartilhar uma base descartável entre as duas, como acontece no CI. Cada conjunto é pulado se sua variável estiver ausente. Use uma base de testes vazia ao mudar de uma versão anterior das migrations.
+As suítes PostgreSQL aplicam as migrations e removem as fixtures que criarem. `HU01_TEST_DATABASE_URL` habilita as suítes de identidade. `HU02_TEST_DATABASE_URL` habilita as de grupos, convites e integração com processos decisórios. `HU03_TEST_DATABASE_URL` habilita as de persistência e autorização de reuniões, convites, transferências e moderação. Os três conjuntos podem compartilhar a mesma base descartável, como no CI. Cada conjunto é pulado se sua variável estiver ausente. Use uma base de testes vazia ao mudar de uma versão anterior das migrations.
 
 Para evoluir o schema, altere `src/db/schema.ts`, execute `npm run db:generate`, revise o SQL e o snapshot e aplique a migration gerada no banco de teste.

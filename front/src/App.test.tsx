@@ -24,6 +24,10 @@ it('mantém a conta criada e permite reenviar o código quando a entrega inicial
     const sendVerification = vi.spyOn(authApi, 'sendVerification').mockResolvedValue({
         channel: 'email', challenge_id: 'challenge', expires_at: '2026-11-21T12:30:00Z',
     });
+    const confirmVerification = vi.spyOn(authApi, 'confirmVerification').mockResolvedValue({
+        user: { ...user, status: 'verified', email_verified_at: '2026-11-21T12:05:00Z' },
+    });
+    vi.spyOn(authApi, 'request').mockResolvedValue({ items: [], next_cursor: null });
     const browser = userEvent.setup();
     render(<App />);
 
@@ -31,10 +35,79 @@ it('mantém a conta criada e permite reenviar o código quando a entrega inicial
     await browser.type(screen.getByLabelText('Nome Completo'), user.name);
     await browser.type(screen.getByLabelText('E-mail'), user.email);
     await browser.type(screen.getByLabelText('Senha'), 'senha-segura');
+    await browser.type(screen.getByLabelText('Confirmar senha'), 'senha-segura');
     await browser.click(screen.getByRole('button', { name: 'Cadastrar' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('O envio do código falhou');
     await browser.click(screen.getByRole('button', { name: 'Solicitar novo código' }));
     expect(sendVerification).toHaveBeenCalledWith('email');
     expect(await screen.findByRole('status')).toHaveTextContent('Código enviado');
+    await browser.type(screen.getByLabelText('Código de 6 dígitos'), '123456');
+    await browser.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(confirmVerification).toHaveBeenCalledWith('email', 'challenge', '123456');
+    expect(await screen.findByRole('status')).toHaveTextContent('Conta Verificada com Sucesso!');
+    await browser.click(screen.getByRole('button', { name: 'Acessar Sistema' }));
+    expect(await screen.findByRole('heading', { name: 'Reuniões' })).toBeVisible();
+});
+
+it('separa reuniões, grupos e projetos de lei em abas com navegação por teclado', async () => {
+    const user = {
+        id: '1', name: 'Ana Silva', email: 'ana@example.com', status: 'verified' as const,
+        email_verified_at: '2026-11-21T12:00:00Z', created_at: '2026-11-21T12:00:00Z',
+    };
+    vi.spyOn(authApi, 'getToken').mockReturnValue('session');
+    vi.spyOn(authApi, 'getMe').mockResolvedValue({ user, verification_challenges: [] });
+    const request = vi.spyOn(authApi, 'request').mockResolvedValue({ items: [], next_cursor: null });
+    const browser = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Reuniões' })).toBeInTheDocument();
+    expect(await screen.findByText('Nenhuma reunião disponível.')).toBeInTheDocument();
+    expect(screen.getByText('Unidebates')).toBeInTheDocument();
+    expect(screen.queryByText('Histórico de Pautas')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cadastrar Pauta')).not.toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith('/meetings?limit=20', { signal: expect.any(AbortSignal) });
+    expect(screen.queryByRole('heading', { name: 'Grupos' })).not.toBeInTheDocument();
+    await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    await browser.type(screen.getByRole('textbox', { name: 'Assunto' }), 'Pauta de teste');
+    const meetings = screen.getByRole('tab', { name: 'Reuniões', selected: true });
+    meetings.focus();
+    await browser.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Grupos', selected: true })).toHaveFocus();
+    expect(await screen.findByRole('heading', { name: 'Grupos' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Reuniões' })).not.toBeInTheDocument();
+
+    await browser.click(screen.getByRole('tab', { name: 'Projetos de lei' }));
+    expect(await screen.findByRole('heading', { name: 'Resumos de PLs' })).toBeVisible();
+    expect(await screen.findByText('Nenhum resumo encontrado.')).toBeVisible();
+    await browser.keyboard('{Home}');
+    expect(meetings).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: 'Assunto' })).toHaveValue('Pauta de teste');
+});
+
+it('mantém o destino do aviso durante o login e só consulta a reunião após verificar a conta', async () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    const user = {
+        id: '1', name: 'Ana Silva', email: 'ana@example.com', status: 'verified' as const,
+        email_verified_at: '2026-11-21T12:00:00Z', created_at: '2026-11-21T12:00:00Z',
+    };
+    history.replaceState(null, '', '#meeting=' + id);
+    try {
+        vi.spyOn(authApi, 'getToken').mockReturnValue(null);
+        vi.spyOn(authApi, 'login').mockResolvedValue({ user, token: 'session' });
+        const request = vi.spyOn(authApi, 'request').mockImplementation(async path => path === '/meetings/' + id
+            ? { id, subject: 'Reunião do aviso', starts_at: '2036-06-10T12:00:00Z', visibility: 'private',
+                organizer_name: 'Ana', actions: { can_manage: false } } as never
+            : { items: [], next_cursor: null } as never);
+        const browser = userEvent.setup();
+        render(<App />);
+        await browser.type(await screen.findByLabelText('E-mail'), user.email);
+        await browser.type(screen.getByLabelText('Senha'), 'senha-segura');
+        expect(request).not.toHaveBeenCalled();
+        await browser.click(screen.getByRole('button', { name: 'Entrar' }));
+        expect(await screen.findByRole('heading', { name: 'Reunião do aviso' })).toBeVisible();
+        expect(request).toHaveBeenCalledWith('/meetings/' + id, { signal: expect.any(AbortSignal) });
+    } finally {
+        history.replaceState(null, '', '/');
+    }
 });

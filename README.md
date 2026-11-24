@@ -10,7 +10,7 @@ O objetivo do sistema é facilitar e estruturar processos de tomada de decisão 
 
 O repositório é organizado no formato de monorepo:
 
-* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém autenticação (HU01), [grupos e convites (HU02)](back/docs/groups-contracts.md), criação de pautas e apuração de votações.
+* `back/`: API em **Node.js** com **Express**, **TypeScript**, **PostgreSQL** e **Drizzle ORM**. Contém autenticação (HU01), [grupos e convites (HU02)](back/docs/groups-contracts.md), [reuniões (HU03)](back/docs/meetings-contracts.md), criação de pautas e apuração de votações.
 * `front/`: Interface web desenvolvida em **React 19**, **Vite** e **Tailwind CSS**.
 * `.github/workflows/`: Pipeline de Integração Contínua (CI) com GitHub Actions.
 
@@ -54,7 +54,7 @@ cp .env.example .env
 
 > **Atenção:** Se `back/.env` já existir, pule o `cp`. Configure `DATABASE_URL` com a linha exibida pelo script ou com os dados do seu PostgreSQL local. Defina também uma string de pelo menos 32 caracteres em `VERIFICATION_HMAC_KEY`.
 
-Use um banco vazio com a migration consolidada de identidade. Para reconstruir uma base local descartável ou rodar as suítes PostgreSQL, siga o [runbook de banco](back/docs/identity-2-database-runbook.md).
+Use um banco vazio para a primeira instalação. As migrations preparam identidade, grupos e reuniões. Para reconstruir uma base local descartável ou rodar as suítes PostgreSQL, siga o [runbook de banco](back/docs/identity-2-database-runbook.md).
 
 Com o banco configurado, aplique as migrações e inicie o servidor:
 
@@ -89,7 +89,7 @@ npm run dev
 
 A interface estará acessível no navegador pelo endereço indicado pelo Vite (normalmente `http://localhost:5173`).
 
-O frontend usa `https://localhost:3000` para autenticação, grupos e pautas. Se usar outro endereço de API, configure `VITE_API_URL` em `front/.env.local`. Quando o backend local usar um certificado autoassinado, abra a URL da API no navegador para aceitar o certificado de desenvolvimento antes de entrar pelo frontend. Configure `TRUSTED_ORIGIN` no backend com a origem efetiva do Vite.
+O frontend usa `https://localhost:3000` para autenticação, grupos, reuniões e pautas. Se usar outro endereço de API, configure `VITE_API_URL` em `front/.env.local`. Quando o backend local usar um certificado autoassinado, abra a URL da API no navegador para aceitar o certificado de desenvolvimento antes de entrar pelo frontend. Configure `TRUSTED_ORIGIN` no backend com a origem efetiva do Vite.
 
 ---
 
@@ -112,7 +112,27 @@ npm run build
 npm run lint
 ```
 
+Para executar a integração da HU09 com PostgreSQL descartável, siga o [guia de encaminhamentos](back/docs/meeting-action-items-contracts.md#execução-local-e-testes).
+
 ---
+
+## Catálogo legislativo
+
+O catálogo da HU11 usa fontes oficiais abertas e uma conexão PostgreSQL. Em `back/`, execute `npm run db:migrate` e `npm run build`. Com a mesma `DATABASE_URL` da API, inicie um processo separado com `LEGISLATIVE_SYNC_ENABLED=true npm run worker:legislative-sync`. O sincronizador fica desabilitado por padrão e não requer chave. Para conferir as UFs disponíveis, a atualização e os testes locais, consulte o [guia de fontes legislativas](back/docs/legislative-sources.md).
+
+### Projetos de lei para demonstração
+
+Use um PostgreSQL local separado para a apresentação. Em `back/.env`, aponte `DATABASE_URL` para esse banco e mantenha os workers de sincronização legislativa e de síntese desligados. Aplique as migrations com `npm run db:migrate` e cadastre e confirme uma conta no Unidebates desse ambiente.
+
+Em `back/`, rode o comando com o e-mail dessa conta:
+
+```bash
+npm run demo:pls -- apresentacao@example.com
+```
+
+Na aba **Projetos de lei**, busque por **transporte**, **bibliotecas**, **hortas** ou **energia solar**, selecione um resultado e abra a ata fictícia. Em **Reuniões → Nova reunião → Associar projeto de lei**, selecione um item marcado **[DEMO]**. O exemplo regional aparece ao escolher **DF**. Esses dados dispensam chamadas ao Gemini e às fontes legislativas.
+
+Rode o mesmo comando no dia da apresentação para renovar a disponibilidade de seleção por 24 horas. O comando reutiliza os mesmos registros.
 
 ## Pipeline de Integração Contínua (CI)
 
@@ -122,7 +142,7 @@ O repositório utiliza o **GitHub Actions** (`.github/workflows/ci.yml`). A cada
 2. Análise estática com ESLint (`npm run lint`);
 3. Execução completa dos testes automatizados e medição de cobertura com Vitest.
 
-O job de backend inicia um PostgreSQL descartável e configura as URLs de teste da HU01 e da HU02 para executar também as suítes de integração. O [runbook de banco](back/docs/identity-2-database-runbook.md#testar-em-postgresql-real) descreve como reproduzir a execução local.
+O job de backend inicia um PostgreSQL descartável e configura as URLs de teste da HU01, da HU02 e da HU03 para executar também as suítes de integração. O [runbook de banco](back/docs/identity-2-database-runbook.md#testar-em-postgresql-real) descreve como reproduzir a execução local.
 
 ---
 

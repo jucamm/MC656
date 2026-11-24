@@ -137,7 +137,7 @@ describe('dashboard de grupos', () => {
       }
       if (path.endsWith('/invitations') && method === 'POST') {
         expect(body).toBe(JSON.stringify({ email: 'carla@example.com' }));
-        if (++attempts === 1) return fail('INVITATION_ALREADY_PENDING', 'Já existe um convite pendente.', 409);
+        if (++attempts === 1) return fail('INVITATION_ALREADY_PENDING', 'Já existe um convite pendente para essa pessoa.', 409);
         sent = true;
         return json({ id: 'invite-1' }, 201);
       }
@@ -155,7 +155,7 @@ describe('dashboard de grupos', () => {
     await screen.findByRole('heading', { name: 'Convites enviados' });
     type('E-mail do destinatário', 'carla@example.com');
     click('Enviar convite');
-    expect(await screen.findByRole('alert')).toHaveTextContent('Já existe um convite pendente.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Já existe um convite pendente para essa pessoa.');
     expect(screen.getByLabelText('E-mail do destinatário')).toHaveValue('carla@example.com');
     click('Enviar convite');
     expect(await screen.findByText('Convite enviado.')).toBeVisible();
