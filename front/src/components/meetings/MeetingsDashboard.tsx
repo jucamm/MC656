@@ -75,8 +75,8 @@ function AvailableMeetings({ userId, selectedId, onSelect }: {
               <li key={meeting.id}>
                 <button type="button" aria-pressed={selectedId === meeting.id} onClick={() => onSelect(meeting.id)}
                   className={`w-full space-y-1 rounded-xl border p-3 text-left focus-visible:outline-2 focus-visible:outline-indigo-600 ${selectedId === meeting.id
-                    ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                  <span className="block break-words font-semibold">{meeting.subject}</span>
+                    ? 'border-indigo-700 border-l-4 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <span className="block break-words font-semibold">{selectedId === meeting.id && <span aria-hidden="true">✓ </span>}{meeting.subject}</span>
                   <time dateTime={meeting.starts_at} className="block text-sm text-slate-600">{formatMeetingTime(meeting.starts_at)}</time>
                 </button>
               </li>

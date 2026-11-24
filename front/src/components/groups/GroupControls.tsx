@@ -55,6 +55,8 @@ export function GroupNameForm({ initialName = '', label, button, busy, onSubmit 
         <input className={`${inputStyle} mt-1`} value={name} autoComplete="off"
           onChange={event => setName(event.target.value)} required maxLength={150} disabled={busy} />
       </label>
+      {!name.trim() && <p className="text-sm text-slate-600">Informe um nome para habilitar a ação.</p>}
+      {busy && <p role="status" className="text-sm text-slate-600">Salvando…</p>}
       <button type="submit" className={primaryStyle} disabled={busy || !name.trim()}>{button}</button>
     </form>
   );

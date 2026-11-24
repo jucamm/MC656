@@ -89,7 +89,7 @@ it('valida data futura, seleciona integrantes e preserva o formulário quando o 
     if (path === '/groups/admin/members') return page([{ user_id: '1', name: 'Ana' }, { user_id: '2', name: 'Bia' }]);
     if (path === '/meetings' && method === 'POST') {
       creationCount++;
-      return creationCount === 1 ? fail('VALIDATION_ERROR', 'Revise os convidados.', 400, { participant_emails: 'E-mail recusado.' })
+      return creationCount === 1 ? fail('VALIDATION_ERROR', 'Informe um e-mail válido.', 400, { participant_emails: 'Informe um e-mail válido.' })
         : ok(baseMeeting, 201);
     }
     if (path === '/meetings') return page(creationCount > 1 ? [baseMeeting] : []);
@@ -122,8 +122,8 @@ it('valida data futura, seleciona integrantes e preserva o formulário quando o 
   await browser.click(await screen.findByRole('checkbox', { name: 'Bia' }));
   await browser.type(email, ' CONVIDADO@EXAMPLE.COM ');
   await browser.click(submit);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Revise os convidados.');
-  expect(email).toHaveAccessibleDescription(expect.stringContaining('E-mail recusado.'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Informe um e-mail válido.');
+  expect(email).toHaveAccessibleDescription(expect.stringContaining('Informe um e-mail válido.'));
   expect(subject).toHaveValue(' Assembleia ');
   expect(date).toHaveValue(futureLocal);
   expect(screen.getByRole('checkbox', { name: 'Bia' })).toBeChecked();
@@ -384,7 +384,7 @@ it('carrega as três origens por UF, associa o PL e mantém o formulário se a f
       chamber: section([{ ...bill, id: 'cd', house_key: 'CD', label: 'PL 2/2036 — Câmara' }]),
       regional: query.get('uf') === 'AC' ? section([bill]) : section([], 'needs_uf'),
     });
-    if (path === '/meetings' && method === 'POST') return fail('LEGISLATIVE_BILL_UNAVAILABLE', 'Atualize as sugestões.', 422);
+    if (path === '/meetings' && method === 'POST') return fail('LEGISLATIVE_BILL_UNAVAILABLE', 'Projeto de lei indisponível para novas reuniões. Atualize as sugestões.', 422);
     return page();
   });
   const browser = userEvent.setup();
@@ -405,7 +405,7 @@ it('carrega as três origens por UF, associa o PL e mantém o formulário se a f
     const date = screen.getByLabelText('Data e horário de início');
     fireEvent.change(date, { target: { value: futureLocal } });
     await browser.click(screen.getByRole('button', { name: 'Criar reunião' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Atualize as sugestões.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Projeto de lei indisponível para novas reuniões. Atualize as sugestões.');
     expect(calls.find(call => call.method === 'POST')?.body).toMatchObject({ legislative_bill_id: bill.id, subject: bill.label });
     expect(date).toHaveValue(futureLocal);
     await browser.click(screen.getByRole('button', { name: 'Usar assunto livre' }));

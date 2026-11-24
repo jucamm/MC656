@@ -38,13 +38,13 @@ export const LoginForm: React.FC<Props> = ({ onSuccess, onSwitchToRegister }) =>
     <div className="auth-panel">
         <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Entrar na Plataforma</h2>
 
-        <Feedback message={error ? { text: error, failed: true } : null} />
+        <div id="login-feedback"><Feedback message={error ? { text: error, failed: true } : null} /></div>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4" aria-busy={loading}>
         <div>
             <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
             <input
-            id="login-email" autoComplete="email"
+            id="login-email" autoComplete="email" aria-invalid={!!error} aria-describedby={error ? 'login-feedback' : undefined}
             type="email"
             required
             className={inputStyle}
@@ -57,7 +57,7 @@ export const LoginForm: React.FC<Props> = ({ onSuccess, onSwitchToRegister }) =>
         <div>
             <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
             <input
-            id="login-password" autoComplete="current-password"
+            id="login-password" autoComplete="current-password" aria-invalid={!!error} aria-describedby={error ? 'login-feedback' : undefined}
             type="password"
             required
             className={inputStyle}
@@ -79,7 +79,7 @@ export const LoginForm: React.FC<Props> = ({ onSuccess, onSwitchToRegister }) =>
         <p className="mt-6 text-center text-sm text-gray-600">
         Não tem uma conta?{' '}
         <button
-            onClick={onSwitchToRegister}
+            onClick={onSwitchToRegister} type="button" disabled={loading}
             className={buttonStyle}
         >
             Cadastre-se
