@@ -1,0 +1,1 @@
+ALTER TABLE "meeting_conferencing" DROP CONSTRAINT "meeting_capture_pair_check", ADD CONSTRAINT "meeting_capture_pair_check" CHECK ((("transcription_space_name" IS NULL) = ("transcription_policy_version" IS NULL)) OR ("provisioning" = 'automatic' AND "transcription_space_name" IS NULL AND "transcription_policy_version" IS NOT NULL));

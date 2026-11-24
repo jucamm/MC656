@@ -16,6 +16,7 @@ import {
   type DecisionProcessConfiguration,
 } from '../decision-process.types';
 import { InMemoryDecisionProcessRepository } from '../repositories/in-memory-decision-process.repository';
+import { fixtureDecisionProcessGroupAccess } from './group-access.fixture';
 
 function validConfiguration(
   overrides: Partial<DecisionProcessConfiguration> = {},
@@ -53,7 +54,7 @@ describe('DecisionProcessService', () => {
 
   beforeEach(() => {
     repository = new InMemoryDecisionProcessRepository();
-    service = new DecisionProcessService(repository);
+    service = new DecisionProcessService(repository, fixtureDecisionProcessGroupAccess());
   });
 
   async function expectServiceError(

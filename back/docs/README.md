@@ -1,14 +1,14 @@
 # Cadastro e Autenticação (HU01)
 
-Este guia apresenta as entregas das Issues #36 a #43 e orienta a leitura dos detalhes. A documentação está em `back/docs`. Os documentos de cada issue retratam aquela etapa; esta introdução considera a integração final da Issue #43 e o código atual.
+Este guia apresenta as entregas das Issues #36 a #43 e orienta a leitura dos detalhes. A documentação está em `back/docs`. Os documentos de cada issue retratam aquela etapa; este guia e o runbook de banco descrevem o fluxo vigente.
 
 ## 1. Visão geral
 
-A HU01 implementa a identificação dos usuários e o controle de entrada na plataforma. Uma pessoa pode criar conta e fazer login, mas só acessa recursos de negócio depois de confirmar e-mail e telefone.
+A HU01 implementa a identificação dos usuários e o controle de entrada na plataforma. Uma pessoa pode criar conta e fazer login, mas só acessa recursos de negócio depois de confirmar seu e-mail.
 
-O backend entrega cadastro, senhas protegidas, sessões persistidas, logout, consulta da própria conta, verificação de canais, limites de envio, reciclagem de telefone e controle de acesso com CORS.
+O backend entrega cadastro, senhas protegidas, sessões persistidas, logout, consulta da própria conta, verificação de e-mail, limites de envio e controle de acesso com CORS.
 
-**Limites da entrega:** e-mail e telefone usam mocks, substitutos locais dos provedores. Não há entrega real nem comprovação efetiva dos contatos. As telas de autenticação e a persistência das associações em grupos não foram implementadas pela HU01. Outros módulos integrados ainda usam componentes em memória; a persistência da identidade não torna toda a plataforma persistente.
+**Entrega de códigos.** O cadastro inicial e o reenvio autenticado usam o mesmo adaptador de [Gmail SMTP](#gmail-smtp). Os convites de grupo são recebidos dentro da plataforma. O código atual não tem fluxos de recuperação de senha ou outras notificações por e-mail.
 
 ## 2. Organização da solução
 
@@ -21,31 +21,29 @@ O módulo está em `back/src/modules/identity`. As responsabilidades são separa
 | Middlewares | Executam verificações antes dos handlers: origem, sessão, estado da conta e identidade usada nos grupos. |
 | Services e validadores | Aplicam cadastro, senha, normalização dos contatos, sessões e verificação. |
 | Repositories e schema | Consultam e alteram o PostgreSQL pelo Drizzle ORM, preservando transações e restrições. |
-| Adaptadores de comunicação | Simulam sucesso/falha e capturam mensagens para inspeção nos testes. |
+| Adaptadores de comunicação | Enviam códigos via Gmail SMTP. Os testes simulam a entrega e inspecionam as mensagens capturadas. |
 
 As quatro tabelas da HU01 guardam contas (`users`), sessões (`authentication_sessions`), desafios correntes (`verification_challenges`) e cotas de envio (`rate_limits`).
 
 ## 3. Conceitos e decisões essenciais
 
-- **Autenticação e autorização:** autenticar identifica a pessoa; autorizar decide seu acesso. Uma conta `pending` pode concluir o cadastro inicial, chamado de onboarding, e sair da sessão. Só fica `verified` após confirmar os dois canais. Mesmo assim, grupos exigem associação/papel próprios: não há concessão automática de administrador.
+- **Autenticação e autorização:** autenticar identifica a pessoa; autorizar decide seu acesso. Uma conta `pending` pode concluir o cadastro inicial, chamado de onboarding, e sair da sessão. Só fica `verified` após confirmar o e-mail. Mesmo assim, grupos exigem associação/papel próprios: não há concessão automática de administrador.
 - **Sessão:** cada login emite um token opaco, uma credencial aleatória sem permissões embutidas. Ele é enviado exclusivamente em `Authorization: Bearer <token>`; o banco guarda apenas seu hash. Não há autenticação por cookies, JWT ou refresh token. A sessão expira após um mês de calendário UTC sem atividade; requisições válidas renovam o prazo. Logout revoga somente a sessão atual.
-- **Desafio:** é uma solicitação de confirmação, com UUID e código de seis dígitos. E-mail dura 30 minutos; telefone dura 5 minutos e exige e-mail confirmado. O código é protegido por HMAC, calculado com chave secreta externa ao banco. Reenvio substitui o desafio; três códigos incorretos exigem novo envio.
-- **Cotas e falhas:** cada conta/canal permite três envios por hora e seis por dia. Exceder o diário bloqueia envios por 72 horas. As janelas começam no primeiro envio aceito. Falhas do mock não consomem cota nem substituem um desafio válido. Falha no envio inicial preserva o cadastro com `201` e `delivery_status: failed`.
-- **Reciclagem de telefone:** contas distintas podem cadastrar o mesmo número. Quando outra conta o confirma, a anterior perde essa confirmação e volta a `pending`, preservando o e-mail. Sua sessão mantém o onboarding disponível, mas a próxima requisição protegida é recusada. Transações e locks evitam duas confirmações vigentes sob concorrência.
+- **Desafio:** é uma solicitação de confirmação, com UUID e código de seis dígitos. O desafio de e-mail expira em 30 minutos. O código é protegido por HMAC, calculado com chave secreta externa ao banco. Reenvio substitui o desafio; três códigos incorretos exigem novo envio.
+- **Cotas e falhas:** cada conta/canal permite três envios por hora e seis por dia. Exceder o diário bloqueia envios por 72 horas. As janelas começam no primeiro envio aceito. Falhas de envio não consomem cota nem substituem um desafio válido. Falha no envio inicial preserva o cadastro com `201` e `delivery_status: failed`.
 - **Senha:** Bcrypt protege a senha sem alterar seu conteúdo. O máximo é 72 bytes, não necessariamente 72 caracteres. Os defaults de custo e mínimo são escolhas técnicas configuráveis; a referência ISO 27100 registrada pela equipe não implica certificação nem define esses valores nos materiais fornecidos.
 
 ## 4. Fluxo de funcionamento
 
 Um exemplo com Ana:
 
-1. `POST /auth/register`: o serviço valida os contatos, protege a senha, persiste uma conta `pending` e solicita o desafio de e-mail ao mock.
+1. `POST /auth/register`: o serviço valida o e-mail, protege a senha, persiste uma conta `pending` e solicita o desafio de e-mail ao adaptador configurado.
 2. `POST /auth/login`: Ana recebe a sessão e passa a enviar o Bearer nos endpoints autenticados.
 3. `POST /auth/verifications/email/confirm`: confirma o e-mail com `challenge_id` e `code`.
-4. `POST /auth/verifications/phone/send` e `POST /auth/verifications/phone/confirm`: solicita e confirma o telefone.
-5. Com ambos confirmados, `GET /auth/me` informa `verified`. Ana pode acessar `/api/pautas`; grupos exigem também os vínculos correspondentes.
-6. `POST /auth/logout`: revoga aquela sessão e responde `204`, sem corpo.
+4. Após confirmar o e-mail, `GET /auth/me` informa `verified`. Ana pode acessar `/api/pautas`; grupos exigem também os vínculos correspondentes.
+5. `POST /auth/logout`: revoga aquela sessão e responde `204`, sem corpo.
 
-Os middlewares verificam acesso antes dos controllers; os serviços coordenam as regras e os repositories persistem os resultados. Neste exemplo, os códigos são obtidos das mensagens capturadas pelo mock em testes: não chegam por e-mail/SMS real nem são expostos pela API.
+Os middlewares verificam acesso antes dos controllers; os serviços coordenam as regras e os repositories persistem os resultados. Neste exemplo, os códigos são obtidos das mensagens capturadas pelo mock em testes: a API omite os códigos.
 
 ## 5. Como continuar o desenvolvimento
 
@@ -59,11 +57,47 @@ Depois, execute `npm run db:migrate`, `npm run build` e `npm start`. Para valida
 
 - **Contratos:** consulte `identity.types.ts` (DTOs, estruturas de dados trocadas entre componentes) e `identity.errors.ts`. Identidade usa `{ "data": ... }` no sucesso e `{ "error": { "code", "message", "details" } }` no erro; logout não tem corpo. Outros módulos preservam formatos próprios.
 - **Convenções:** campos em inglês e `snake_case`, IDs `bigint` como strings, desafios identificados por UUID e datas ISO UTC. Códigos também são strings, preservando zeros iniciais. Entradas HTTP precisam de validação, além da tipagem TypeScript.
-- **Acesso:** monte novos routers de negócio depois da autenticação e da verificação globais. Permissões de grupo vêm do servidor, associadas ao ID real. Sem vínculo configurado, mesmo uma conta `verified` recebe `403` nesses recursos; headers mockados não concedem acesso.
+- **Acesso:** monte novos routers de negócio depois da autenticação e da verificação globais. A HU02 resolve os papéis a partir do vínculo persistido da conta autenticada. Os processos decisórios retornam `403` quando a conta verificada está sem o vínculo ou papel exigido em um grupo ativo. [Contratos da HU02](groups-contracts.md)
 - **Frontend:** envie o Bearer explicitamente. Trate `401` como autenticação inválida, examine a causa de `403` e respeite `Retry-After`/`details.retry_at` em `429`. O armazenamento do token no navegador ainda é escolha da equipe. CORS exige a origem exata, permite preflight sem Bearer e não substitui autenticação.
 - **Evolução:** preserve transações e a ordem dos locks. Tentativas incorretas e bloqueios precisam permanecer gravados mesmo quando o HTTP retorna erro. Crie novas migrations, sem editar as já aplicadas. Provedores futuros devem integrar pela interface `sendVerification`, respeitando as garantias de falha e a proteção dos códigos.
 
+### Gmail SMTP
+
+Use a conta Google que enviará os códigos. Em **Segurança** na Conta Google, ative a [verificação em duas etapas](https://support.google.com/accounts/answer/185839) e crie uma [senha de aplicativo](https://myaccount.google.com/apppasswords) para o backend. Use essa senha de 16 caracteres em `MAIL_PASSWORD`. A opção pode estar indisponível em contas gerenciadas, no Programa de Proteção Avançada ou quando a verificação em duas etapas usa somente chaves de segurança. Consulte o administrador se a conta for institucional. [Ajuda do Google sobre senhas de app](https://support.google.com/mail/answer/185833?hl=pt-BR)
+
+Em desenvolvimento, configure `back/.env` com os valores abaixo e substitua os dois últimos pelos dados da conta de teste. Reinicie o backend após modificar a configuração.
+
+```dotenv
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=seuemail@gmail.com
+MAIL_PASSWORD=sua_senha_de_app
+```
+
+Para trabalhar com o simulador local, deixe `MAIL_USERNAME` e `MAIL_PASSWORD` vazias. Nesse modo, nenhum e-mail sai do backend. Preencher somente uma credencial gera um erro de configuração na inicialização. Em produção, defina `NODE_ENV=production`, injete as cinco variáveis pelo gerenciador de segredos do ambiente e permita conexões de saída para `smtp.gmail.com:587`. O endereço de `MAIL_USERNAME` também é o remetente. [Configuração SMTP do Gmail](https://developers.google.com/workspace/gmail/imap/imap-smtp)
+
+O serviço aguarda uma tentativa SMTP por solicitação, dentro do fluxo existente de emissão. A aceitação pelo Gmail habilita a gravação do desafio e da cota local. Falhas preservam o desafio anterior e permitem reenvio explícito. Um timeout após o servidor receber a mensagem pode deixar o resultado incerto. Como a API não repete o envio automaticamente, confira a caixa de entrada antes de solicitar outro código. Aceitação SMTP não confirma a chegada à caixa de entrada.
+
+**Cotas.** Cadastro e reenvio compartilham a cota da conta remetente, inclusive com o que essa conta envia fora da plataforma. O Gmail pessoal tem limite de 500 mensagens por dia. No Google Workspace, o limite usual é de 2.000 mensagens por usuário em 24 horas e cai para 500 em contas de teste. Há também limites por destinatário e políticas antispam. Eventuais fluxos transacionais que usem a mesma conta vão dividir essa capacidade. As cotas do Gmail são independentes dos limites de verificação por usuário da aplicação. [Limites do Gmail pessoal](https://support.google.com/mail/answer/22839?hl=pt-BR) · [Limites do Google Workspace](https://support.google.com/a/answer/166852?hl=pt-BR)
+
+**Diagnóstico.** Falha no cadastro inicial mantém a conta pendente e a tela orienta a solicitar outro código. Um reenvio rejeitado retorna `503 VERIFICATION_DELIVERY_FAILED`. O backend registra apenas a categoria da falha SMTP, sem credenciais, destinatários ou códigos de verificação.
+
+| Categoria | O que conferir |
+|---|---|
+| Autenticação | Endereço completo, senha de aplicativo correspondente, revogação após troca da senha da conta e políticas da organização. |
+| Conexão, TLS ou tempo limite | DNS, firewall, saída TCP 587, relógio do servidor e cadeia de certificação. Use o comando abaixo no ambiente do backend. |
+| Mensagem rejeitada | Validade do destinatário, cotas e restrições da conta remetente. Se o SMTP aceitou a mensagem, confira spam, filtros e eventuais devoluções. |
+
+```bash
+openssl s_client -starttls smtp -connect smtp.gmail.com:587 -servername smtp.gmail.com -verify_hostname smtp.gmail.com -verify_return_error </dev/null
+```
+
+**Verificação manual.** O comando testa conectividade e TLS sem autenticar. Para testar a entrega completa, inicie o backend com a conta Gmail configurada, cadastre uma conta com um endereço que você controle, espere o código chegar e confirme-o na interface. Com outra conta de teste ainda pendente, use **Solicitar novo código**, confirme a chegada da nova mensagem e use seu código. Os testes automatizados simulam o transporte SMTP e não validam autenticação nem entrega no Gmail real.
+
 ## 6. Aprofundamentos
+
+Os guias por Issue registram as decisões da época. Use os DTOs no código e o runbook vigente para configurar o ambiente e verificar o contrato atual.
 
 | Documento | Assunto |
 |---|---|
@@ -74,9 +108,11 @@ Depois, execute `npm run db:migrate`, `npm run build` e `npm start`. Para valida
 | [Issue 4 — Sessões](identity-4-sessions.md) | Token, renovação, logout e estado por `/auth/me`. |
 | [Issue 5 — Verificação](identity-5-verification.md) | Desafios, HMAC, confirmação atômica e falhas. |
 | [Issue 6 — Comunicação e limites](identity-6-verification-delivery.md) | Mocks por canal, cotas, bloqueios e nova tentativa. |
-| [Issue 7 — Reciclagem de telefone](identity-7-phone-recycling.md) | Transferência, concorrência e perda de acesso. |
 | [Issue 8 — Acesso e frontend](identity-8-access-control.md) | Matriz final de acesso, CORS, grupos e respostas ao cliente. |
 
-**Atenção às diferenças entre as etapas:** o modo sem banco descrito na Issue 4 foi substituído pela exigência de `DATABASE_URL` na Issue 8. O emissor simulado da Issue 3 foi integrado ao serviço persistido na Issue 5. Pendências e contagens de testes antigas retratam aquela entrega; para acesso e inicialização atuais, consulte a Issue 8.
+**Atenção às diferenças entre as etapas:** o modo sem banco descrito na Issue 4 foi substituído pela exigência de `DATABASE_URL` na Issue 8. O emissor simulado da Issue 3 foi integrado ao serviço persistido na Issue 5. Pendências e contagens de testes antigas retratam aquela entrega; consulte o runbook para inicializar o banco com a migration atual.
 
-**Lacunas explícitas:** provedores reais, filtro definitivo de e-mails, persistência dos vínculos de grupo e escolha de armazenamento do token ainda dependem de outras implementações ou decisões. Alguns exemplos da Issue 1 têm comentários e campos omitidos: são ilustrações, não JSON pronto para envio. Use os DTOs e os documentos específicos para montar requisições completas.
+**Lacunas explícitas:** filtro definitivo de e-mails e escolha de armazenamento do token ainda dependem de outras implementações ou decisões. Use os DTOs e os documentos vigentes para montar requisições completas.
+
+- [Google Meet e transcrições privadas](google-meet-integration.md)
+- [Gemini e geração revisável](gemini-integration.md)

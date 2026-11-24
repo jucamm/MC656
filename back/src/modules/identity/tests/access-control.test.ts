@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../../app';
 import { mockUsers, type MockUser } from '../../../mocks/mock-users';
+import { fixtureDecisionProcessGroupAccess } from '../../decision-process/tests/group-access.fixture';
 import type { UserDto } from '../identity.types';
 import { PasswordService } from '../password.service';
 import { readTrustedOrigin } from '../cors.middleware';
@@ -30,7 +31,9 @@ beforeEach(() => {
   });
   vi.spyOn(sessions, 'me').mockImplementation(async identity => ({ user: identity.user_id === pending.id ? pending : verified, verification_challenges: [] }));
   groupUsers = [...mockUsers, { id: '2', name: 'Ana', memberships: mockUsers[0].memberships }];
-  app = createApp(undefined, sessions, undefined, { trustedOrigin: origin, groupUsers });
+  app = createApp(undefined, sessions, undefined, {
+    trustedOrigin: origin, decisionProcessGroupAccess: fixtureDecisionProcessGroupAccess(groupUsers),
+  });
 });
 
 describe('controle global de acesso', () => {
@@ -79,7 +82,7 @@ describe('controle global de acesso', () => {
     expect(created.body.activeVersion.createdByUserId).toBe(verified.id);
     await request(app).get(`/groups/group-1/decision-processes/${created.body.process.id}`)
       .set('Authorization', `Bearer ${verifiedToken}`).expect(200);
-    groupUsers.splice(groupUsers.findIndex(user => user.id === verified.id), 1);
+    groupUsers[groupUsers.findIndex(user => user.id === verified.id)] = { id: verified.id, name: verified.name, memberships: [] };
     await request(app).get(`/groups/group-1/decision-processes/${created.body.process.id}`)
       .set('Authorization', `Bearer ${verifiedToken}`).set('X-Mock-User-Id', 'admin-group-1').expect(403);
   });

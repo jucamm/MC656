@@ -28,7 +28,7 @@ describe.skipIf(!connectionString)('sessões com PostgreSQL real', () => {
   beforeEach(async () => {
     now = new Date('2026-01-31T10:00:00.000Z');
     email = `sessions-${randomUUID()}@example.com`;
-    const user = await userRepository.create({ name: 'Ana', email, phone: '+55 (11) 98765-4321', password_hash: await passwords.hash(' SenhaSegura ') });
+    const user = await userRepository.create({ name: 'Ana', email, password_hash: await passwords.hash(' SenhaSegura ') });
     userId = BigInt(user.id);
     service = new SessionService(userRepository, repository, passwords, () => new Date(now));
     app = createApp(undefined, service);
@@ -102,7 +102,7 @@ describe.skipIf(!connectionString)('sessões com PostgreSQL real', () => {
     const challengeId = randomUUID();
     await db.insert(verificationChallenges).values({ id: challengeId, user_id: userId, channel: 'email', code_hmac: 'a'.repeat(64),
       issued_at: now, expires_at: new Date('2026-01-31T10:30:00.000Z') });
-    await db.update(users).set({ status: 'verified', email_verified_at: now, phone_verified_at: now }).where(eq(users.id, userId));
+    await db.update(users).set({ status: 'verified', email_verified_at: now }).where(eq(users.id, userId));
     const current = await request(app).get('/auth/me').set('Authorization', `Bearer ${token}`).expect(200);
     expect(current.body.data.user.status).toBe('verified');
     expect(current.body.data.verification_challenges).toEqual([{ challenge_id: challengeId, channel: 'email',
@@ -110,7 +110,7 @@ describe.skipIf(!connectionString)('sessões com PostgreSQL real', () => {
     expect(JSON.stringify(current.body)).not.toContain('password_hash');
     expect(JSON.stringify(current.body)).not.toContain('code_hmac');
     expect(JSON.stringify(current.body)).not.toContain(token);
-    await db.update(users).set({ status: 'pending', phone_verified_at: null }).where(eq(users.id, userId));
+    await db.update(users).set({ status: 'pending', email_verified_at: null }).where(eq(users.id, userId));
     const changed = await service.authenticate(token);
     expect(changed.user.status).toBe('pending');
   });

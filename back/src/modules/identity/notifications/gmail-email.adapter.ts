@@ -1,45 +1,46 @@
-import nodemailer, { type Transporter } from 'nodemailer';
+import type { Transporter } from 'nodemailer';
+import { createGmailTransport } from './gmail-smtp.transport';
+import type { GmailSmtpConfig } from './gmail-smtp.config';
 import type { VerificationDelivery, VerificationMessage } from './verification-delivery';
 import { VerificationDeliveryError } from './verification-delivery';
 
-export interface GmailEmailAdapterOptions {
-  user?: string;
-  appPassword?: string;
+function smtpFailureCategory(error: unknown): string {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  switch (code) {
+    case 'EAUTH': return 'autenticação';
+    case 'ETIMEDOUT': return 'tempo limite';
+    case 'ECONNECTION':
+    case 'EDNS':
+    case 'ESOCKET':
+    case 'ETLS': return 'conexão ou TLS';
+    case 'EENVELOPE':
+    case 'EMESSAGE': return 'mensagem rejeitada';
+    default: return 'envio';
+  }
 }
 
 /**
  * Adapter para envio de e-mails via Gmail SMTP usando nodemailer.
  */
 export class GmailEmailAdapter implements VerificationDelivery {
-  private readonly user: string;
-  private readonly appPassword: string;
-  private transporter: Transporter | null = null;
+  private readonly sender: string;
+  private readonly transporter: Transporter;
 
-  constructor(options: GmailEmailAdapterOptions = {}) {
-    this.user = options.user ?? process.env.GMAIL_USER ?? '';
-    this.appPassword = options.appPassword ?? process.env.GMAIL_APP_PASSWORD ?? '';
-
-    if (this.user && this.appPassword) {
-      this.transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: this.user,
-          pass: this.appPassword,
-        },
-      });
-    }
+  constructor(config: GmailSmtpConfig) {
+    this.sender = config.user;
+    this.transporter = createGmailTransport(config, {
+      connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 15_000,
+    });
   }
 
   async sendVerification(message: VerificationMessage): Promise<void> {
-    if (message.channel !== 'email' || !this.transporter) {
+    if (message.channel !== 'email') {
       throw new VerificationDeliveryError();
     }
 
     try {
       await this.transporter.sendMail({
-        from: `"Sistema de Decisão" <${this.user}>`,
+        from: { name: 'Sistema de Decisão', address: this.sender },
         to: message.destination,
         subject: 'Seu código de verificação de conta',
         text: `Seu código de verificação é: ${message.code}. Ele expira em 30 minutos.`,
@@ -54,7 +55,8 @@ export class GmailEmailAdapter implements VerificationDelivery {
           </div>
         `,
       });
-    } catch {
+    } catch (error) {
+      console.warn(`Falha no Gmail SMTP (${smtpFailureCategory(error)}).`);
       throw new VerificationDeliveryError();
     }
   }

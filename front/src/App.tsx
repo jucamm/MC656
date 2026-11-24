@@ -4,8 +4,8 @@
     import { LoginForm } from './components/auth/LoginForm';
     import { RegisterForm } from './components/auth/RegisterForm';
     import { VerificationView } from './components/auth/VerificationView';
-    import Historico from './components/Historico';
-    import FormularioPauta from './components/formulario-pauta';
+    import { WorkspaceTabs } from './components/WorkspaceTabs';
+    import { meetingFromNotification } from './components/meetings/meeting-notification-link';
     import './App.css';
     
     type Screen = 'login' | 'register' | 'verification' | 'dashboard';
@@ -14,6 +14,7 @@
       const [currentUser, setCurrentUser] = useState<User | null>(null);
       const [currentScreen, setCurrentScreen] = useState<Screen>('login');
       const [loadingInitial, setLoadingInitial] = useState(true);
+      const [initialDeliveryFailed, setInitialDeliveryFailed] = useState(false);
     
       // Recupera sessão existente ao recarregar a página
       useEffect(() => {
@@ -34,9 +35,15 @@
       }, []);
     
       const handleLogout = async () => {
-        await authApi.logout();
-        setCurrentUser(null);
-        setCurrentScreen('login');
+        try {
+          await authApi.logout();
+        } catch {
+          // O cliente de autenticação já encerrou a sessão local.
+        } finally {
+          setCurrentUser(null);
+          setInitialDeliveryFailed(false);
+          setCurrentScreen('login');
+        }
       };
     
       if (loadingInitial) {
@@ -50,20 +57,19 @@
       return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
           {/* Barra de Navegação Superior */}
-          <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm">
+          <header className="app-header">
             <div className="flex items-center gap-3">
-              <span className="text-xl font-bold text-indigo-600">MC656</span>
-              <span className="text-sm bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full font-mono">HU01</span>
+              <span className="app-brand"><img src="/favicon.svg" alt="" />Unidebates</span>
             </div>
     
             {currentUser && (
-              <div className="flex items-center gap-4">
-                <div className="text-right">
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1 break-words text-right">
                   <div className="text-sm font-semibold text-gray-800">{currentUser.name}</div>
                   <div className="text-xs text-gray-500">
                     Status:{' '}
-                    <span className={`font-semibold ${currentUser.status === 'verified' ? 'text-green-600' : 'text-amber-600'}`}>
-                      {currentUser.status === 'verified' ? 'Verificado' : 'Pendente (2FA)'}
+                    <span className={`font-semibold ${currentUser.status === 'verified' ? 'text-green-800' : 'text-amber-800'}`}>
+                      {currentUser.status === 'verified' ? 'Verificado' : 'E-mail pendente'}
                     </span>
                   </div>
                 </div>
@@ -78,7 +84,7 @@
           </header>
     
           {/* Conteúdo Principal */}
-          <main className="flex-1 p-8">
+          <main className="app-content flex-1 p-4 sm:p-8">
             {currentScreen === 'login' && (
               <LoginForm
                 onSuccess={(user) => {
@@ -91,9 +97,10 @@
     
             {currentScreen === 'register' && (
               <RegisterForm
-                onSuccess={async () => {
+                onSuccess={async (deliveryFailed) => {
                   const res = await authApi.getMe();
                   setCurrentUser(res.user);
+                  setInitialDeliveryFailed(deliveryFailed);
                   setCurrentScreen('verification');
                 }}
                 onSwitchToLogin={() => setCurrentScreen('login')}
@@ -103,23 +110,15 @@
             {currentScreen === 'verification' && currentUser && (
               <VerificationView
                 user={currentUser}
+                initialDeliveryFailed={initialDeliveryFailed}
                 onUserUpdated={(updated) => setCurrentUser(updated)}
                 onContinue={() => setCurrentScreen('dashboard')}
               />
             )}
     
-            {currentScreen === 'dashboard' && currentUser && (
-              <div className="max-w-6xl mx-auto flex flex-col gap-8">
-                <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg shadow-sm">
-                  <h3 className="font-bold text-green-800">Bem-vindo(a) à Área Protegida!</h3>
-                  <p className="text-sm text-green-700">
-                    Sua conta foi autenticada e validada com e-mail.
-                  </p>
-                </div>
-                {/* Componentes de negócio já existentes */}
-                <Historico />
-                <FormularioPauta />
-              </div>
+            {currentScreen === 'dashboard' && currentUser?.status === 'verified' && (
+              <WorkspaceTabs key={currentUser.id} userId={currentUser.id} userName={currentUser.name}
+                initialMeetingId={meetingFromNotification(window.location.hash)} />
             )}
           </main>
         </div>
@@ -127,5 +126,3 @@
     }
     
     export default App;
-
-    

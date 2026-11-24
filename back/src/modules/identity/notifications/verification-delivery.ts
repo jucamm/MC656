@@ -12,13 +12,13 @@ export interface VerificationMessage {
   code: string;
 }
 /**
- * Contrato comum aos canais; sucesso significa aceitação local, não posse comprovada.
+ * Contrato comum aos canais; sucesso indica que o adaptador aceitou a entrega.
  */
 export interface VerificationDelivery {
   /**
    * @param {VerificationMessage} message - Mensagem preparada pelo emissor.
    * @returns {Promise<void>} Resolve quando aceita; uma rejeição não deve consumir cota.
-   * @throws {VerificationDeliveryError} Recusa normalizada do mock de entrega.
+   * @throws {VerificationDeliveryError} Recusa normalizada de entrega.
    */
   sendVerification(message: VerificationMessage): Promise<void>;
 }
@@ -32,12 +32,11 @@ export class VerificationDeliveryError extends Error {
    * @returns {VerificationDeliveryError} Erro sem destino, código numérico ou dados de provedor.
    */
   constructor() {
-    super('Falha simulada de comunicação.');
+    super('Falha na entrega do código de verificação.');
     this.name = 'VerificationDeliveryError';
   }
 }
 
-/** Adaptador local instanciado separadamente para e-mail e telefone. */
 /**
  * Adaptador sem chamadas externas, com outbox e controle de falha próprios do canal.
  * @remarks WARNING: A outbox tem o código em claro; é fixture interna, não endpoint de depuração.
@@ -63,9 +62,6 @@ export class MockChannelVerificationDelivery implements VerificationDelivery {
   }
 }
 
-/** Composição dos canais; preserva fail/outbox agregados da Issue 5.
- * Outboxes são fixtures internas: nunca publicar nem logar seus códigos.
- */
 /**
  * Adaptador mockado de verificação de e-mail com controle de falha e outbox.
  */

@@ -1,30 +1,39 @@
 import { DomainError } from './errors/domain.error';
-import type { MockUser } from './mocks/mock-users';
 import { pautasRouter } from './modules/pautas/pautas.routes';
-import { bindGroupIdentity } from './modules/identity/group-identity.middleware';
 import { readTrustedOrigin, trustedOriginCors } from './modules/identity/cors.middleware';
 import { identityErrorHandler, requireAuthentication, requireVerifiedAccount } from './modules/identity/session.middleware';
 import type { IdentityOnboardingServices } from './modules/identity/identity.controller';
 import { createIdentityRouter } from './modules/identity/identity.routes';
 import type { SessionService } from './modules/identity/session.service';
-import express, { type Express } from 'express';
+import express, { type Express, type Router } from 'express';
 
 import { errorHandlerMiddleware } from './middlewares/error-handler.middleware';
 import { DecisionProcessController } from './modules/decision-process/decision-process.controller';
+import type { DecisionProcessGroupAccess } from './modules/decision-process/decision-process.group-access';
 import { createDecisionProcessRouter } from './modules/decision-process/decision-process.routes';
 import { DecisionProcessService } from './modules/decision-process/decision-process.service';
 import { InMemoryDecisionProcessRepository } from './modules/decision-process/repositories/in-memory-decision-process.repository';
 import type { DecisionProcessRepository } from './modules/decision-process/repositories/decision-process.repository';
+import type { GroupsHttpServices } from './modules/groups/groups.controller';
+import { createGroupsRouter } from './modules/groups/groups.routes';
+import { createMeetingsRouter, meetingsNoStore } from './modules/meetings/meetings.routes';
+import type { MeetingsService } from './modules/meetings/meetings.service';
 
 /**
- * Configuração de origem e permissões de grupo fornecida exclusivamente pela composição.
+ * Configuração e serviços fornecidos pela composição da aplicação.
  * @property {string | undefined} trustedOrigin - Origem HTTP(S) do frontend, sem wildcard.
- * @property {readonly MockUser[] | undefined} groupUsers - Vínculos por ID persistido; ausência não concede associação.
+ * @property {DecisionProcessGroupAccess | undefined} decisionProcessGroupAccess - Autorização dos processos decisórios.
+ * @property {GroupsHttpServices | undefined} groups - Serviços de grupos e convites.
+ * @property {MeetingsService | undefined} meetings - Serviço de reuniões e seus convites.
+ * @property {Router[] | undefined} meetingExtensionRouters - Rotas de recursos de reunião atrás do mesmo gate.
  */
 export interface AppOptions {
   trustedOrigin?: string;
-  /** Vínculos por ID real, fornecidos no servidor. Não cria associações automáticas. */
-  groupUsers?: readonly MockUser[];
+  googleCallbackRouter?: Router;
+  decisionProcessGroupAccess?: DecisionProcessGroupAccess;
+  groups?: GroupsHttpServices;
+  meetings?: MeetingsService;
+  meetingExtensionRouters?: Router[];
 }
 
 /**
@@ -32,7 +41,7 @@ export interface AppOptions {
  * @param {DecisionProcessRepository} repository - Persistência do módulo de processos; default em memória.
  * @param {SessionService | undefined} identitySessions - Sessões persistidas; ausência recusa recursos, sem fallback mockado.
  * @param {IdentityOnboardingServices | undefined} identityOnboarding - Cadastro e verificação da mesma composição.
- * @param {AppOptions} options - Origem e vínculos de grupo definidos no servidor.
+ * @param {AppOptions} options - Origem e serviços definidos no servidor.
  * @returns {Express} Aplicação com CORS antes da autenticação e gate global antes dos recursos.
  * @throws {Error} Configuração de origem inválida interrompe a montagem.
  */
@@ -44,14 +53,13 @@ export function createApp(
   options: AppOptions = {},
 ): Express {
   const application = express();
-  const groupUsers = options.groupUsers ?? [];
-  const service = new DecisionProcessService(repository, undefined, groupUsers);
-  const controller = new DecisionProcessController(service);
 
   // WARNING: A ordem faz parte da política de segurança. Preflight deve responder
   // sem Bearer; handlers /auth resolvem suas próprias exigências antes do gate de
   // verified, para permitir que pending confirme canais e encerre sua sessão.
+  if (options.meetings || options.meetingExtensionRouters?.length) application.use(['/meetings', '/meeting-minutes', '/meeting-invitations', '/meeting-organizer-transfers', '/legislative-bills'], meetingsNoStore);
   application.use(trustedOriginCors(readTrustedOrigin(options.trustedOrigin)));
+  if (options.googleCallbackRouter) application.use(options.googleCallbackRouter);
   if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions, identityOnboarding));
   // Gate global: nenhum router registrado abaixo fica público ou depende de headers mockados.
   application.use(identitySessions ? requireAuthentication(identitySessions) : (_request, _response, _next) => {
@@ -61,11 +69,17 @@ export function createApp(
   // Este error handler intercepta os erros do gate acima. Os erros posteriores
   // dos módulos mantêm seus contratos legados no handler montado ao final.
   application.use(identityErrorHandler);
+  if (options.groups) application.use(createGroupsRouter(options.groups));
+  if (options.meetings) application.use(createMeetingsRouter(options.meetings));
+  for (const router of options.meetingExtensionRouters ?? []) application.use(router);
   application.use(express.json());
   // NOTE: Novos routers de negócio devem ser montados aqui, depois do gate;
   // mover uma leitura para cima dele reintroduziria acesso anônimo/parcial.
   application.use('/api/pautas', pautasRouter);
-  application.use(createDecisionProcessRouter(controller, bindGroupIdentity(groupUsers)));
+  if (options.decisionProcessGroupAccess) {
+    const service = new DecisionProcessService(repository, options.decisionProcessGroupAccess);
+    application.use(createDecisionProcessRouter(new DecisionProcessController(service)));
+  }
   application.use(errorHandlerMiddleware);
 
   return application;

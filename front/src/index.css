@@ -1,104 +1,37 @@
+@import "tailwindcss";
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  color-scheme: light;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #172033;
+  background: #f1f5f9;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --ui-primary: #4338ca;
+  --ui-border: #64748b;
+  --ui-space: 1rem;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
+body { margin: 0; min-width: 320px; }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 3px solid #4338ca; outline-offset: 3px; }
+.ui-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; border: 1px solid #64748b; border-radius: .5rem; background: #fff; padding: .5rem 1rem; font-size: .875rem; font-weight: 600; color: #334155; }
+.ui-button:hover { background: #f1f5f9; }
+.ui-button-primary { border-color: #4338ca; background: #4338ca; color: #fff; }
+.ui-button-primary:hover { background: #3730a3; }
+.ui-button-success { border-color: #166534; background: #166534; color: #fff; }
+.ui-button-success:hover { background: #14532d; }
+.ui-button:disabled { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
+.ui-input { min-height: 44px; width: 100%; min-width: 0; border: 1px solid #8290a3; border-radius: .5rem; padding: .5rem .75rem; background: #fff; color: #0f172a; box-shadow: none; }
+.ui-input:focus { outline: 2px solid #4338ca; outline-offset: 2px; }
+.ui-input[aria-invalid="true"] { border-color: #b91c1c; }
+.ui-input:disabled { background: #f1f5f9; }
+.workspace-tab[aria-selected="true"] { border-color: #4338ca; background: #eef2ff; color: #3730a3; box-shadow: inset 0 -2px #4338ca; }
+.auth-panel { width: 100%; max-width: 28rem; margin-inline: auto; padding: clamp(1.25rem, 4vw, 2rem); border: 1px solid #cbd5e1; border-radius: .75rem; background: #fff; }
+.auth-panel h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; color: #172033; }
+.auth-panel label { display: block; margin-bottom: .375rem; font-size: .875rem; font-weight: 600; color: #334155; }

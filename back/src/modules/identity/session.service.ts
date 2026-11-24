@@ -131,8 +131,7 @@ export class SessionService {
       if (previous && previous.expires_at <= now) throw new DomainError('SESSION_EXPIRED', 'Sessão expirada.', {});
       throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
     }
-    // NOTE: Recarregar a conta aqui faz a reciclagem de telefone retirar acesso
-    // na próxima requisição, sem revogar a sessão ou exigir um novo token.
+    // Recarrega o estado da conta antes da autorização de recursos protegidos.
     const user = await this.users.findById(session.user_id.toString());
     if (!user) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
     return { identity: { user_id: user.id, session_id: session.id }, user };
