@@ -60,7 +60,11 @@ describe.skipIf(!connectionString)('HU11 em PostgreSQL real', () => {
 
   it('importa sem colidir IDs, preserva vínculo, expira a oferta em 24 horas e mantém leitura histórica', async () => {
     const senate = vi.fn().mockResolvedValue([fixture('SF')]);
-    const chamber = vi.fn().mockResolvedValue([fixture('CD')]);
+    const chamber = vi.fn<import('../legislative.types').LegislativeSource['collect']>()
+      .mockImplementation(async (_known, _now, _signal, observeAge) => {
+        observeAge?.(30_000);
+        return [fixture('CD')];
+      });
     const district = vi.fn().mockResolvedValue([fixture('CLDF')]);
     const worker = new LegislativeSync(db, [{ key: 'SF', collect: senate }, { key: 'CD', collect: chamber },
       { key: 'CLDF', collect: district }], clock, () => 0);
@@ -76,6 +80,7 @@ describe.skipIf(!connectionString)('HU11 em PostgreSQL real', () => {
     expect(suggestions.regional).toMatchObject({ items: [expect.objectContaining({ house_key: 'CLDF' })], status: 'fresh' });
     const bill = suggestions.senate.items[0];
     expect(bill.id).not.toBe(suggestions.chamber.items[0].id);
+    expect(suggestions.chamber.items[0].verified_at).toBe(new Date(now.getTime() - 30_000).toISOString());
     expect((await get('/legislative-bills?house_key=SF&q=educa').expect(200)).body.data.items).toHaveLength(1);
     expect((await get('/legislative-bills/suggestions?uf=SP').expect(200)).body.data.regional.status).toBe('unsupported');
     expect((await get('/legislative-bills/suggestions').expect(200)).body.data.regional.status).toBe('needs_uf');

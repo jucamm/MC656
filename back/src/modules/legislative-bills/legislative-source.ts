@@ -49,7 +49,7 @@ function retryDelay(header: string | null) {
   return Number.isFinite(ms) ? Math.max(0, ms) : 0;
 }
 
-export function sourceClient(base: string, fetcher = fetch, pause = wait) {
+export function sourceClient(base: string, fetcher = fetch, pause = wait, observeCacheAge?: (ms: number) => void) {
   let next = 0;
   return async (path: string, signal?: AbortSignal, init?: RequestInit): Promise<unknown> => {
     signal?.throwIfAborted();
@@ -73,6 +73,7 @@ export function sourceClient(base: string, fetcher = fetch, pause = wait) {
       await response.body?.cancel();
       throw new SourceError('SOURCE_CACHE_STALE');
     }
+    if (Number.isFinite(age) && age > 0) observeCacheAge?.(age);
     if (!response.headers.get('content-type')?.includes('application/json') || !response.body) {
       await response.body?.cancel();
       throw new SourceError('INVALID_RESPONSE');

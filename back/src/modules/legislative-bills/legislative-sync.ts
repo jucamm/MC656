@@ -42,7 +42,11 @@ export class LegislativeSync {
         or(eq(bills.status, 'in_progress'), exists(this.db.select({ id: meetings.id }).from(meetings)
           .where(eq(meetings.legislative_bill_id, bills.id)))),
       )).orderBy(asc(bills.verified_at), asc(bills.external_id)).limit(120);
-      const found = await adapter.collect(known, started, AbortSignal.timeout(4 * 60_000));
+      let cacheAge = 0;
+      const found = await adapter.collect(known, started, AbortSignal.timeout(4 * 60_000),
+        ms => { cacheAge = Math.max(cacheAge, ms); });
+      // O lote usa a evidência mais antiga reportada, preservando o limite de oferta mesmo sob cache.
+      const verified = new Date(started.getTime() - cacheAge);
       await this.db.transaction(async tx => {
         const [current] = await tx.select().from(sources).where(eq(sources.house_key, adapter.key)).for('update');
         const finished = this.clock();
@@ -52,13 +56,13 @@ export class LegislativeSync {
           throw new SourceError('INVALID_BATCH');
         }
         if (found.length) {
-          await tx.insert(bills).values(found.map(bill => ({ ...bill, id: randomUUID(), verified_at: started })))
+          await tx.insert(bills).values(found.map(bill => ({ ...bill, id: randomUUID(), verified_at: verified })))
             .onConflictDoUpdate({ target: [bills.house_key, bills.external_id], set: {
               kind: sql`excluded.kind`, number: sql`excluded.number`, year: sql`excluded.year`, label: sql`excluded.label`,
               abstract: sql`excluded.abstract`, official_url: sql`excluded.official_url`, status: sql`excluded.status`,
               status_label: sql`excluded.status_label`, source_updated_at: sql`excluded.source_updated_at`,
               verified_at: sql`excluded.verified_at`,
-            }, setWhere: lte(bills.verified_at, started) });
+            }, setWhere: lte(bills.verified_at, verified) });
         }
         await tx.update(sources).set({ last_success_at: started, failure_code: null,
           next_attempt_at: new Date(finished.getTime() + sixHours + this.jitter()), lease_token: null, lease_until: null })

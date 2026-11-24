@@ -10,7 +10,7 @@ export type KnownBill = Pick<OfficialBill, 'external_id' | 'number' | 'year'>;
 
 export interface LegislativeSource {
   key: string;
-  collect: (knownBills: KnownBill[], now: Date, signal?: AbortSignal) => Promise<OfficialBill[]>;
+  collect: (knownBills: KnownBill[], now: Date, signal?: AbortSignal, observeCacheAge?: (ms: number) => void) => Promise<OfficialBill[]>;
 }
 
 export function billIsSelectable(bill: Pick<LegislativeBill, 'status' | 'verified_at'>, now: Date) {

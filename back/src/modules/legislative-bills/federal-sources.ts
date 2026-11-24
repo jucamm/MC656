@@ -15,8 +15,8 @@ function normalizeSenate(input: unknown) {
 }
 
 export function senateSource(fetcher?: typeof fetch): LegislativeSource {
-  const read = sourceClient(senateBase, fetcher);
-  return { key: 'SF', async collect(known, _now, signal) {
+  return { key: 'SF', async collect(known, _now, signal, observeCacheAge) {
+    const read = sourceClient(senateBase, fetcher, undefined, observeCacheAge);
     const found = list(await read('/processo?sigla=PL&casa=SF&tramitando=S&numdias=7', signal))
       .filter(raw => {
         const label = record(raw).identificacao;
@@ -48,8 +48,8 @@ export function chamberStatus(code: unknown): BillStatus {
 }
 
 export function chamberSource(fetcher?: typeof fetch): LegislativeSource {
-  const read = sourceClient(chamberBase, fetcher);
-  return { key: 'CD', async collect(known, now, signal) {
+  return { key: 'CD', async collect(known, now, signal, observeCacheAge) {
+    const read = sourceClient(chamberBase, fetcher, undefined, observeCacheAge);
     const newIds = new Set<string>();
     for (let page = 1; page <= 4; page++) {
       const body = record(await read(`/proposicoes?siglaTipo=PL&ano=${now.getUTCFullYear()}&itens=25&ordenarPor=id&ordem=DESC&pagina=${page}`, signal));

@@ -22,9 +22,9 @@ export function saplSource(uf: keyof typeof saplHouses, fetcher?: typeof fetch):
   const [host, name] = saplHouses[uf];
   const origin = 'https://' + host;
   const base = '/api/materia/materialegislativa/';
-  const read = sourceClient(origin, fetcher);
   const key = 'AL-' + uf;
-  return { key, async collect(known, now, signal) {
+  return { key, async collect(known, now, signal, observeCacheAge) {
+    const read = sourceClient(origin, fetcher, undefined, observeCacheAge);
     const types = new Set<string>();
     let typePagesExhausted = false;
     for (let n = 1; n <= 8; n++) {
@@ -86,17 +86,6 @@ export function districtStatus(situation: unknown, phase: unknown): BillStatus {
 }
 
 export function districtSource(fetcher?: typeof fetch): LegislativeSource {
-  const read = sourceClient(dfOrigin + '/pleservico/api/public', fetcher);
-  const search = async (year: number, page: number, number: number | undefined, signal?: AbortSignal) => {
-    const body = record(await read(`/proposicao/filter?page=${page}&size=20&sort=dataLeitura,DESC`, signal, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipoProposicao: 'Projeto de Lei', ano: String(year),
-        numeroProposicao: number === undefined ? undefined : String(number), ementa: true }),
-    }));
-    // A CLDF retorna number=0 também para páginas seguintes. IDs repetidos são verificados a seguir.
-    if (typeof body.last !== 'boolean' || !Number.isInteger(body.totalPages)) throw new SourceError('INVALID_PAGE');
-    return { items: list(body.content).map(record), last: body.last };
-  };
   const convert = (row: Record<string, unknown>) => {
     const id = numericId(row.id);
     const match = typeof row.siglaNumeroAno === 'string' && /^PL ([1-9]\d*)\/(\d{4})$/.exec(row.siglaNumeroAno);
@@ -105,7 +94,18 @@ export function districtSource(fetcher?: typeof fetch): LegislativeSource {
       districtStatus(row.situacaoProposicao, row.etapa), row.situacaoProposicao || row.etapa,
       dfOrigin + '/#/buscar-proposicao?buscar=true');
   };
-  return { key: 'CLDF', async collect(known, now, signal) {
+  return { key: 'CLDF', async collect(known, now, signal, observeCacheAge) {
+    const read = sourceClient(dfOrigin + '/pleservico/api/public', fetcher, undefined, observeCacheAge);
+    const search = async (year: number, page: number, number: number | undefined, signal?: AbortSignal) => {
+      const body = record(await read(`/proposicao/filter?page=${page}&size=20&sort=dataLeitura,DESC`, signal, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipoProposicao: 'Projeto de Lei', ano: String(year),
+          numeroProposicao: number === undefined ? undefined : String(number), ementa: true }),
+      }));
+      // A CLDF retorna number=0 também para páginas seguintes. IDs repetidos são verificados a seguir.
+      if (typeof body.last !== 'boolean' || !Number.isInteger(body.totalPages)) throw new SourceError('INVALID_PAGE');
+      return { items: list(body.content).map(record), last: body.last };
+    };
     const result = new Map<string, OfficialBill>();
     for (let n = 0; n < 2; n++) {
       const page = await search(now.getUTCFullYear(), n, undefined, signal);
