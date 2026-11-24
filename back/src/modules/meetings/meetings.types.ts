@@ -78,13 +78,13 @@ export interface MeetingScope {
 
 export type MeetingPhase = 'scheduled' | 'in_progress' | 'ended';
 
-export function meetingPhase(meeting: Pick<Meeting, 'starts_at' | 'ended_at'>, now: Date): MeetingPhase {
-  if (meeting.ended_at) return 'ended';
+export function meetingPhase(meeting: Pick<Meeting, 'starts_at' | 'ended_at'> & { cancelled_at?: Date | null }, now: Date): MeetingPhase {
+  if (meeting.ended_at || meeting.cancelled_at) return 'ended';
   return now < meeting.starts_at ? 'scheduled' : 'in_progress';
 }
 
 export function canParticipate(scope: MeetingScope): boolean {
-  return !scope.isBlocked && (scope.isOrganizer || scope.isEligibleParticipant);
+  return !scope.meeting.cancelled_at && !scope.isBlocked && (scope.isOrganizer || scope.isEligibleParticipant);
 }
 
 export function canModerate(scope: MeetingScope): boolean {

@@ -16,6 +16,6 @@ export async function setConferencing(db: ConferencingQueries, meetingId: string
     return;
   }
 
-  await db.insert(meetingConferencing).values({ meeting_id: meetingId, ...input })
-    .onConflictDoUpdate({ target: meetingConferencing.meeting_id, set: input });
+  await db.insert(meetingConferencing).values({ meeting_id: meetingId, ...input, provisioning: input.provisioning ?? 'manual' })
+    .onConflictDoUpdate({ target: meetingConferencing.meeting_id, set: { ...input, provisioning: input.provisioning ?? 'manual' } });
 }
