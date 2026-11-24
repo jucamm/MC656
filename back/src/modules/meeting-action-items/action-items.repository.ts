@@ -84,9 +84,9 @@ export class ActionItemsRepository {
 
   // The task row is locked before any writes to its assignments.
   async propose(itemId: string, ids: bigint[], actor: bigint, now: Date) {
-    await this.db.insert(assignments).values(ids.map(userId => ({
+    return this.db.insert(assignments).values(ids.map(userId => ({
       id: randomUUID(), action_item_id: itemId, user_id: userId, proposed_by_user_id: actor, proposed_at: now,
-    })));
+    }))).returning({ id: assignments.id });
   }
 
   async ownAssignment(itemId: string, assignmentId: string, actor: bigint) {

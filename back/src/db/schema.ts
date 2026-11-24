@@ -433,3 +433,42 @@ export const meetingActionAssignments = pgTable('meeting_action_assignments', {
     AND (${table.withdrawn_at} IS NULL OR ${table.withdrawn_at} >= ${table.responded_at})
   `),
 ]);
+
+export const actionItemEmailJobs = pgTable('action_item_email_jobs', {
+  id: uuid('id').primaryKey(),
+  assignment_id: uuid('assignment_id').notNull().references(() => meetingActionAssignments.id),
+  kind: text('kind', { enum: ['assigned', 'reminder_week', 'reminder_due'] }).notNull(),
+  due_revision: integer('due_revision').notNull(),
+  status: text('status', { enum: ['queued', 'running', 'sent', 'suppressed', 'failed', 'uncertain'] }).notNull().default('queued'),
+  event_at: timestamp('event_at', { withTimezone: true }).notNull(),
+  available_at: timestamp('available_at', { withTimezone: true }).notNull(),
+  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  attempt_count: integer('attempt_count').notNull().default(0),
+  lease_token: uuid('lease_token'),
+  lease_until: timestamp('lease_until', { withTimezone: true }),
+  dispatch_started_at: timestamp('dispatch_started_at', { withTimezone: true }),
+  sent_at: timestamp('sent_at', { withTimezone: true }),
+  failure_code: varchar('failure_code', { length: 40 }),
+}, table => [
+  unique('action_item_email_occurrence_unique').on(table.assignment_id, table.kind, table.due_revision),
+  index('action_item_email_queue_idx').on(table.available_at, table.id).where(sql`${table.status} = 'queued'`),
+  index('action_item_email_lease_idx').on(table.lease_until, table.id).where(sql`${table.status} = 'running'`),
+  check('action_item_email_state_check', sql`
+    (${table.kind} = 'assigned' AND ${table.due_revision} = 0)
+    OR (${table.kind} IN ('reminder_week','reminder_due') AND ${table.due_revision} > 0)
+  `),
+  check('action_item_email_lifecycle_check', sql`
+    ${table.status} IN ('queued','running','sent','suppressed','failed','uncertain')
+    AND (${table.status} = 'running') = (${table.lease_token} IS NOT NULL)
+    AND (${table.lease_token} IS NULL) = (${table.lease_until} IS NULL)
+    AND (${table.status} = 'sent') = (${table.sent_at} IS NOT NULL)
+    AND (${table.status} <> 'queued' OR ${table.dispatch_started_at} IS NULL)
+    AND ${table.attempt_count} BETWEEN 0 AND 5
+    AND ${table.created_at} <= ${table.event_at}
+    AND ${table.event_at} <= ${table.available_at} AND ${table.available_at} < ${table.expires_at}
+    AND (${table.sent_at} IS NULL OR ${table.sent_at} >= ${table.dispatch_started_at})
+    AND (${table.dispatch_started_at} IS NULL OR ${table.dispatch_started_at} >= ${table.event_at})
+    AND (${table.status} <> 'sent' OR ${table.dispatch_started_at} IS NOT NULL)
+  `),
+]);

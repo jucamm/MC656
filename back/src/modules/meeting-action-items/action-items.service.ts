@@ -1,3 +1,4 @@
+import { enqueueProposals, scheduleReminders, suppressEmails } from '../action-item-notifications/action-item-email.schedule';
 import { invalidField } from '../identity/validators/registration.validator';
 import type { PageInput } from '../groups/groups.types';
 import type { MeetingTransaction, PostgresMeetingsRepository } from '../meetings/meetings.repository';
@@ -78,7 +79,7 @@ async function propose(repo: ActionItemsRepository, item: ActionItem, ids: bigin
   if ((await repo.eligible(item.meeting_id, undefined, ids)).length !== ids.length) {
     throw actionItemError('ACTION_ITEM_INELIGIBLE_ASSIGNEE');
   }
-  await repo.propose(item.id, ids, actor, now);
+  return repo.propose(item.id, ids, actor, now);
 }
 
 function requireDueDate(value: string, now: Date) {
@@ -149,7 +150,8 @@ export class MeetingActionItemsService {
         created_by_user_id: actor, created_at: now, updated_at: now,
       });
       if (!item) throw actionItemError('ACTION_ITEM_ID_CONFLICT');
-      await propose(repo, item, input.assignee_user_ids, actor, now, []);
+      const proposed = await propose(repo, item, input.assignee_user_ids, actor, now, []);
+      await enqueueProposals(db, proposed.map(row => row.id), now);
       return describe(repo, item, actor, access);
     });
   }
@@ -173,28 +175,42 @@ export class MeetingActionItemsService {
       const now = requestTime < item.updated_at ? item.updated_at : requestTime;
       const changes: Partial<ActionItem> = { version: item.version + 1, updated_at: now };
       switch (command.kind) {
-        case 'assign':
-          await propose(repo, item, command.assignee_user_ids, actor, now, active);
+        case 'assign': {
+          const proposed = await propose(repo, item, command.assignee_user_ids, actor, now, active);
+          await enqueueProposals(db, proposed.map(row => row.id), now);
           break;
-        case 'deadline':
+        }
+        case 'deadline': {
           if (command.due_on === item.due_on) return describe(repo, item, actor, access);
           requireDueDate(command.due_on, requestTime);
           changes.due_on = command.due_on;
           changes.due_revision = item.due_revision + 1;
+          await suppressEmails(db, { itemId: id }, 'DEADLINE_CHANGED');
+          const accepted = active.filter(row => row.state === 'accepted');
+          if (accepted.length) {
+            const users = new Set((await repo.eligible(meeting, undefined, accepted.map(row => row.user_id))).map(row => row.user_id));
+            await scheduleReminders(db, { ...item, due_on: command.due_on, due_revision: changes.due_revision },
+              accepted.filter(row => users.has(row.user_id)).map(row => row.id), now);
+          }
           break;
+        }
         case 'respond':
           if (own?.state !== 'pending') throw actionItemError('ACTION_ITEM_INVALID_TRANSITION');
           await repo.updateAssignment(own, { state: command.decision === 'accept' ? 'accepted' : 'declined', responded_at: now });
+          if (command.decision === 'accept') await scheduleReminders(db, item, [own.id], now);
+          else await suppressEmails(db, { assignmentId: own.id }, 'ASSIGNMENT_CLOSED');
           break;
         case 'withdraw':
           if (own?.state !== 'accepted') throw actionItemError('ACTION_ITEM_INVALID_TRANSITION');
           await repo.updateAssignment(own, { state: 'withdrawn', withdrawn_at: now });
+          await suppressEmails(db, { assignmentId: own.id }, 'ASSIGNMENT_CLOSED');
           break;
         case 'complete':
         case 'cancel':
           changes.status = command.kind === 'complete' ? 'completed' : 'cancelled';
           changes.closed_at = now;
           changes.closed_by_user_id = actor;
+          await suppressEmails(db, { itemId: id }, 'TASK_CLOSED');
           break;
       }
       return describe(repo, await repo.update(id, changes), actor, access);

@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../../app';
-import { authenticationSessions, groups, groupMemberships, meetingActionAssignments, meetingActionItems,
+import { actionItemEmailJobs, authenticationSessions, groups, groupMemberships, meetingActionAssignments, meetingActionItems,
   meetingAgendaItems, meetings, meetingParticipants, meetingParticipationBlocks, meetingPolls, users } from '../../../db/schema';
 import { PasswordService } from '../../identity/password.service';
 import { PostgresSessionRepository } from '../../identity/session.repository';
@@ -47,6 +47,9 @@ describe.skipIf(!connectionString)('HU09 com PostgreSQL e autenticação real', 
   afterAll(async () => {
     try {
       if (itemIds.length) {
+        await db.delete(actionItemEmailJobs).where(inArray(actionItemEmailJobs.assignment_id,
+          db.select({ id: meetingActionAssignments.id }).from(meetingActionAssignments)
+            .where(inArray(meetingActionAssignments.action_item_id, itemIds))));
         await db.delete(meetingActionAssignments).where(inArray(meetingActionAssignments.action_item_id, itemIds));
         await db.delete(meetingActionItems).where(inArray(meetingActionItems.id, itemIds));
       }
