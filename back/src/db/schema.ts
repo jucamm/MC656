@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  bigint, bigserial, boolean, check, foreignKey, index, integer, pgEnum, pgTable,
+  bigint, bigserial, boolean, check, date, foreignKey, index, integer, pgEnum, pgTable,
   primaryKey, text, timestamp, unique, uniqueIndex, uuid, varchar,
 } from 'drizzle-orm/pg-core';
 
@@ -248,6 +248,7 @@ export const meetingAgendaItems = pgTable('meeting_agenda_items', {
     OR (${table.review_status} IN ('approved', 'rejected') AND ${table.reviewed_by_user_id} IS NOT NULL
       AND ${table.reviewed_at} IS NOT NULL AND ${table.reviewed_at} >= ${table.created_at})
   `),
+  unique('action_item_agenda_scope_unique').on(table.meeting_id, table.id),
   index('meeting_agenda_items_meeting_id_idx').on(table.meeting_id, table.id),
 ]);
 
@@ -279,6 +280,7 @@ export const meetingPolls = pgTable('meeting_polls', {
     (${table.closed_at} IS NULL) = (${table.closed_by_user_id} IS NULL)
     AND (${table.closed_at} IS NULL OR ${table.closed_at} >= ${table.opened_at})
   `),
+  unique('action_item_polls_scope_unique').on(table.meeting_id, table.id),
   index('meeting_polls_meeting_id_idx').on(table.meeting_id, table.id),
   uniqueIndex('meeting_polls_one_open_idx').on(table.meeting_id).where(sql`${table.closed_at} IS NULL`),
 ]);
@@ -377,3 +379,57 @@ export const meetingTranscriptionConsents = pgTable('meeting_transcription_conse
   policy_version: varchar('policy_version', { length: 80 }).notNull(),
   accepted_at: timestamp('accepted_at', { withTimezone: true }).notNull(),
 }, table => [primaryKey({ columns: [table.meeting_id, table.user_id, table.policy_version] })]);
+
+export const meetingActionItems = pgTable('meeting_action_items', {
+  id: uuid('id').primaryKey(),
+  meeting_id: uuid('meeting_id').notNull().references(() => meetings.id),
+  agenda_item_id: uuid('agenda_item_id'),
+  poll_id: uuid('poll_id'),
+  description: varchar('description', { length: 500 }).notNull(),
+  due_on: date('due_on', { mode: 'string' }).notNull(),
+  due_revision: integer('due_revision').notNull().default(1),
+  status: text('status', { enum: ['open', 'completed', 'cancelled'] }).notNull().default('open'),
+  version: integer('version').notNull().default(1),
+  created_by_user_id: bigint('created_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull(),
+  closed_by_user_id: bigint('closed_by_user_id', { mode: 'bigint' }).references(() => users.id),
+  closed_at: timestamp('closed_at', { withTimezone: true }),
+}, table => [
+  foreignKey({ name: 'action_items_agenda_scope_fk', columns: [table.meeting_id, table.agenda_item_id],
+    foreignColumns: [meetingAgendaItems.meeting_id, meetingAgendaItems.id] }),
+  foreignKey({ name: 'action_items_poll_scope_fk', columns: [table.meeting_id, table.poll_id],
+    foreignColumns: [meetingPolls.meeting_id, meetingPolls.id] }),
+  index('action_items_meeting_idx').on(table.meeting_id, table.id),
+  check('action_items_state_check', sql`
+    (${table.agenda_item_id} IS NULL) <> (${table.poll_id} IS NULL)
+    AND ${table.description} ~ '[^[:space:]]' AND ${table.version} >= ${table.due_revision} AND ${table.due_revision} > 0
+    AND ${table.status} IN ('open','completed','cancelled')
+    AND (${table.closed_by_user_id} IS NULL) = (${table.closed_at} IS NULL)
+    AND (${table.status} = 'open') = (${table.closed_at} IS NULL)
+    AND ${table.updated_at} >= ${table.created_at}
+    AND (${table.closed_at} IS NULL OR ${table.closed_at} BETWEEN ${table.created_at} AND ${table.updated_at})
+  `),
+]);
+
+export const meetingActionAssignments = pgTable('meeting_action_assignments', {
+  id: uuid('id').primaryKey(),
+  action_item_id: uuid('action_item_id').notNull().references(() => meetingActionItems.id),
+  user_id: bigint('user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  proposed_by_user_id: bigint('proposed_by_user_id', { mode: 'bigint' }).notNull().references(() => users.id),
+  state: text('state', { enum: ['pending', 'accepted', 'declined', 'withdrawn'] }).notNull().default('pending'),
+  proposed_at: timestamp('proposed_at', { withTimezone: true }).notNull(),
+  responded_at: timestamp('responded_at', { withTimezone: true }),
+  withdrawn_at: timestamp('withdrawn_at', { withTimezone: true }),
+}, table => [
+  index('action_assignments_history_idx').on(table.action_item_id, table.id),
+  uniqueIndex('action_assignments_active_unique').on(table.action_item_id, table.user_id)
+    .where(sql`${table.state} IN ('pending','accepted')`),
+  check('action_assignments_state_check', sql`
+    ${table.state} IN ('pending','accepted','declined','withdrawn')
+    AND (${table.state} = 'pending') = (${table.responded_at} IS NULL)
+    AND (${table.state} = 'withdrawn') = (${table.withdrawn_at} IS NOT NULL)
+    AND (${table.responded_at} IS NULL OR ${table.responded_at} >= ${table.proposed_at})
+    AND (${table.withdrawn_at} IS NULL OR ${table.withdrawn_at} >= ${table.responded_at})
+  `),
+]);
