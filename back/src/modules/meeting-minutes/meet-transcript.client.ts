@@ -24,6 +24,12 @@ export function readMeetCaptureConfig(env = process.env): MeetCaptureConfig | un
   return { clientId, clientSecret, refreshToken, policyVersion, notice, operators };
 }
 
+export interface TranscriptEntry {
+  text: string;
+  start_at: string;
+  end_at: string;
+}
+
 export class MeetTranscriptClient {
   private token?: { value: string; expires: number };
   constructor(readonly config: MeetCaptureConfig, private readonly request = fetch) {}
@@ -74,5 +80,67 @@ export class MeetTranscriptClient {
     const { name } = await this.get<{ name?: string }>('spaces/' + code);
     if (!name || !/^spaces\/[a-zA-Z0-9_-]+$/.test(name)) throw new TranscriptError('MEET_INVALID_ROOM');
     return name;
+  }
+
+  private async pages<T>(path: string, key: string, filter?: string): Promise<T[]> {
+    const query = new URLSearchParams({ pageSize: '100' });
+    if (filter) query.set('filter', filter);
+    const rows: T[] = [];
+    const seen = new Set<string>();
+    for (let page = 0; page < 30; page++) {
+      const result = await this.get<Record<string, unknown>>(path, query);
+      const items = result[key];
+      if (items !== undefined && !Array.isArray(items)) throw new TranscriptError('MEET_INVALID_RESPONSE');
+      if (Array.isArray(items)) rows.push(...items as T[]);
+      const next = result.nextPageToken;
+      if (next === undefined || next === '') return rows;
+      if (typeof next !== 'string' || seen.has(next)) throw new TranscriptError('MEET_INVALID_RESPONSE');
+      seen.add(next);
+      query.set('pageToken', next);
+    }
+    throw new TranscriptError('TRANSCRIPT_TOO_LARGE');
+  }
+
+  async conferenceSource(space: string, startsAt: Date, endedAt: Date) {
+    if (!/^spaces\/[a-zA-Z0-9_-]+$/.test(space)) throw new TranscriptError('MEET_INVALID_ROOM');
+    const earliest = new Date(startsAt.getTime() - 15 * 60_000).toISOString();
+    const latest = endedAt.toISOString();
+    const matches = await this.pages<{ name: string; endTime?: string }>('conferenceRecords', 'conferenceRecords',
+      `space.name = "${space}" AND start_time >= "${earliest}" AND start_time <= "${latest}"`);
+    if (matches.length > 1) throw new TranscriptError('MEET_AMBIGUOUS_CONFERENCE');
+    const conference = matches[0];
+    if (!conference?.endTime) throw new TranscriptError('MEET_WAITING_ARTIFACT', true);
+    if (!/^conferenceRecords\/[a-zA-Z0-9_-]+$/.test(conference.name)) throw new TranscriptError('MEET_INVALID_RESPONSE');
+    const artifacts = await this.pages<{ name: string; state: string; startTime: string }>(
+      conference.name + '/transcripts', 'transcripts',
+    );
+    if (!artifacts.length || artifacts.some(artifact => artifact.state !== 'FILE_GENERATED')) {
+      throw new TranscriptError('MEET_WAITING_ARTIFACT', true);
+    }
+    if (artifacts.length > 5) throw new TranscriptError('TRANSCRIPT_TOO_LARGE');
+    const transcripts = artifacts.sort((a, b) => a.startTime.localeCompare(b.startTime)).map(artifact => artifact.name);
+    return { conference: conference.name, transcripts, entries: await this.entries(conference.name, transcripts) };
+  }
+
+  async entries(conference: string, transcripts: string[]): Promise<TranscriptEntry[]> {
+    const entries: TranscriptEntry[] = [];
+    let size = 0;
+    for (const name of transcripts) {
+      const parts = name.split('/');
+      if (parts.length !== 4 || parts.slice(0, 2).join('/') !== conference || parts[2] !== 'transcripts' ||
+          !/^[a-zA-Z0-9_-]+$/.test(parts[3])) throw new TranscriptError('MEET_INVALID_RESPONSE');
+      const rows = await this.pages<{ text?: string; startTime?: string; endTime?: string }>(name + '/entries', 'transcriptEntries');
+      for (const row of rows) {
+        if (typeof row.text !== 'string' || !row.startTime || !row.endTime ||
+            !Number.isFinite(Date.parse(row.startTime)) || !Number.isFinite(Date.parse(row.endTime))) {
+          throw new TranscriptError('MEET_INVALID_RESPONSE');
+        }
+        size += row.text.length;
+        if (size > 500_000 || entries.length >= 3000) throw new TranscriptError('TRANSCRIPT_TOO_LARGE');
+        entries.push({ text: row.text, start_at: row.startTime, end_at: row.endTime });
+      }
+    }
+    if (!entries.some(entry => entry.text.trim())) throw new TranscriptError('TRANSCRIPT_EMPTY');
+    return entries.sort((a, b) => a.start_at.localeCompare(b.start_at));
   }
 }
