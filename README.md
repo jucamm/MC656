@@ -120,6 +120,20 @@ Para executar a integração da HU09 com PostgreSQL descartável, siga o [guia d
 
 O catálogo da HU11 usa fontes oficiais abertas e uma conexão PostgreSQL. Em `back/`, execute `npm run db:migrate` e `npm run build`. Com a mesma `DATABASE_URL` da API, inicie um processo separado com `LEGISLATIVE_SYNC_ENABLED=true npm run worker:legislative-sync`. O sincronizador fica desabilitado por padrão e não requer chave. Para conferir as UFs disponíveis, a atualização e os testes locais, consulte o [guia de fontes legislativas](back/docs/legislative-sources.md).
 
+### Projetos de lei para demonstração
+
+Use um PostgreSQL local separado para a apresentação. Em `back/.env`, aponte `DATABASE_URL` para esse banco e mantenha os workers de sincronização legislativa e de síntese desligados. Aplique as migrations com `npm run db:migrate` e cadastre e confirme uma conta no Unidebates desse ambiente.
+
+Em `back/`, rode o comando com o e-mail dessa conta:
+
+```bash
+npm run demo:pls -- apresentacao@example.com
+```
+
+Na aba **Projetos de lei**, busque por **transporte**, **bibliotecas**, **hortas** ou **energia solar**, selecione um resultado e abra a ata fictícia. Em **Reuniões → Nova reunião → Associar projeto de lei**, selecione um item marcado **[DEMO]**. O exemplo regional aparece ao escolher **DF**. Esses dados dispensam chamadas ao Gemini e às fontes legislativas.
+
+Rode o mesmo comando no dia da apresentação para renovar a disponibilidade de seleção por 24 horas. O comando reutiliza os mesmos registros.
+
 ## Pipeline de Integração Contínua (CI)
 
 O repositório utiliza o **GitHub Actions** (`.github/workflows/ci.yml`). A cada *Pull Request* e *Push* nas branches `develop` e `main`, a esteira executa automaticamente:
