@@ -35,6 +35,7 @@
     "lint": "eslint .",
     "start": "node dist/server.js",
     "worker:minutes": "node dist/minutes-worker.js",
+    "worker:action-item-emails": "node dist/action-item-email-worker.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
