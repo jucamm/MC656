@@ -6,6 +6,7 @@ import { groupError, useGroupAction } from '../groups/groups-state';
 import { MeetingAgendaPanel } from '../meeting-agenda/MeetingAgendaPanel';
 import { MeetingConferencingPanel } from '../meeting-conferencing/MeetingConferencingPanel';
 import { AgendaReviewPanel } from '../meeting-moderation/AgendaReviewPanel';
+import { MeetingMinutesPanel } from '../meeting-minutes/MeetingMinutesPanel';
 import { MeetingModerationPanel } from '../meeting-moderation/MeetingModerationPanel';
 import { formatMeetingTime, localTimeZone } from './meeting-time';
 
@@ -80,6 +81,7 @@ export function MeetingDetails({ id, userId, onChanged }: { id: string; userId: 
           <MeetingConferencingPanel meetingId={id} startsAt={meeting.starts_at} revision={featureRevision} />
           <MeetingAgendaPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           <AgendaReviewPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
+          <MeetingMinutesPanel meetingId={id} revision={featureRevision} />
           <MeetingModerationPanel meetingId={id} revision={featureRevision} onChanged={refreshFeatures} />
           {management && (
             <MeetingManagement key={revision} userId={userId} data={management} busy={action.busy}

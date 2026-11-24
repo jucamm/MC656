@@ -60,6 +60,7 @@ function mockApi(route: (call: Call) => Response, mockExtensions = true) {
       return ok({ phase: 'scheduled', actions: { can_moderate: false, can_end: false, can_manage_polls: false }, targets: [] });
     }
     if (mockExtensions && call.method === 'GET' && call.path.endsWith('/polls')) return page();
+    if (/\/minutes(?:\/review)?$/.test(call.path)) return fail('MINUTES_NOT_FOUND', 'Ata indisponível.', 404);
     return route(call);
   }));
   return calls;

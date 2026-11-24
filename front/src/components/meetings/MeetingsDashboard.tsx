@@ -4,12 +4,14 @@ import { buttonStyle, Feedback, PageControls } from '../groups/GroupControls';
 import { useGroupPages } from '../groups/groups-state';
 import { CreateMeetingForm } from './CreateMeetingForm';
 import { MeetingDetails } from './MeetingDetails';
+import { MinutesHistory } from '../meeting-minutes/MeetingMinutesPanel';
 import { MeetingInbox } from './MeetingInbox';
 import { formatMeetingTime } from './meeting-time';
 
 const views = [
   { id: 'available', label: 'Reuniões disponíveis' },
   { id: 'create', label: 'Nova reunião' },
+  { id: 'minutes', label: 'Atas publicadas' },
   { id: 'inbox', label: 'Convites e transferências' },
 ] as const;
 
@@ -46,6 +48,7 @@ export function MeetingsDashboard({ userId, userName }: { userId: string; userNa
         }} />}
         {view === 'create' && <CreateMeetingForm userId={userId} userName={userName}
           onCreated={meeting => openMeeting(meeting.id, 'Reunião criada.')} />}
+        {view === 'minutes' && <MinutesHistory open={id => { setSelectedId(id); setView('available'); }} />}
         {view === 'inbox' && <MeetingInbox onAccepted={openMeeting} />}
       </div>
     </section>

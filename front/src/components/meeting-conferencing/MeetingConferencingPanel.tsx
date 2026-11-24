@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
+import { meetingMinutesApi } from '../../services/meetingMinutesApi';
 import { meetingConferencingApi } from '../../services/meetingConferencingApi';
 import type { ConferencingDto, ConferencingMode } from '../../types/meetingConferencing';
 import { buttonStyle, Feedback, inputStyle, primaryStyle } from '../groups/GroupControls';
@@ -21,6 +22,7 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<ConferencingMode>('in_person');
   const [url, setUrl] = useState('');
+  const [transcriptionAccepted, setTranscriptionAccepted] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [joinUrl, setJoinUrl] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -29,6 +31,7 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
   const refresh = useCallback(() => {
     setJoinUrl(null);
     setAccepted(false);
+    setTranscriptionAccepted(false);
     setLoadError(null);
     setConfiguration(null);
     setRevision(value => value + 1);
@@ -36,7 +39,7 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
 
   const action = useGroupAction(code => {
     if (['MEETING_NOT_FOUND', 'MEETING_ORGANIZER_REQUIRED', 'MEETING_NOT_STARTED', 'MEETING_ENDED',
-      'CONFERENCING_NOT_CONFIGURED', 'PARTICIPATION_FORBIDDEN'].includes(code)) refresh();
+      'CONFERENCING_NOT_CONFIGURED', 'PARTICIPATION_FORBIDDEN', 'TRANSCRIPTION_CONSENT_OUTDATED', 'TRANSCRIPTION_CONSENT_REQUIRED'].includes(code)) refresh();
   });
 
   useEffect(() => {
@@ -69,6 +72,7 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
     if (!configuration?.actions.can_configure || action.busy) return;
     setJoinUrl(null);
     setAccepted(false);
+    setTranscriptionAccepted(false);
     setLocalError(null);
     if (mode !== 'in_person' && !meetUrl.test(url.trim())) {
       setLocalError('Use um endereço no formato https://meet.google.com/aaa-bbbb-ccc.');
@@ -78,6 +82,7 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
       const updated = await meetingConferencingApi.configure(meetingId, mode === 'in_person'
         ? { mode } : { mode, google_meet_url: url.trim() });
       setConfiguration(updated);
+      refresh();
       setMode(updated.mode);
       setUrl('');
     }, 'Modalidade salva.');
@@ -85,10 +90,11 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
 
   function join(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!accepted || !configuration?.actions.can_join || action.busy) return;
+    if (!accepted || !configuration?.actions.can_join || action.busy ||
+        (configuration.transcription?.policy_version && !transcriptionAccepted)) return;
     setJoinUrl(null);
     void action.run(async () => {
-      const response = await meetingConferencingApi.join(meetingId);
+      const response = await meetingConferencingApi.join(meetingId, configuration.transcription?.policy_version);
       if (!meetUrl.test(response.join_url)) throw new Error('Endereço Meet inválido.');
       setJoinUrl(response.join_url);
     }, 'Link liberado.');
@@ -128,6 +134,14 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
               <button type="submit" className={buttonStyle} disabled={action.busy}>Salvar modalidade</button>
             </form>
           )}
+          {configuration.transcription?.can_configure && <button type="button" className={buttonStyle} disabled={action.busy}
+            onClick={() => void action.run(async () => {
+              await meetingMinutesApi.capture(meetingId, !configuration.transcription?.policy_version);
+              refresh();
+            }, 'Configuração de transcrição salva.')}>
+            {configuration.transcription.policy_version ? 'Desativar transcrição' : 'Habilitar transcrição'}
+          </button>}
+          {configuration.transcription && !configuration.transcription.available && <p>O aviso da transcrição está indisponível.</p>}
           {configuration.mode !== 'in_person' && !configuration.actions.can_join && (
             <p className="text-sm text-slate-600">O ingresso fica disponível durante a reunião para participantes autorizados.</p>
           )}
@@ -143,7 +157,17 @@ function ConferencingState({ meetingId, startsAt }: { meetingId: string; startsA
                 }} />
                 Aceito usar áudio e vídeo no Google Meet
               </label>
-              <button type="submit" className={primaryStyle} disabled={!accepted || action.busy}>Liberar link do Meet</button>
+              {configuration.transcription?.policy_version && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" checked={transcriptionAccepted} disabled={action.busy} onChange={event => {
+                    setTranscriptionAccepted(event.target.checked);
+                    if (!event.target.checked) setJoinUrl(null);
+                  }} />
+                  Aceito a transcrição desta reunião. {configuration.transcription.notice}
+                </label>
+              )}
+              <button type="submit" className={primaryStyle}
+                disabled={!accepted || action.busy || Boolean(configuration.transcription?.policy_version && !transcriptionAccepted)}>Liberar link do Meet</button>
               {accepted && joinUrl && (
                 <div className="space-y-2">
                   <a className={buttonStyle} href={joinUrl} target="_blank" rel="noopener noreferrer">Abrir Google Meet</a>
