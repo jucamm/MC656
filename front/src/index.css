@@ -24,10 +24,14 @@ button:disabled { cursor: not-allowed; }
 .ui-button:hover { background: #f1f5f9; }
 .ui-button-primary { border-color: #4338ca; background: #4338ca; color: #fff; }
 .ui-button-primary:hover { background: #3730a3; }
+.ui-button-success { border-color: #166534; background: #166534; color: #fff; }
+.ui-button-success:hover { background: #14532d; }
 .ui-button:disabled { background: #e2e8f0; border-color: #94a3b8; color: #475569; }
-.ui-input { min-height: 44px; width: 100%; min-width: 0; border: 1px solid #64748b; border-radius: .5rem; padding: .5rem .75rem; background: #fff; color: #0f172a; }
-.ui-input[aria-invalid="true"] { border: 2px solid #b91c1c; }
+.ui-input { min-height: 44px; width: 100%; min-width: 0; border: 1px solid #8290a3; border-radius: .5rem; padding: .5rem .75rem; background: #fff; color: #0f172a; box-shadow: none; }
+.ui-input:focus { outline: 2px solid #4338ca; outline-offset: 2px; }
+.ui-input[aria-invalid="true"] { border-color: #b91c1c; }
 .ui-input:disabled { background: #f1f5f9; }
+.workspace-tab[aria-selected="true"] { border-color: #4338ca; background: #eef2ff; color: #3730a3; box-shadow: inset 0 -2px #4338ca; }
 .auth-panel { width: 100%; max-width: 28rem; margin-inline: auto; padding: clamp(1.25rem, 4vw, 2rem); border: 1px solid #cbd5e1; border-radius: .75rem; background: #fff; }
 .auth-panel h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; color: #172033; }
 .auth-panel label { display: block; margin-bottom: .375rem; font-size: .875rem; font-weight: 600; color: #334155; }

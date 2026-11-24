@@ -112,11 +112,24 @@ export const VerificationView: React.FC<Props> = ({ user, initialDeliveryFailed,
     return <section className="auth-panel" aria-labelledby="verification-title">
         <h2 id="verification-title">Confirmação de E-mail</h2>
         {isEmailVerified ? <div className="space-y-4">
-            <p role="status">Conta Verificada com Sucesso! Seu e-mail foi confirmado.</p>
-            <button type="button" onClick={onContinue} className={primaryStyle}>Acessar Sistema</button>
+            <div role="status" className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800">
+                <span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-green-100 font-bold">✓</span>
+                <div>
+                    <p className="font-semibold">Conta Verificada com Sucesso!</p>
+                    <p className="text-sm">Seu e-mail foi confirmado.</p>
+                </div>
+            </div>
+            <button type="button" onClick={onContinue} className={`${buttonStyle} ui-button-success`}>Acessar Sistema</button>
         </div> : <div className="space-y-4">
             <p className="text-sm text-slate-600 break-words">Confirme {user.email} com o código enviado por e-mail. A verificação está pendente.</p>
-            <div id="verification-feedback"><Feedback message={emailMsg ? { text: emailMsg.text, failed: emailMsg.type === 'error' } : null} /></div>
+            <div id="verification-feedback">
+                {emailMsg?.type === 'success'
+                    ? <p role="status" className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                        <span aria-hidden="true" className="font-bold">✓</span>
+                        {emailMsg.text}
+                    </p>
+                    : <Feedback message={emailMsg ? { text: emailMsg.text, failed: true } : null} />}
+            </div>
             <form onSubmit={event => { event.preventDefault(); void handleConfirm(); }} className="space-y-3" aria-busy={emailLoading}>
                 <label htmlFor="verification-code">Código de 6 dígitos</label>
                 <input id="verification-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={inputStyle} value={emailCode} onChange={event => setEmailCode(event.target.value.trim())} aria-invalid={emailMsg?.type === 'error'} aria-describedby="verification-help verification-feedback" />

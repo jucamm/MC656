@@ -62,7 +62,7 @@ it('exige confirmação antes de emitir voto e carrega a escolha persistida', as
   expect(screen.queryByRole('button', { name: 'Confirmar voto' })).not.toBeInTheDocument();
 });
 
-it('trata versão substituída, indisponibilidade de síntese e conflito no voto', async () => {
+it('trata versão substituída, indisponibilidade do resumo e conflito no voto', async () => {
   const actor = userEvent.setup();
   const { details } = mockData();
   vi.spyOn(api, 'minute').mockResolvedValue({ ...minute, revision_id: 'rev-nova', body: 'Resultado de outra versão' });
@@ -78,7 +78,7 @@ it('trata versão substituída, indisponibilidade de síntese e conflito no voto
   details.mockResolvedValue({ ...initial, opinion: { ...emptyOpinion, can_vote: false },
     summary: { status: 'unavailable', generated_at: null, topics: [] } });
   await actor.click(screen.getByRole('button', { name: 'Atualizar votação' }));
-  expect(await screen.findByText(/Síntese indisponível/)).toBeVisible();
+  expect(await screen.findByText(/Resumo indisponível/)).toBeVisible();
   expect(await screen.findByRole('button', { name: minute.title })).toBeEnabled();
   expect(screen.queryByText('Apoio ao transporte gratuito.')).not.toBeInTheDocument();
 });
@@ -86,7 +86,7 @@ it('trata versão substituída, indisponibilidade de síntese e conflito no voto
 it('mostra o estado vazio quando ainda não há publicações elegíveis', async () => {
   vi.spyOn(api, 'search').mockResolvedValue({ items: [], next_cursor: null });
   render(<CompendiumPanel />);
-  expect(await screen.findByText('Nenhum compêndio encontrado.')).toBeVisible();
+  expect(await screen.findByText('Nenhum resumo encontrado.')).toBeVisible();
 });
 
 it('mantém atas publicadas e votação com configuração da IA pendente', async () => {

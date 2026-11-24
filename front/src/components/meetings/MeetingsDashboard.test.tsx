@@ -394,6 +394,9 @@ it('carrega as três origens por UF, associa o PL e mantém o formulário se a f
     await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
     const subject = screen.getByRole('textbox', { name: 'Assunto' });
     fireEvent.change(subject, { target: { value: 'Assunto livre' } });
+    expect(screen.queryByLabelText('Sua unidade federativa')).not.toBeInTheDocument();
+    expect(calls.some(call => call.path.endsWith('/suggestions'))).toBe(false);
+    await browser.click(screen.getByRole('button', { name: 'Associar projeto de lei' }));
     await browser.selectOptions(screen.getByLabelText('Sua unidade federativa'), 'AC');
     expect(await screen.findByRole('button', { name: 'PL 1/2036 — Senado' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'PL 2/2036 — Câmara' })).toBeVisible();
@@ -402,12 +405,15 @@ it('carrega as três origens por UF, associa o PL e mantém o formulário se a f
     await browser.keyboard('{Enter}');
     expect(subject).toHaveValue(bill.label);
     expect(subject).toHaveAttribute('readonly');
+    await browser.click(screen.getByRole('button', { name: 'Ocultar opções de projetos de lei' }));
+    expect(screen.getByText('Projeto associado: ' + bill.label)).toBeVisible();
     const date = screen.getByLabelText('Data e horário de início');
     fireEvent.change(date, { target: { value: futureLocal } });
     await browser.click(screen.getByRole('button', { name: 'Criar reunião' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Projeto de lei indisponível para novas reuniões. Atualize as sugestões.');
     expect(calls.find(call => call.method === 'POST')?.body).toMatchObject({ legislative_bill_id: bill.id, subject: bill.label });
     expect(date).toHaveValue(futureLocal);
+    await browser.click(screen.getByRole('button', { name: 'Alterar projeto de lei' }));
     await browser.click(screen.getByRole('button', { name: 'Usar assunto livre' }));
     expect(subject).toHaveValue('Assunto livre');
     expect(localStorage.getItem('mc656:legislative-uf:1')).toBe('AC');
@@ -430,6 +436,7 @@ it('ignora UFs inválidas do armazenamento e do formulário, aceita uma UF váli
   try {
     dashboard();
     await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    await browser.click(screen.getByRole('button', { name: 'Associar projeto de lei' }));
     const uf = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Sua unidade federativa' });
     expect(uf).toHaveValue('');
     expect(suggestions().at(-1)?.query.get('uf')).toBeNull();
@@ -446,6 +453,7 @@ it('ignora UFs inválidas do armazenamento e do formulário, aceita uma UF váli
 
     await browser.click(screen.getByRole('button', { name: 'Reuniões disponíveis' }));
     await browser.click(screen.getByRole('button', { name: 'Nova reunião' }));
+    await browser.click(screen.getByRole('button', { name: 'Associar projeto de lei' }));
     const restored = screen.getByRole('combobox', { name: 'Sua unidade federativa' });
     expect(restored).toHaveValue('DF');
     await browser.selectOptions(restored, '');

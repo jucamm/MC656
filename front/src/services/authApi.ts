@@ -19,6 +19,7 @@ const messages: Record<string, string> = {
     INVITATION_RESOLVED: "Este convite já foi encerrado.",
     LAST_GROUP_ADMIN: "Promova outro integrante verificado antes de deixar a administração.",
     LEGISLATIVE_BILL_UNAVAILABLE: "Projeto de lei indisponível para novas reuniões. Atualize as sugestões.",
+    LEGISLATIVE_MINUTE_NOT_FOUND: 'Ata indisponível no resumo.',
     MEETING_ENDED: "A reunião foi encerrada.",
     MEETING_INVITATION_NOT_FOUND: "Convite de reunião indisponível.",
     MEETING_INVITATION_RESOLVED: "Este convite de reunião já foi encerrado.",

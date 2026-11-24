@@ -7,8 +7,8 @@ import { formatMeetingTime } from '../meetings/meeting-time';
 const stanceLabel = { for: 'A favor', against: 'Contra', unclassified: 'Posição indefinida' };
 const summaryStatus = {
   empty: 'Este projeto ainda não possui atas públicas elegíveis.',
-  updating: 'A síntese está em atualização.',
-  unavailable: 'Síntese indisponível. As atas publicadas estão abaixo.',
+  updating: 'O resumo está em atualização.',
+  unavailable: 'Resumo indisponível. As atas publicadas estão abaixo.',
 };
 
 export function CompendiumPanel() {
@@ -22,7 +22,7 @@ export function CompendiumPanel() {
         setSelected(null);
         setQuery(input.trim());
       }}>
-        <label className="flex-1 text-sm font-semibold">
+        <label className="min-w-0 flex-1 text-sm font-semibold">
           Buscar por projeto ou tema
           <input className={inputStyle} value={input} maxLength={120} onChange={event => setInput(event.target.value)} />
         </label>
@@ -41,7 +41,7 @@ function CompendiumResults({ query, selected, onSelect }: {
   const page = useGroupPages(read);
   return (
     <>
-      {!page.items.length && !page.loading && !page.error && <p>Nenhum compêndio encontrado.</p>}
+      {!page.items.length && !page.loading && !page.error && <p>Nenhum resumo encontrado.</p>}
       <ul className="space-y-2">
         {page.items.map(bill => (
           <li key={bill.id}>
@@ -52,7 +52,7 @@ function CompendiumResults({ query, selected, onSelect }: {
         ))}
       </ul>
       <PageControls {...page} />
-      {!page.loading && !page.error && <button type="button" className={buttonStyle} onClick={page.refresh}>Atualizar lista de compêndios</button>}
+      {!page.loading && !page.error && <button type="button" className={buttonStyle} onClick={page.refresh}>Atualizar lista de resumos</button>}
     </>
   );
 }
@@ -84,7 +84,7 @@ function CompendiumDetail({ billId }: { billId: string }) {
     <Feedback message={{ text: error, failed: true }} />
     <button type="button" className={buttonStyle} onClick={refresh}>Tentar novamente</button>
   </div>;
-  if (!data) return <p role="status">Carregando compêndio…</p>;
+  if (!data) return <p role="status">Carregando resumo…</p>;
 
   return (
     <article className="space-y-5 rounded-xl border border-slate-200 p-4">
@@ -93,7 +93,7 @@ function CompendiumDetail({ billId }: { billId: string }) {
           <h3 className="text-lg font-bold">{data.bill.label}</h3>
           <p className="text-sm text-slate-600">{data.bill.status_label}</p>
         </div>
-        <button type="button" className={buttonStyle} onClick={refresh}>Atualizar compêndio</button>
+        <button type="button" className={buttonStyle} onClick={refresh}>Atualizar resumo</button>
       </header>
       <Summary summary={data.summary} open={setSource} />
       <PublishedMinutes billId={billId} open={setSource} />
@@ -107,7 +107,7 @@ function CompendiumDetail({ billId }: { billId: string }) {
 function Summary({ summary, open }: { summary: Compendium['summary']; open: (source: MinuteReference) => void }) {
   return (
     <section aria-labelledby="compendium-summary" className="space-y-2">
-      <h4 id="compendium-summary" className="font-semibold">Síntese das discussões por IA</h4>
+      <h4 id="compendium-summary" className="font-semibold">Resumo das discussões por IA</h4>
       {summary.reason === 'AI_CONFIGURATION_PENDING' && summary.status !== 'empty' && <p>Configuração da IA pendente.</p>}
       {summary.status !== 'ready' ? <p>{summaryStatus[summary.status]}</p> : (
         <>
@@ -169,7 +169,7 @@ function ReadMinute({ billId, source, onClose }: { billId: string; source: Minut
     const abort = new AbortController();
     void api.minute(billId, source.meeting_id, abort.signal).then(result => {
       if (abort.signal.aborted) return;
-      if (result.revision_id !== source.revision_id) setError('A publicação mudou. Atualize o compêndio para ler a versão vigente.');
+      if (result.revision_id !== source.revision_id) setError('A publicação mudou. Atualize o resumo para ler a versão vigente.');
       else setData(result);
     }).catch(failure => {
       if (!abort.signal.aborted) setError(groupError(failure).message);

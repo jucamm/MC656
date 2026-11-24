@@ -23,6 +23,7 @@ export function CreateMeetingForm({ userId, userName, onCreated }: {
   const formId = useId();
   const [freeSubject, setSubject] = useState('');
   const [bill, setBill] = useState<LegislativeBill | null>(null);
+  const [showBillPicker, setShowBillPicker] = useState(false);
   const [catalogRevision, setCatalogRevision] = useState(0);
   const subject = bill?.label ?? freeSubject;
   const [startsAt, setStartsAt] = useState('');
@@ -87,12 +88,22 @@ export function CreateMeetingForm({ userId, userName, onCreated }: {
       </div>
       <Feedback message={error ? { text: error, failed: true } : null} />
       <fieldset disabled={busy} className="min-w-0 space-y-4">
-        <LegislativeBillPicker userId={userId} chosen={bill} select={setBill} clear={() => setBill(null)} revision={catalogRevision} />
         <div>
           <label htmlFor={`${formId}-subject-input`} className="block text-sm font-semibold">Assunto</label>
           <input id={`${formId}-subject-input`} className={inputStyle} value={subject} required readOnly={bill !== null}
             onChange={event => setSubject(event.target.value)} {...fieldProps('subject')} />
           <FieldError id={`${formId}-subject`} message={fields.subject} />
+        </div>
+        <div className="space-y-2">
+          <button type="button" className={buttonStyle} aria-expanded={showBillPicker}
+            aria-controls={`${formId}-bill-picker`} onClick={() => setShowBillPicker(open => !open)}>
+            {showBillPicker ? 'Ocultar opções de projetos de lei' : bill ? 'Alterar projeto de lei' : 'Associar projeto de lei'}
+          </button>
+          {bill && !showBillPicker && <p className="break-words text-sm text-slate-600">Projeto associado: {bill.label}</p>}
+          <div id={`${formId}-bill-picker`} hidden={!showBillPicker}>
+            {showBillPicker && <LegislativeBillPicker userId={userId} chosen={bill} select={setBill}
+              clear={() => setBill(null)} revision={catalogRevision} />}
+          </div>
         </div>
         <div>
           <label htmlFor={`${formId}-starts_at-input`} className="block text-sm font-semibold">Data e horário de início</label>
