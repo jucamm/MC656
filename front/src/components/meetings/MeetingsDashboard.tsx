@@ -4,18 +4,22 @@ import { buttonStyle, Feedback, PageControls } from '../groups/GroupControls';
 import { useGroupPages } from '../groups/groups-state';
 import { CreateMeetingForm } from './CreateMeetingForm';
 import { MeetingDetails } from './MeetingDetails';
+import { MinutesHistory } from '../meeting-minutes/MeetingMinutesPanel';
 import { MeetingInbox } from './MeetingInbox';
 import { formatMeetingTime } from './meeting-time';
 
 const views = [
   { id: 'available', label: 'Reuniões disponíveis' },
   { id: 'create', label: 'Nova reunião' },
+  { id: 'minutes', label: 'Atas publicadas' },
   { id: 'inbox', label: 'Convites e transferências' },
 ] as const;
 
-export function MeetingsDashboard({ userId, userName }: { userId: string; userName: string }) {
+export function MeetingsDashboard({ userId, userName, initialMeetingId }: {
+  userId: string; userName: string; initialMeetingId?: string | null;
+}) {
   const [view, setView] = useState<(typeof views)[number]['id']>('available');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialMeetingId ?? null);
   const [notice, setNotice] = useState<string | null>(null);
 
   function openMeeting(id: string, message: string) {
@@ -46,6 +50,7 @@ export function MeetingsDashboard({ userId, userName }: { userId: string; userNa
         }} />}
         {view === 'create' && <CreateMeetingForm userId={userId} userName={userName}
           onCreated={meeting => openMeeting(meeting.id, 'Reunião criada.')} />}
+        {view === 'minutes' && <MinutesHistory open={id => { setSelectedId(id); setView('available'); }} />}
         {view === 'inbox' && <MeetingInbox onAccepted={openMeeting} />}
       </div>
     </section>
@@ -67,8 +72,8 @@ function AvailableMeetings({ userId, selectedId, onSelect }: {
               <li key={meeting.id}>
                 <button type="button" aria-pressed={selectedId === meeting.id} onClick={() => onSelect(meeting.id)}
                   className={`w-full space-y-1 rounded-xl border p-3 text-left focus-visible:outline-2 focus-visible:outline-indigo-600 ${selectedId === meeting.id
-                    ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                  <span className="block break-words font-semibold">{meeting.subject}</span>
+                    ? 'border-indigo-700 border-l-4 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <span className="block break-words font-semibold">{selectedId === meeting.id && <span aria-hidden="true">✓ </span>}{meeting.subject}</span>
                   <time dateTime={meeting.starts_at} className="block text-sm text-slate-600">{formatMeetingTime(meeting.starts_at)}</time>
                 </button>
               </li>

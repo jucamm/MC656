@@ -8,8 +8,10 @@ export const meetingConferencingApi = {
     authApi.request<ConferencingDto>(`/meetings/${meetingId}/conferencing`, {
       method: 'PUT', body: JSON.stringify(input),
     }),
-  join: (meetingId: string) =>
+  join: (meetingId: string, policyVersion?: string) =>
     authApi.request<{ join_url: string }>(`/meetings/${meetingId}/conferencing/join`, {
-      method: 'POST', body: JSON.stringify({ accepted_audio_video: true }),
+      method: 'POST', body: JSON.stringify(policyVersion ? {
+        accepted_audio_video: true, accepted_transcription: true, transcription_policy_version: policyVersion,
+      } : { accepted_audio_video: true }),
     }),
 };

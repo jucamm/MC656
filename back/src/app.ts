@@ -29,6 +29,7 @@ import type { MeetingsService } from './modules/meetings/meetings.service';
  */
 export interface AppOptions {
   trustedOrigin?: string;
+  googleCallbackRouter?: Router;
   decisionProcessGroupAccess?: DecisionProcessGroupAccess;
   groups?: GroupsHttpServices;
   meetings?: MeetingsService;
@@ -56,8 +57,9 @@ export function createApp(
   // WARNING: A ordem faz parte da política de segurança. Preflight deve responder
   // sem Bearer; handlers /auth resolvem suas próprias exigências antes do gate de
   // verified, para permitir que pending confirme canais e encerre sua sessão.
-  if (options.meetings || options.meetingExtensionRouters?.length) application.use(['/meetings', '/meeting-invitations', '/meeting-organizer-transfers'], meetingsNoStore);
+  if (options.meetings || options.meetingExtensionRouters?.length) application.use(['/meetings', '/meeting-minutes', '/meeting-invitations', '/meeting-organizer-transfers', '/legislative-bills'], meetingsNoStore);
   application.use(trustedOriginCors(readTrustedOrigin(options.trustedOrigin)));
+  if (options.googleCallbackRouter) application.use(options.googleCallbackRouter);
   if (identitySessions) application.use('/auth', createIdentityRouter(identitySessions, identityOnboarding));
   // Gate global: nenhum router registrado abaixo fica público ou depende de headers mockados.
   application.use(identitySessions ? requireAuthentication(identitySessions) : (_request, _response, _next) => {

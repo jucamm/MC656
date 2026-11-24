@@ -4,6 +4,7 @@ import type { MeetingTransaction, PostgresMeetingsRepository } from '../meetings
 import { canModerate, meetingPhase, type MeetingScope } from '../meetings/meetings.types';
 import { moderationError } from './meeting-moderation.errors';
 import { PostgresMeetingModerationRepository } from './meeting-moderation.repository';
+import { enqueueMinutes } from '../meeting-minutes/minutes.worker';
 import type { MeetingModerationDto } from './meeting-moderation.types';
 import { PostgresMeetingPollsRepository } from './meeting-polls.repository';
 import { toPollDto } from './meeting-polls.types';
@@ -18,6 +19,7 @@ function mayTarget(scope: MeetingScope, actorId: bigint, target: Target): boolea
 export async function lockModerationScope(tx: MeetingTransaction, meetingId: string, actorId: bigint): Promise<MeetingScope> {
   const scope = await tx.lockScope(meetingId, actorId);
   if (!scope) throw moderationError('MEETING_NOT_FOUND');
+  if (scope.meeting.cancelled_at) throw moderationError('MEETING_ENDED');
   if (!canModerate(scope)) throw moderationError('MODERATION_FORBIDDEN');
   return scope;
 }
@@ -72,6 +74,7 @@ export class MeetingModerationService {
       if (phase === 'scheduled') throw moderationError('MEETING_NOT_STARTED');
       await new PostgresMeetingPollsRepository(db).closeOpen(meetingId, actorId, now);
       await new PostgresMeetingModerationRepository(db).end(meetingId, actorId, now);
+      await enqueueMinutes(db, meetingId, now);
     });
   }
 

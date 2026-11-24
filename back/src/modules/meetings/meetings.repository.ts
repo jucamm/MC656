@@ -1,7 +1,7 @@
-import { and, eq, exists, gt, inArray, isNull, not, or, sql } from 'drizzle-orm';
+import { and, eq, exists, gt, inArray, isNull, not, or, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { alias } from 'drizzle-orm/pg-core';
-import { groupMemberships, groups, meetingOrganizerTransfers, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../db/schema';
+import { groupMemberships, groups, legislativeBills, meetingOrganizerTransfers, meetingParticipants, meetingParticipationBlocks, meetings, users } from '../../db/schema';
 import { lockGroup } from '../groups/groups.repository';
 import type { PageInput } from '../groups/groups.types';
 import type { InvitationDecision, MeetingCursor, MeetingScope, OrganizerTransfer, Participant, TransferResolution } from './meetings.types';
@@ -16,7 +16,7 @@ function invitationsFor(userId: bigint) {
   return and(eq(meetingParticipants.user_id, userId), eq(meetingParticipants.origin, 'invitation'));
 }
 
-function hasGroupMembership(db: DatabaseQueries, userId: bigint | typeof meetingParticipants.user_id) {
+function hasGroupMembership(db: DatabaseQueries, userId: bigint | SQL | typeof meetingParticipants.user_id) {
   return exists(db.select({ one: sql`1` }).from(groupMemberships).where(and(
     eq(groupMemberships.group_id, meetings.group_id),
     eq(groupMemberships.user_id, userId),
@@ -35,7 +35,7 @@ function eligibleParticipant(db: DatabaseQueries) {
     confirmedParticipantWithAccess(hasGroupMembership(db, meetingParticipants.user_id)));
 }
 
-function blockedParticipant(db: DatabaseQueries, actorId: bigint | typeof meetingParticipants.user_id) {
+export function blockedParticipant(db: DatabaseQueries, actorId: bigint | SQL | typeof meetingParticipants.user_id) {
   return exists(db.select({ one: sql`1` }).from(meetingParticipationBlocks).where(and(
     eq(meetingParticipationBlocks.meeting_id, meetings.id),
     eq(meetingParticipationBlocks.user_id, actorId),
@@ -46,7 +46,7 @@ function participantCanBeSelected(db: DatabaseQueries) {
   return and(eligibleParticipant(db), not(blockedParticipant(db, meetingParticipants.user_id)));
 }
 
-function visibleTo(db: DatabaseQueries, actorId: bigint) {
+export function visibleTo(db: DatabaseQueries, actorId: bigint | SQL) {
   const member = hasGroupMembership(db, actorId);
   const participant = exists(db.select({ one: sql`1` }).from(meetingParticipants).where(and(
     eq(meetingParticipants.meeting_id, meetings.id),
@@ -72,6 +72,12 @@ export class MeetingTransaction {
     if (!emails.length) return [];
     const rows = await this.db.select({ id: users.id }).from(users).where(inArray(users.email, emails));
     return rows.map(row => row.id);
+  }
+
+  async lockLegislativeBill(id: string) {
+    const [row] = await this.db.select({ label: legislativeBills.label, status: legislativeBills.status, verified_at: legislativeBills.verified_at })
+      .from(legislativeBills).where(eq(legislativeBills.id, id)).for('share');
+    return row;
   }
 
   async insertMeeting(meeting: typeof meetings.$inferInsert, participants: Participant[]) {
@@ -250,6 +256,7 @@ export class PostgresMeetingsRepository {
   private meetingsForActor(actorId: bigint) {
     return this.db.select({
       id: meetings.id, subject: meetings.subject, starts_at: meetings.starts_at, access_mode: meetings.access_mode,
+      legislative_bill_id: meetings.legislative_bill_id,
       organizer_name: users.name, canManage: sql<boolean>`${meetings.organizer_user_id} = ${actorId}`,
       cursorStartsAt: sql<string>`to_char(${meetings.starts_at} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
     }).from(meetings)

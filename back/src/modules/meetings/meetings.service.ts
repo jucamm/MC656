@@ -1,3 +1,7 @@
+import { eq } from 'drizzle-orm';
+import { meetings } from '../../db/schema';
+import { refreshGoogleIntent } from '../google-integration/google.intent';
+import { billIsSelectable } from '../legislative-bills/legislative.types';
 import { randomUUID } from 'node:crypto';
 import { requireActiveGroupMember, requireGroupAdministrator } from '../groups/group-access';
 import type { PageDto, PageInput } from '../groups/groups.types';
@@ -9,12 +13,12 @@ import type {
   MeetingModeratorsDto, MeetingParticipantDto, OrganizerTransfer, OrganizerTransferDto, Participant, ReceivedOrganizerTransferDto, TransferResolution,
 } from './meetings.types';
 
-function toMeetingDto(row: Pick<Meeting, 'id' | 'subject' | 'starts_at' | 'access_mode'> & {
+function toMeetingDto(row: Pick<Meeting, 'id' | 'subject' | 'starts_at' | 'access_mode' | 'legislative_bill_id'> & {
   organizer_name: string;
   canManage: boolean;
 }): MeetingDto {
   return {
-    id: row.id, subject: row.subject, starts_at: row.starts_at.toISOString(),
+    id: row.id, subject: row.subject, legislative_bill_id: row.legislative_bill_id, starts_at: row.starts_at.toISOString(),
     visibility: row.access_mode === 'public' ? 'public' : 'private',
     organizer_name: row.organizer_name, actions: { can_manage: row.canManage },
   };
@@ -36,6 +40,53 @@ function requireOrganizer(meeting: Meeting, actorId: bigint): void {
 export class MeetingsService {
   constructor(private readonly repository: PostgresMeetingsRepository, private readonly clock = () => new Date()) {}
 
+  async getSchedule(id: string, actor: bigint) {
+    return this.repository.transaction(async tx => {
+      const scope = await tx.readScope(id, actor);
+      if (!scope) throw meetingError('MEETING_NOT_FOUND');
+      return this.scheduleDto(scope.meeting, scope.isOrganizer);
+    }, { isolationLevel: 'repeatable read', accessMode: 'read only' });
+  }
+
+  private scheduleDto(meeting: Meeting, organizer: boolean) {
+    const allowed = organizer && !meeting.cancelled_at && !meeting.ended_at && this.clock() < meeting.starts_at;
+    return { starts_at: meeting.starts_at.toISOString(), scheduled_ends_at: meeting.scheduled_ends_at?.toISOString() ?? null,
+      version: meeting.schedule_version, cancelled_at: meeting.cancelled_at?.toISOString() ?? null,
+      actions: { can_reschedule: allowed, can_cancel: allowed } };
+  }
+
+  async updateSchedule(id: string, actor: bigint, input: { startsAt: Date; endsAt: Date; version: number }) {
+    return this.repository.transaction(async (tx, db) => {
+      const scope = await tx.lockScope(id, actor);
+      if (!scope) throw meetingError('MEETING_NOT_FOUND');
+      requireOrganizer(scope.meeting, actor);
+      if (scope.meeting.schedule_version !== input.version) throw meetingError('MEETING_VERSION_CONFLICT');
+      if (scope.meeting.cancelled_at) throw meetingError('MEETING_CANCELLED');
+      this.requireBeforeStart(scope.meeting);
+      const now = this.clock();
+      if (input.startsAt <= now || input.endsAt <= input.startsAt) invalidField('scheduled_ends_at', 'Informe início futuro e fim previsto posterior ao início.');
+      const [updated] = await db.update(meetings).set({ starts_at: input.startsAt, scheduled_ends_at: input.endsAt,
+        schedule_version: input.version + 1 }).where(eq(meetings.id, id)).returning();
+      await refreshGoogleIntent(db, updated, now);
+      return this.scheduleDto(updated, true);
+    });
+  }
+
+  async cancel(id: string, actor: bigint, version: number) {
+    return this.repository.transaction(async (tx, db) => {
+      const scope = await tx.lockScope(id, actor);
+      if (!scope) throw meetingError('MEETING_NOT_FOUND');
+      requireOrganizer(scope.meeting, actor);
+      if (scope.meeting.cancelled_at && (scope.meeting.schedule_version === version + 1 || scope.meeting.schedule_version === version)) return this.scheduleDto(scope.meeting, true);
+      if (scope.meeting.schedule_version !== version) throw meetingError('MEETING_VERSION_CONFLICT');
+      this.requireBeforeStart(scope.meeting);
+      const now = this.clock();
+      const [updated] = await db.update(meetings).set({ cancelled_at: now, schedule_version: version + 1 }).where(eq(meetings.id, id)).returning();
+      await refreshGoogleIntent(db, updated, now);
+      return this.scheduleDto(updated, true);
+    });
+  }
+
   async create(actor: { id: bigint; name: string }, input: CreateMeetingInput): Promise<MeetingDto> {
     const meeting = await this.repository.transaction(async tx => {
       const group = input.groupId ? await tx.lockGroup(input.groupId) : null;
@@ -53,7 +104,9 @@ export class MeetingsService {
         throw meetingError('MEETING_PARTICIPANT_NOT_ELIGIBLE');
       }
 
+      const bill = input.legislativeBillId ? await tx.lockLegislativeBill(input.legislativeBillId) : null;
       const now = this.clock();
+      if (input.legislativeBillId && (!bill || !billIsSelectable(bill, now))) throw meetingError('LEGISLATIVE_BILL_UNAVAILABLE');
       if (input.startsAt <= now) invalidField('starts_at', 'Informe um horário de início no futuro.');
       const meetingId = randomUUID();
       const participants: Participant[] = [{
@@ -67,7 +120,7 @@ export class MeetingsService {
         });
       }
       return tx.insertMeeting({
-        id: meetingId, subject: input.subject, starts_at: input.startsAt, group_id: input.groupId,
+        id: meetingId, subject: bill?.label ?? input.subject, legislative_bill_id: input.legislativeBillId, starts_at: input.startsAt, group_id: input.groupId,
         access_mode: input.accessMode, created_by_user_id: actor.id, organizer_user_id: actor.id, created_at: now,
       }, participants);
     });
@@ -108,6 +161,7 @@ export class MeetingsService {
       if (!availability) throw meetingError('MEETING_INVITATION_NOT_FOUND');
       const meeting = await tx.lockActiveMeeting(meetingId, availability.groupId);
       if (!meeting) throw meetingError('MEETING_INVITATION_NOT_FOUND');
+      if (meeting.cancelled_at && decision === 'confirmed') throw meetingError('MEETING_CANCELLED');
       if (meeting.ended_at && decision === 'confirmed') throw meetingError('MEETING_ENDED');
 
       const now = this.clock();
@@ -203,6 +257,7 @@ export class MeetingsService {
   }
 
   private requireBeforeStart(meeting: Meeting): Date {
+    if (meeting.cancelled_at) throw meetingError('MEETING_CANCELLED');
     const now = this.clock();
     if (meeting.starts_at <= now) throw meetingError('MEETING_STARTED');
     return now;

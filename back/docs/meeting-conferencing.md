@@ -36,3 +36,7 @@ A URL de ingresso só sai pelo POST. O serviço não consulta o provedor para te
 - Registre conta/edição utilizada, política e resultados sem gravar e-mails, credenciais ou URLs da sala na evidência.
 
 A homologação externa depende de conta Workspace e configuração compatível. Os testes automatizados validam a aplicação e o PostgreSQL. A aprovação de admissão externa, controles de mídia e limites do provedor exige a execução real da lista acima.
+
+## Agenda central opcional
+
+Além do fallback manual, provisioning=automatic aceita modalidade virtual/híbrida sem URL. A organização informa início/fim na agenda; o worker cria evento central e solicita a sala na janela de quinze minutos. Participantes continuam usando a autenticação do aplicativo e o ingresso autorizado/consentido. Consulte [configuração central e limites](google-meet-integration.md). A recomendação antiga de desativar transcrição aplica-se ao fallback sem política aprovada; o caminho central pode habilitá-la previamente conforme licença e consentimento, sem garantia de captura externa.

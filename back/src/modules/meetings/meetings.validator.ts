@@ -16,14 +16,14 @@ function readObject(input: unknown, field: string, keys: string[]): Record<strin
   return input as Record<string, unknown>;
 }
 
-function validateStartsAt(value: unknown): Date {
+function validateMeetingInstant(value: unknown, field: 'starts_at' | 'scheduled_ends_at'): Date {
   const match = typeof value === 'string' ? instantPattern.exec(value) : null;
   if (!match || match[0] !== value || match[1].startsWith('0000-')) {
-    invalidField('starts_at', 'Informe data e hora ISO 8601 com fuso horário explícito.');
+    invalidField(field, 'Informe data e hora ISO 8601 com fuso horário explícito.');
   }
   const civilDate = new Date(match[1] + 'T00:00:00Z');
   if (!Number.isFinite(civilDate.getTime()) || civilDate.toISOString().slice(0, 10) !== match[1]) {
-    invalidField('starts_at', 'Informe uma data de calendário válida.');
+    invalidField(field, 'Informe uma data de calendário válida.');
   }
   return new Date(match[0]);
 }
@@ -47,9 +47,10 @@ function readList(input: unknown, field: string): unknown[] {
 }
 
 export function validateCreateMeeting(input: unknown): CreateMeetingInput {
-  const body = readObject(input, 'body', ['subject', 'starts_at', 'access', 'group_id', 'participant_ids', 'participant_emails']);
+  const body = readObject(input, 'body', ['subject', 'legislative_bill_id', 'starts_at', 'access', 'group_id', 'participant_ids', 'participant_emails']);
+  const bill = body.legislative_bill_id === undefined ? undefined : validateUuid(body.legislative_bill_id, 'legislative_bill_id');
   const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
-  if (!subject || [...subject].length > 150 || subject.includes('\u0000')) {
+  if ((!subject && !bill) || [...subject].length > 150 || subject.includes('\u0000')) {
     invalidField('subject', 'Informe um assunto válido de até 150 caracteres.');
   }
   const groupId = body.group_id === undefined ? null : validateUuid(body.group_id, 'group_id');
@@ -61,8 +62,9 @@ export function validateCreateMeeting(input: unknown): CreateMeetingInput {
   }
   return {
     subject,
+    ...(bill ? { legislativeBillId: bill } : {}),
     groupId,
-    startsAt: validateStartsAt(body.starts_at),
+    startsAt: validateMeetingInstant(body.starts_at, 'starts_at'),
     accessMode: validateAccess(body.access, groupId),
     participantIds: [...new Set(ids.map(value => validateUserId(value, 'participant_ids')))],
     participantEmails: [...new Set(emails.map(value => normalizeEmail(value, 'participant_emails')))],
@@ -95,4 +97,20 @@ export function validateModerators(input: unknown): bigint[] {
     invalidField('participant_ids', 'Informe uma lista com até 101 identificadores de participantes.');
   }
   return [...new Set(ids.map(id => validateUserId(id, 'participant_ids')))];
+}
+
+export function validateSchedule(body: unknown) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) invalidField('body', 'Informe um objeto JSON.');
+  const fields = body as Record<string, unknown>;
+  if (Object.keys(fields).some(key => !['starts_at', 'scheduled_ends_at', 'version'].includes(key))) invalidField('body', 'Campos de agenda inválidos.');
+  const version = validateScheduleVersion({ version: fields.version });
+  const startsAt = validateMeetingInstant(fields.starts_at, 'starts_at');
+  const endsAt = validateMeetingInstant(fields.scheduled_ends_at, 'scheduled_ends_at');
+  if (endsAt <= startsAt) invalidField('scheduled_ends_at', 'Informe fim posterior ao início.');
+  return { startsAt, endsAt, version };
+}
+export function validateScheduleVersion(body: unknown): number {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'version') ||
+    !Number.isSafeInteger((body as { version?: unknown }).version) || Number((body as { version?: unknown }).version) < 1) invalidField('version', 'Informe a versão atual da agenda.');
+  return (body as { version: number }).version;
 }

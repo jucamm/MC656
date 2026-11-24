@@ -3,7 +3,7 @@ import { DomainError } from '../../errors/domain.error';
 import { validatePage, validateUserId, validateUuid } from '../groups/groups.validator';
 import type { MeetingsService } from './meetings.service';
 import type { InvitationDecision, TransferResolution } from './meetings.types';
-import { validateCreateMeeting, validateMeetingCursor, validateModerators, validateOrganizerTransfer } from './meetings.validator';
+import { validateSchedule, validateScheduleVersion, validateCreateMeeting, validateMeetingCursor, validateModerators, validateOrganizerTransfer } from './meetings.validator';
 
 function actorId(request: Request): bigint {
   if (!request.auth) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});
@@ -16,6 +16,10 @@ function meetingId(request: Request): string {
 
 export class MeetingsController {
   constructor(private readonly service: MeetingsService) {}
+
+  getSchedule: RequestHandler = async (req, res) => { res.json({ data: await this.service.getSchedule(meetingId(req), actorId(req)) }); };
+  updateSchedule: RequestHandler = async (req, res) => { res.json({ data: await this.service.updateSchedule(meetingId(req), actorId(req), validateSchedule(req.body)) }); };
+  cancel: RequestHandler = async (req, res) => { res.json({ data: await this.service.cancel(meetingId(req), actorId(req), validateScheduleVersion(req.body)) }); };
 
   create: RequestHandler = async (request, response) => {
     if (!request.account) throw new DomainError('UNAUTHENTICATED', 'Autenticação necessária.', {});

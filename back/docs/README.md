@@ -113,3 +113,6 @@ Os guias por Issue registram as decisões da época. Use os DTOs no código e o 
 **Atenção às diferenças entre as etapas:** o modo sem banco descrito na Issue 4 foi substituído pela exigência de `DATABASE_URL` na Issue 8. O emissor simulado da Issue 3 foi integrado ao serviço persistido na Issue 5. Pendências e contagens de testes antigas retratam aquela entrega; consulte o runbook para inicializar o banco com a migration atual.
 
 **Lacunas explícitas:** filtro definitivo de e-mails e escolha de armazenamento do token ainda dependem de outras implementações ou decisões. Use os DTOs e os documentos vigentes para montar requisições completas.
+
+- [Google Meet e transcrições privadas](google-meet-integration.md)
+- [Gemini e geração revisável](gemini-integration.md)
