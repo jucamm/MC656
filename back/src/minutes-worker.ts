@@ -2,23 +2,17 @@ import 'dotenv/config';
 import { setTimeout as wait } from 'node:timers/promises';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { MeetTranscriptClient, readMeetCaptureConfig, TranscriptError } from './modules/meeting-minutes/meet-transcript.client';
+import { GeminiClient, minutesPipelineRevision, readAiConfig } from './modules/ai/gemini';
 import { MinutesWorker } from './modules/meeting-minutes/minutes.worker';
 
 async function main() {
+  const config = readAiConfig();
+  if (!config) { console.info('Configuração da IA pendente.'); return; }
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória.');
-  const config = readMeetCaptureConfig();
-  const client = config && new MeetTranscriptClient(config);
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = drizzle({ client: pool });
-  const worker = new MinutesWorker(db, async (job, meeting) => {
-    if (!client || !job.source_space_name || !meeting.ended_at) throw new TranscriptError('MEET_NOT_CONFIGURED');
-    const { conference, transcripts, entries } = await client.conferenceSource(
-      job.source_space_name, meeting.starts_at, meeting.ended_at,
-    );
-    // A fonte integral continua privada e é lida sob demanda do Google.
-    return { conference, transcripts, excerpt: entries.length + ' trechos disponíveis no painel privado de revisão.' };
-  });
+  // Coordinator injects the local TranscriptSourceReader alongside ai after the Meet handoff.
+  const worker = new MinutesWorker(db, { ai: new GeminiClient(config), pipeline: minutesPipelineRevision + ':' + config.model });
   let stopping = false;
   const stop = () => { stopping = true; };
   process.on('SIGINT', stop);
@@ -37,6 +31,6 @@ async function main() {
   }
 }
 void main().catch(() => {
-  console.error('Falha ao iniciar worker de atas. Verifique DATABASE_URL e a configuração do Meet.');
+  console.error('Falha ao iniciar worker de atas. Verifique DATABASE_URL e a configuração da IA.');
   process.exitCode = 1;
 });

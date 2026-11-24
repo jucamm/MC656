@@ -57,7 +57,7 @@ export class GeminiClient implements AiClient {
     if (!response.ok) {
       const retry = response.headers.get('retry-after');
       const delay = retry && /^\d+$/.test(retry) ? Number(retry) * 1000 : Date.parse(retry ?? '') - Date.now();
-      throw new SynthesisError('AI_PROVIDER_HTTP_' + response.status, response.status === 429 || response.status >= 500,
+      throw new SynthesisError('AI_PROVIDER_HTTP_' + response.status, response.status === 408 || response.status === 429 || response.status >= 500,
         Number.isFinite(delay) ? Math.min(60_000, Math.max(0, delay)) : 0);
     }
     const raw: unknown = await response.json().catch(() => null);
@@ -87,6 +87,7 @@ export class GeminiClient implements AiClient {
     if (data.promptFeedback && object(data.promptFeedback) && data.promptFeedback.blockReason) throw new SynthesisError('AI_CONTENT_BLOCKED');
     if (!Array.isArray(candidates) || candidates.length !== 1 || !object(candidates[0])) throw new SynthesisError('AI_INVALID_OUTPUT');
     const candidate = candidates[0];
+    if (Array.isArray(candidate.safetyRatings) && candidate.safetyRatings.some(rating => object(rating) && rating.blocked === true)) throw new SynthesisError('AI_CONTENT_BLOCKED');
     if (candidate.finishReason !== 'STOP') throw new SynthesisError('AI_INCOMPLETE_OUTPUT');
     if (!object(candidate.content) || !Array.isArray(candidate.content.parts) || candidate.content.parts.length !== 1 ||
         !object(candidate.content.parts[0]) || typeof candidate.content.parts[0].text !== 'string') throw new SynthesisError('AI_INVALID_OUTPUT');

@@ -227,7 +227,9 @@ describe.skipIf(!connectionString)('HU12 com PostgreSQL e sessões reais', () =>
     extract.mockRejectedValueOnce(new SynthesisError('PROVIDER_HTTP_429', true, 65_000));
     expect(await worker.runOnce()).toBe(true);
     expect(await worker.runOnce()).toBe(false);
-    now = new Date(now.getTime() + 65_000);
+    const [retryJob] = await db.select().from(legislativeCompendiumSummaries)
+      .where(eq(legislativeCompendiumSummaries.bill_id, id));
+    now = retryJob.next_attempt_at!;
     extract.mockImplementationOnce(async () => {
       await decide(left.editorial, 'hide', replacement.version, replacement.published.id);
       return { points: [] };

@@ -31,11 +31,11 @@ it('impede geração acima do orçamento real sem truncar entrada', async () => 
   await expect(new GeminiClient(config, send).extractInsights('Texto', signal())).rejects.toMatchObject({ code: 'AI_INPUT_LIMIT', retryable: false });
   expect(send).toHaveBeenCalledTimes(2);
 });
-describe.each([401, 403, 404, 429, 500, 503])('HTTP %s', status => {
+describe.each([401, 403, 404, 408, 429, 500, 503])('HTTP %s', status => {
   it('classifica falha sem corpo remoto ou retry interno', async () => {
     const send = vi.fn<typeof fetch>().mockResolvedValue(new Response('secret error', { status, headers: { 'retry-after': '120' } }));
     await expect(new GeminiClient(config, send).extractInsights('Texto', signal())).rejects.toMatchObject({
-      code: 'AI_PROVIDER_HTTP_' + status, retryable: status === 429 || status >= 500, retryMs: 60_000,
+      code: 'AI_PROVIDER_HTTP_' + status, retryable: status === 408 || status === 429 || status >= 500, retryMs: 60_000,
     });
     expect(send).toHaveBeenCalledTimes(1);
   });
